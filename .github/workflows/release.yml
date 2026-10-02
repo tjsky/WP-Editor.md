@@ -1,0 +1,178 @@
+name: Release
+
+# 为什么用 GitHub Actions 而不是提交本地构建产物：
+#   本仓库的 .gitignore 忽略了 vendor/、所有 *.min.js / *.min.css、languages/*.mo
+#   与 Vue 子项目的 html/ 产物。这些是「运行期必需但不宜入库」的东西 ——
+#   直接安装 GitHub 源码包会因缺少 vendor/autoload.php 而致命报错。
+#   因此由 CI 从源码干净构建，产出的 zip 才可安装，且过程可复现、可追溯。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 10.3.0，需与插件头 Version 一致）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: 构建并发布
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 解析版本号
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "本次构建版本：$V"
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装 PHP 与 Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+
+      - name: 环境信息
+        run: |
+          node -v
+          npm -v
+          php -v | head -1
+          composer --version
+          python3 --version
+
+      - name: 安装 PHP 依赖（生成 vendor/）
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: 构建前端产物
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build-prod
+
+      - name: 构建 sm.ms 图片管理页（Vue 子项目）
+        working-directory: src/Pages/page/sm-ms-management
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: 编译语言包（.po → .mo）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext
+          shopt -s nullglob
+          for po in languages/*.po; do
+            msgfmt -o "${po%.po}.mo" "$po"
+            echo "已编译 $po"
+          done
+          ls -la languages/*.mo
+
+      - name: PHP 语法校验
+        run: |
+          fail=0
+          count=0
+          while IFS= read -r f; do
+            count=$((count + 1))
+            if ! php -l "$f" > /dev/null 2>&1; then
+              echo "语法错误：$f"
+              php -l "$f"
+              fail=1
+            fi
+          done < <(find . -name '*.php' \
+                     -not -path './.git/*' \
+                     -not -path '*/node_modules/*' \
+                     -not -path './dist/*')
+          echo "共检查 $count 个 PHP 文件"
+          if [ "$fail" -ne 0 ]; then
+            echo "PHP 语法校验未通过"
+            exit 1
+          fi
+          echo "PHP 语法校验通过"
+
+      - name: 打包可安装 zip
+        run: |
+          python3 .github/scripts/build_package.py \
+            . \
+            "dist/wp-editormd-${{ steps.ver.outputs.version }}.zip" \
+            "${{ steps.ver.outputs.version }}"
+
+      - name: 产物二次校验
+        run: |
+          ls -lh dist/
+          python3 - <<'PY'
+          import glob, zipfile
+          path = glob.glob("dist/*.zip")[0]
+          names = set(zipfile.ZipFile(path).namelist())
+          required = [
+              "wp-editormd/wp-editormd.php",
+              "wp-editormd/uninstall.php",
+              "wp-editormd/vendor/autoload.php",
+              "wp-editormd/assets/Editormd/editormd.min.js",
+              "wp-editormd/assets/Config/editormd-nonce.js",
+              "wp-editormd/languages/editormd-zh_CN.mo",
+              "wp-editormd/src/Pages/page/sm-ms-management/html/index.html",
+          ]
+          bad = [r for r in required if r not in names]
+          print("zip 条目数:", len(names))
+          for r in required:
+              print(("  OK   " if r in names else "  MISS ") + r)
+          if bad:
+              raise SystemExit("产物校验失败，缺少：%s" % bad)
+          print("产物校验通过")
+          PY
+
+      - name: 发布 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          name: WP Editor.md v${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          draft: false
+          generate_release_notes: true
+          body: |
+            > **这是修改版（Modified Version），非上游原版。**
+            > 上游 [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md)
+            > 最后版本为 10.2.1，长期未更新，并已于 2025-04-09 被 WordPress.org 以安全问题下架
+            > （对应 **CVE-2025-31035**，Stored XSS，影响 `<= 10.2.1`）。本 Release 为在其基础上
+            > 完成安全加固与新版兼容性适配的维护版本。
+
+            ## 安装
+
+            下载下方 `wp-editormd-${{ steps.ver.outputs.version }}.zip`，在 WordPress 后台
+            「插件 → 安装插件 → 上传插件」中上传并启用即可。
+
+            该 zip 已包含 `vendor/` 与全部前端编译产物，**可直接安装**。
+            请勿使用 GitHub 自动生成的 Source code 压缩包 —— 它缺少这些运行期必需文件。
+
+            ## 本版要点
+
+            * 修复 KaTeX 公式渲染链路的**存储型 XSS**（与 CVE-2025-31035 同类）
+            * 修复图片粘贴接口缺失权限与 CSRF 校验、任意文件写入的问题
+            * 修复 sm.ms 图床代理的 SSRF / 开放代理问题
+            * 修复设置页选项互相覆盖导致思维导图失效的数据损坏缺陷
+            * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
+
+            完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异修改清单)
+            与 [CHANGELOG](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
+
+            ## 授权
+
+            本项目沿用上游的 **GNU GPL v3 or later**。
