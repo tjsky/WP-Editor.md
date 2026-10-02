@@ -60,6 +60,41 @@ jobs:
           composer --version
           python3 --version
 
+      - name: 修正 composer.lock 的下载源
+        run: |
+          python3 - <<'PY'
+          import json
+
+          REPOS = {
+              "league/html-to-markdown": "thephpleague/html-to-markdown",
+              "michelf/php-markdown": "michelf/php-markdown",
+              "lurenjiasworld/wp-settings-api-class": "LuRenJiasWorld/wp-settings-api-class",
+          }
+
+          with open("composer.lock", encoding="utf-8") as fh:
+              lock = json.load(fh)
+
+          changed = 0
+          for pkg in lock.get("packages", []):
+              repo = REPOS.get(pkg["name"])
+              dist = pkg.get("dist") or {}
+              url = dist.get("url", "")
+              if not repo or "mirrors.cloud.tencent.com" not in url:
+                  continue
+              dist["url"] = "https://codeload.github.com/%s/zip/%s" % (repo, dist.get("reference"))
+              dist["type"] = "zip"
+              dist["shasum"] = ""
+              pkg["dist"] = dist
+              changed += 1
+              print("  替换 %s" % pkg["name"])
+
+          with open("composer.lock", "w", encoding="utf-8") as fh:
+              json.dump(lock, fh, indent=4, ensure_ascii=False)
+              fh.write("\n")
+
+          print("共替换 %d 个包" % changed)
+          PY
+
       - name: 安装 PHP 依赖（生成 vendor/）
         run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
