@@ -11,7 +11,16 @@ if (
     wp_die();
 }
 
-static $options_name = array(
+function wp_editormd_uninstall_site_options( $options_name ) {
+    foreach ( $options_name as $option_name ) {
+        delete_option( $option_name );
+    }
+
+    delete_transient( 'editormd_static_file_ver' );
+    delete_transient( 'editormd_plugin_activated' );
+}
+
+$options_name = array(
     'editor_basics',
     'editor_style',
     'syntax_highlighting',
@@ -24,11 +33,23 @@ static $options_name = array(
     'editor_version'
 );
 
+if ( is_multisite() ) {
+    $wp_editormd_site_ids = get_sites(
+        array(
+            'fields' => 'ids',
+            'number' => 0,
+        )
+    );
 
-// 删除选项
-foreach($options_name as $optionName) {
-    delete_option($optionName);
+    foreach ( $wp_editormd_site_ids as $wp_editormd_site_id ) {
+        switch_to_blog( $wp_editormd_site_id );
+        wp_editormd_uninstall_site_options( $options_name );
+        restore_current_blog();
+    }
+
+    delete_site_option( 'editor_version' );
+} else {
+    wp_editormd_uninstall_site_options( $options_name );
 }
 
 //开启自带可视化编辑器
-add_filter( 'user_can_richedit', '__return_true' );

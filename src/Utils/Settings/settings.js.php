@@ -1,6 +1,6 @@
 <!-- 导出调试信息需要使用到的JS文件 -->
-<script src="<?php echo $editor_style_base_address . "/assets/DomToImage/dist/dom-to-image.min.js?version=" . WP_EDITORMD_VER ?>"></script>
-<script src="<?php echo $editor_style_base_address . "/assets/FileSaver/FileSaver.min.js?version=" . WP_EDITORMD_VER ?>"></script>
+<script src="<?php echo esc_url( $editor_style_base_address . "/assets/DomToImage/dist/dom-to-image.min.js?version=" . WP_EDITORMD_VER ); ?>"></script>
+<script src="<?php echo esc_url( $editor_style_base_address . "/assets/FileSaver/FileSaver.min.js?version=" . WP_EDITORMD_VER ); ?>"></script>
 
 <script type="text/javascript">
 (function ($) {
@@ -71,12 +71,9 @@
 		$("#sm-ms-management").click(function(event) {
 			event.preventDefault();
 
-			var sm_ms_token = $("#editor_basics\\[imagepaste_sm_token\\]").val();
-
 			$("#wp-editormd-modal").remove();
 			$(modalTemplate(
-				'<iframe id="sm-ms-management-window" src="<?php echo get_site_url(); ?>/wp-admin/admin-ajax.php?action=wp_editormd_pages&page=sm-ms-management&token=' + sm_ms_token + 
-				'&endpoint_url=' + encodeURIComponent("<?php echo get_site_url(); ?>/wp-admin/admin-ajax.php?action=wp_editormd_pages&page=sm-ms-management&entry=sm_ms_proxy") + '"></iframe>'
+				'<iframe id="sm-ms-management-window" src="<?php echo esc_url( admin_url( "admin-ajax.php" ) ); ?>?action=wp_editormd_pages&page=sm-ms-management&_wpnonce=<?php echo esc_js( wp_create_nonce( "wp_editormd_pages" ) ); ?>"></iframe>'
 			)).appendTo("body").modal({
 				fadeDuration: 200
 			});
@@ -107,7 +104,7 @@
 
 		if ($.urlParam("page") === "wp-editormd-settings" && $.urlParam("action") === "release" && $.urlParam("version")) {
 			$(modalTemplate(
-				'<iframe id="upgrade-release" src="<?php echo get_site_url(); ?>/wp-admin/admin-ajax.php?action=wp_editormd_pages&page=upgrade-release&version=' + $.urlParam("version") + '"></iframe>'
+				'<iframe id="upgrade-release" src="<?php echo esc_url( admin_url( "admin-ajax.php" ) ); ?>?action=wp_editormd_pages&page=upgrade-release&version=' + encodeURIComponent($.urlParam("version")) + '&_wpnonce=<?php echo esc_js( wp_create_nonce( "wp_editormd_pages" ) ); ?>"></iframe>'
 			)).appendTo("body").modal({
 				fadeDuration: 200
 			});
@@ -139,19 +136,19 @@
 			// 插入按钮
 			$(
 				'<br />'
-			+ '<button class="button reset-button button-secondary" id="reset_editor_addres_local"><?php echo __('Use local', $this->text_domain) ?></button>'
-			+ '<button class="button reset-button button-secondary" id="reset_editor_addres_cdn"><?php echo __('Use CDN', $this->text_domain) ?></button>'
+			+ '<button class="button reset-button button-secondary" id="reset_editor_addres_local"><?php echo esc_html__('Use local', $this->text_domain) ?></button>'
+			+ '<button class="button reset-button button-secondary" id="reset_editor_addres_cdn"><?php echo esc_html__('Use CDN', $this->text_domain) ?></button>'
 			).insertAfter(editor_address);
 
 			$(
 				'<br />'
-			+ '<button class="button reset-button button-secondary" id="reset_customize_mindmap_local"><?php echo __('Use local', $this->text_domain) ?></button>'
-			+ '<button class="button reset-button button-secondary" id="reset_customize_mindmap_cdn"><?php  echo __('Use CDN', $this->text_domain) ?></button>' 
+			+ '<button class="button reset-button button-secondary" id="reset_customize_mindmap_local"><?php echo esc_html__('Use local', $this->text_domain) ?></button>'
+			+ '<button class="button reset-button button-secondary" id="reset_customize_mindmap_cdn"><?php echo esc_html__('Use CDN', $this->text_domain) ?></button>' 
 			).insertAfter(customize_mindmap);
 
 			// 本地和CDN基础路径
-			var siteUrl = "<?php echo get_site_url(); ?>" + "/wp-content/plugins/wp-editormd";
-			var cdnUrl = "https://cdn.jsdelivr.net/wp/wp-editormd/tags/" + "<?php echo WP_EDITORMD_VER; ?>";
+			var siteUrl = <?php echo wp_json_encode( WP_EDITORMD_URL ); ?>;
+			var cdnUrl = "https://cdn.jsdelivr.net/wp/wp-editormd/tags/" + <?php echo wp_json_encode( WP_EDITORMD_VER ); ?>;
 
 			// 按钮点击事件
 			$("#reset_editor_addres_local").click(function(event) {

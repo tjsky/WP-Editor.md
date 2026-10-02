@@ -4,153 +4,116 @@ namespace EditormdUtils;
 
 class Debugger {
 
+    private static $sensitive_keywords = array("token", "secret", "password", "passwd", "apikey", "api_key", "key");
+
     public static function editormd_debug($text_domain) {
 
         $user = wp_get_current_user();
 
-        $basics         = "";
-        $style          = "";
-        $highlighting   = "";
-        $emoji          = "";
-        $toc            = "";
-        $katex          = "";
-        $mermaid        = "";
-        $mindmap        = "";
-        $advanced       = "";
-        $enabled_plugin = "";
-
-        foreach ((array)get_option("editor_basics") as $key => $value) {
-            $basics .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_style") as $key => $value) {
-            $style .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("syntax_highlighting") as $key => $value) {
-            $highlighting .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_emoji") as $key => $value) {
-            $emoji .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_toc") as $key => $value) {
-            $toc .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_latex") as $key => $value) {
-            $katex .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_mermaid") as $key => $value) {
-            $mermaid .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_mindmap") as $key => $value) {
-            $mindmap .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("editor_advanced") as $key => $value) {
-            $advanced .= "{$key} => {$value} <br>";
-        }
-        foreach ((array)get_option("active_plugins") as $key => $value) {
-            $enabled_plugin .= "{$key} => {$value} <br>";
-        }
+        $option_groups = array(
+            "editor_basics"       => "Basic Settings",
+            "editor_style"        => "Editor Style Settings",
+            "syntax_highlighting" => "Syntax Highlighting Settings",
+            "editor_emoji"        => "Emoji Settings",
+            "editor_toc"          => "TOC Settings",
+            "editor_latex"        => "KaTeX Settings",
+            "editor_mermaid"      => "Mermaid Settings",
+            "editor_mindmap"      => "MindMap Settings",
+            "editor_advanced"     => "Advanced Settings",
+        );
 
         $debug_info = '<div class="debugger-wrap">';
 
-            $debug_info .= '<hr />';
+        $debug_info .= '<hr />';
 
-            $debug_info .= '<button style="margin: 10px;" id="debugger-download" class="button button-primary">' . __('Export debugging info', $text_domain) . '</button>';
+        $debug_info .= '<button style="margin: 10px;" id="debugger-download" class="button button-primary">'
+            . esc_html__('Export debugging info', $text_domain) . '</button>';
 
-            $debug_info .= '<div>';
+        $debug_info .= '<div>';
 
-                $debug_info .= '<table style="margin: 10px 10px 20px;">';
+        $debug_info .= '<table style="margin: 10px 10px 20px;">';
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Operating System", $text_domain) . "</th><th>" . PHP_OS . "</th>";
-                    $debug_info .= "</tr>";
+        $environment_rows = array(
+            __("Operating System", $text_domain)     => PHP_OS,
+            __("Operating Environment", $text_domain) => self::server_value("SERVER_SOFTWARE"),
+            __("PHP Version", $text_domain)          => PHP_VERSION,
+            __("PHP Operating Mode", $text_domain)   => php_sapi_name(),
+            __("Browser Information", $text_domain)  => self::server_value("HTTP_USER_AGENT"),
+            __("WordPress Version", $text_domain)    => isset($GLOBALS["wp_version"]) ? $GLOBALS["wp_version"] : "",
+            __("WP Editor.md Version", $text_domain) => WP_EDITORMD_VER,
+        );
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Operating Environment", $text_domain) . "</th><th>" . $_SERVER["SERVER_SOFTWARE"] . "</th>";
-                    $debug_info .= "</tr>";
+        foreach ($environment_rows as $label => $value) {
+            $debug_info .= '<tr><th>' . esc_html($label) . '</th><th>' . esc_html((string) $value) . '</th></tr>';
+        }
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("PHP Version", $text_domain) . "</th><th>" . PHP_VERSION . "</th>";
-                    $debug_info .= "</tr>";
+        $debug_info .= '<tr><th>' . esc_html__("jQuery Version", $text_domain) . '</th><th id="jquery"></th></tr>';
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("PHP Operating Mode", $text_domain) . "</th><th>" . php_sapi_name() . "</th>";
-                    $debug_info .= "</tr>";
+        $roles = (is_object($user) && ! empty($user->roles) && is_array($user->roles))
+            ? implode(", ", array_map("sanitize_text_field", $user->roles))
+            : "";
+        $debug_info .= '<tr><th>' . esc_html__("Current Roles", $text_domain) . '</th><th>' . esc_html($roles) . '</th></tr>';
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Browser Information", $text_domain) . "</th><th>" . $_SERVER["HTTP_USER_AGENT"] . "</th>";
-                    $debug_info .= "</tr>";
+        $debug_info .= '<tr><th>' . esc_html__("Site URL", $text_domain) . '</th><th>' . esc_html(site_url()) . '</th></tr>';
+        $debug_info .= '<tr><th>' . esc_html__("Home URL", $text_domain) . '</th><th>' . esc_html(home_url()) . '</th></tr>';
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("WordPress Version", $text_domain) . "</th><th>" . $GLOBALS["wp_version"] . "</th>";
-                    $debug_info .= "</tr>";
+        foreach ($option_groups as $option_name => $label) {
+            $rows = self::render_option_rows((array) get_option($option_name));
+            $debug_info .= '<tr><th>' . esc_html__($label, $text_domain) . '</th><th>' . $rows . '</th></tr>';
+        }
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("WP Editor.md Version", $text_domain) . "</th><th>" . WP_EDITORMD_VER . "</th>";
-                    $debug_info .= "</tr>";
+        $plugins = array();
+        foreach ((array) get_option("active_plugins") as $key => $value) {
+            $plugins[] = $key . " => " . $value;
+        }
+        $debug_info .= '<tr><th>' . esc_html__("Enabled Plugins List", $text_domain) . '</th><th>'
+            . esc_html(implode("\n", $plugins)) . '</th></tr>';
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("jQuery Version", $text_domain) . '</th><th id="jquery"></th>';
-                    $debug_info .= "</tr>";
+        $debug_info .= "</table>";
 
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Current Roles", $text_domain) . "</th><th>" . $user->roles[0] . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Site URL", $text_domain) . "</th><th>" . site_url() . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Home URL", $text_domain) . "</th><th>" . home_url() . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Basic Settings", $text_domain) . "</th><th>" . $basics . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Editor Style Settings", $text_domain) . "</th><th>" . $style . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Syntax Highlighting Settings", $text_domain) . "</th><th>" . $highlighting . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Emoji Settings", $text_domain) . "</th><th>" . $emoji . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("TOC Settings", $text_domain) . "</th><th>" . $toc . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("KaTeX Settings", $text_domain) . "</th><th>" . $katex . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Mermaid Settings", $text_domain) . "</th><th>" . $mermaid . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("MindMap Settings", $text_domain) . "</th><th>" . $mindmap . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Advanced Settings", $text_domain) . "</th><th>" . $advanced . "</th>";
-                    $debug_info .= "</tr>";
-
-                    $debug_info .= "<tr>";
-                    $debug_info .= "<th>" . __("Enabled Plugins List", $text_domain) . "</th><th>" . $enabled_plugin . "</th>";
-                    $debug_info .= "</tr>";
-
-                $debug_info .= "</table>";
-
-            $debug_info .= "</div>";
+        $debug_info .= "</div>";
 
         $debug_info .= "</div>";
 
         return $debug_info;
+    }
+
+    private static function render_option_rows($options) {
+        $rows = "";
+
+        foreach ($options as $key => $value) {
+            if (is_array($value) || is_object($value)) {
+                $value = wp_json_encode($value);
+            }
+
+            $rows .= esc_html($key) . " => " . esc_html(self::mask_sensitive($key, (string) $value)) . " <br>";
+        }
+
+        return $rows;
+    }
+
+    private static function mask_sensitive($key, $value) {
+        $lower_key = strtolower((string) $key);
+
+        foreach (self::$sensitive_keywords as $keyword) {
+            if (false !== strpos($lower_key, $keyword)) {
+                if ("" === $value) {
+                    return "";
+                }
+
+                return substr($value, 0, 4) . "******";
+            }
+        }
+
+        return $value;
+    }
+
+    private static function server_value($key) {
+        if (! isset($_SERVER[$key])) {
+            return "";
+        }
+
+        return wp_unslash((string) $_SERVER[$key]);
     }
 
 }

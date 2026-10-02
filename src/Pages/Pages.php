@@ -11,74 +11,115 @@ class Pages {
     const LOGIN_PRIV = 1;
     const GURST_PRIV = 2;
 
-    // 页面路径和权限
     private $pages;
+
+    private $entries;
 
     private $text_domain;
 
     function __construct($text_domain) {
         $this->text_domain = $text_domain;
 
-        $this->pages = [
+        $this->pages = array(
             "sm-ms-management"   =>    self::ADMIN_PRIV,
             "upgrade-release"    =>    self::ADMIN_PRIV,
-        ];
+        );
+
+        $this->entries = array(
+            "sm-ms-management"   => array(
+                "sm_ms_proxy" => "wp_editormd_entry_sm_ms_proxy",
+            ),
+            "upgrade-release"    => array(),
+        );
 
         // 注册wp_ajax接口，同时允许登录和非登录用户访问，权限由本类控制
         add_action("wp_ajax_wp_editormd_pages", array($this, "renderer"));
         add_action("wp_ajax_nopriv_wp_editormd_pages", array($this, "renderer"));
     }
-    
-    public function renderer() {
-        $page  = $_GET["page"];
-        $entry = $_GET["entry"];
 
-        // 正则表达式匹配目的在于过滤潜在不安全字符，避免在require_once的时候被利用
-        $safeParamRegex = "/^([a-z0-9\-\_]?)+$/";
-        if (isset($this->pages[$page]) && preg_match($safeParamRegex, $page) && preg_match($safeParamRegex, $entry)) {
-            $pagePriv = $this->pages[$page];
-        } else {
+    public function renderer() {
+        $page  = isset($_GET["page"]) ? sanitize_key(wp_unslash($_GET["page"])) : "";
+        $entry = isset($_GET["entry"]) ? sanitize_key(wp_unslash($_GET["entry"])) : "";
+
+        if (! isset($this->pages[$page])) {
             $this->noAccess();
         }
 
-        $authorized = false;
+        if (! $this->verifyRequest($page)) {
+            $this->noAccess();
+        }
 
+        if (! $this->isAuthorized($this->pages[$page])) {
+            $this->noAccess();
+        }
+
+        require_once(__DIR__ . "/page/$page/$page.php");
+
+        if ("" !== $entry) {
+            if (! isset($this->entries[$page][$entry]) || ! function_exists($this->entries[$page][$entry])) {
+                $this->noAccess();
+            }
+
+            echo call_user_func($this->entries[$page][$entry]);
+        } else {
+            echo display_page($this->text_domain, Config::class);
+        }
+
+        wp_die();
+    }
+
+    private function verifyRequest($page) {
+        $nonce = isset($_REQUEST["_wpnonce"]) ? sanitize_text_field(wp_unslash($_REQUEST["_wpnonce"])) : "";
+        if ("" !== $nonce && wp_verify_nonce($nonce, "wp_editormd_pages")) {
+            return true;
+        }
+
+        return $this->isSameOriginRequest();
+    }
+
+    private function isSameOriginRequest() {
+        $home = wp_parse_url(home_url());
+        if (empty($home["host"])) {
+            return false;
+        }
+
+        foreach (array("HTTP_ORIGIN", "HTTP_REFERER") as $key) {
+            if (empty($_SERVER[$key])) {
+                continue;
+            }
+
+            $source = wp_parse_url(esc_url_raw(wp_unslash($_SERVER[$key])));
+            if (empty($source["host"])) {
+                continue;
+            }
+
+            if (strtolower($source["host"]) === strtolower($home["host"])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isAuthorized($pagePriv) {
         switch ($pagePriv) {
             case self::ADMIN_PRIV:
-                if ($this->canAdmin()) $authorized = true;
-                break;
+                return $this->canAdmin();
             case self::LOGIN_PRIV:
-                if ($this->canLogin()) $authorized = true;
-                $authorized = true;
-                break;
+                return $this->canLogin();
             case self::GURST_PRIV:
-                $authorized = true;
-                break;
+                return $this->canGuest();
         }
 
-        if ($authorized) {
-            require_once(__DIR__ . "/page/$page/$page.php");
-
-            if (isset($entry)) {
-                if  (!function_exists("wp_editormd_entry_" . $entry)) {
-                    $this->noAccess();
-                }
-                echo call_user_func("wp_editormd_entry_" . $entry);
-            } else {
-                echo display_page($this->text_domain, Config::class);
-            }
-            wp_die();
-        } else {
-            $this->noAccess();
-        }
+        return false;
     }
 
     private function canAdmin() {
-        return (bool)current_user_can("administrator");
+        return (bool) current_user_can("manage_options");
     }
 
     private function canLogin() {
-        return (bool)is_user_logged_in();
+        return (bool) is_user_logged_in();
     }
 
     private function canGuest() {
@@ -86,9 +127,15 @@ class Pages {
     }
 
     private function noAccess() {
-        // 直接返回一个404
+        if (function_exists("wp_doing_ajax") && wp_doing_ajax()) {
+            nocache_headers();
+            wp_die("Forbidden", "Forbidden", array("response" => 403));
+        }
+
         global $wp_query;
-        $wp_query->set_404();
+        if ($wp_query instanceof \WP_Query) {
+            $wp_query->set_404();
+        }
         status_header(404);
         nocache_headers();
         die();

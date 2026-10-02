@@ -203,8 +203,9 @@ export default class App extends Vue implements AppInterface {
       this.authorize.authorize_token = "00000000000000000000000000000000";
       this.endpoint_url = "test_endpoint";
     } else {
-      this.authorize.authorize_token = Utils.getGet("token") as string || "";
-      this.endpoint_url = Utils.getGet("endpoint_url") as string || "";
+      const bootstrap = (window as any).__EDITORMD_BOOTSTRAP__ || {};
+      this.authorize.authorize_token = bootstrap.token || (Utils.getGet("token") as string) || "";
+      this.endpoint_url = bootstrap.endpointUrl || (Utils.getGet("endpoint_url") as string) || "";
     }
 
     // 避免在热更新时出现数据重复问题

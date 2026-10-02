@@ -23,6 +23,15 @@ use EditormdUtils\Ajax;
  *  2. 在出现未知错误时，返回错误内容
  */
 class ImagePaste {
+    const MAX_PAYLOAD_BYTES = 8388608;
+
+    private static $allowed_mimes = array(
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+    );
+
     /*
      * WordPress预置常量
      */
@@ -35,7 +44,9 @@ class ImagePaste {
      */
     private $extension;             // 保存的文件扩展名，一般为png
     private $name;                  // 文件名，是所传递base64的md5值
-    private $content;               // 文件二进制数据
+    private $content;               // 文件二进制数据（base64 原文）
+
+    private $result = array();
 
     public function __construct() {
         add_action("wp_ajax_wp_editormd_imagepaste", array($this, "editormd_imagepaste_action_callback"));
@@ -46,27 +57,68 @@ class ImagePaste {
         // 1. 采集用户上传的数据信息
         try {
             $this->result = array("error" => "");
-            $this->uploadUrl = wp_upload_dir()["url"];
-            $this->uploadDir = wp_upload_dir()["path"];
-            $this->tempDir   = get_temp_dir();
 
-            list($data, $image) = explode(";", $_REQUEST["dataurl"]);
-            list($field, $type) = explode(":", $data);
-            list($encoding, $this->content) = explode(",", $image);
-            if ($type == "image/png") {
-                $this->extension = "png";
-            } else {
+            $upload = wp_upload_dir();
+            if (! empty($upload["error"])) {
+                Ajax::editormd_return_json("", "unknown_error", $upload["error"]);
+            }
+
+            $this->uploadUrl = $upload["url"];
+            $this->uploadDir = $upload["path"];
+            $this->tempDir   = trailingslashit(get_temp_dir());
+
+            if (! isset($_REQUEST["dataurl"]) || ! is_string($_REQUEST["dataurl"])) {
+                Ajax::editormd_return_json("", "unknown_error", "Missing or invalid dataurl");
+            }
+
+            $dataurl = wp_unslash($_REQUEST["dataurl"]);
+
+            if (strlen($dataurl) > self::MAX_PAYLOAD_BYTES) {
+                Ajax::editormd_return_json("", "file_too_large", "");
+            }
+
+            $parts = explode(";", $dataurl, 2);
+            if (count($parts) < 2) {
+                Ajax::editormd_return_json("", "unknown_error", "Malformed dataurl");
+            }
+            list($data, $image) = $parts;
+
+            $data_parts = explode(":", $data, 2);
+            if (count($data_parts) < 2) {
+                Ajax::editormd_return_json("", "unknown_error", "Malformed dataurl header");
+            }
+            list($field, $type) = $data_parts;
+
+            $image_parts = explode(",", $image, 2);
+            if (count($image_parts) < 2) {
+                Ajax::editormd_return_json("", "unknown_error", "Malformed dataurl body");
+            }
+            list($encoding, $this->content) = $image_parts;
+
+            if ("base64" !== strtolower(trim($encoding))) {
                 Ajax::editormd_return_json("", "file_extension_error");
             }
-            $this->name = "wp_editor_md_" . md5($_REQUEST["dataurl"]);
-        } catch (\Exception $e) {
+
+            $declared = strtolower(trim($type));
+            if (! in_array($declared, self::$allowed_mimes, true) && "image/jpg" !== $declared) {
+                Ajax::editormd_return_json("", "file_extension_error");
+            }
+
+            $this->extension = "png";
+            $this->name      = "wp_editor_md_" . md5($dataurl);
+        } catch (\Throwable $e) {
             Ajax::editormd_return_json("", "unknown_error", "Exception occurred when parsing requests:" . $e->getMessage());
         }
 
+        if (! current_user_can("upload_files")) {
+            Ajax::editormd_return_json("", "permission_denied", "");
+        }
+
+        check_ajax_referer("wp_editormd_imagepaste", "_wpnonce");
 
         // 2. 选择上传目的地
         try {
-            switch(Config::get_option("imagepaste_sm", "editor_basics")) {
+            switch (Config::get_option("imagepaste_sm", "editor_basics")) {
                 case "on":
                     $this->editormd_imagepaste_smms();
                     break;
@@ -74,61 +126,98 @@ class ImagePaste {
                     $this->editormd_imagepaste_save();
                     break;
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Ajax::editormd_return_json("", "unknown_error", "Exception occurred when uploading:" . $e->getMessage());
         }
     }
 
     // 存储图片到本地
     private function editormd_imagepaste_save() {
-        // 保存后进行转换
-        $file    = $this->uploadDir . "/" . $this->name . "." . $this->extension;
-        file_put_contents($file, base64_decode($this->content));
-        $this->editormd_png2jpg($file);
+        $tempFile = $this->editormd_save_to_temp_dir();
+        if (false === $tempFile) {
+            Ajax::editormd_return_json("", "file_extension_error");
+        }
 
         $this->extension = "jpg";
-        $fileUrl = $this->uploadUrl . "/" . $this->name . "." . $this->extension;
+        $finalName       = $this->name . "." . $this->extension;
+        $targetUrl       = trailingslashit($this->uploadUrl) . $finalName;
 
-        Ajax::editormd_return_json($fileUrl);
+        if (file_exists(trailingslashit($this->uploadDir) . $finalName)) {
+            wp_delete_file($tempFile);
+            Ajax::editormd_return_json($targetUrl);
+        }
+
+        $bits = file_get_contents($tempFile);
+        wp_delete_file($tempFile);
+
+        if (false === $bits) {
+            Ajax::editormd_return_json("", "unknown_error", "Failed to read converted image");
+        }
+
+        $uploaded = wp_upload_bits($finalName, null, $bits);
+        if (! empty($uploaded["error"])) {
+            Ajax::editormd_return_json("", "unknown_error", $uploaded["error"]);
+        }
+
+        Ajax::editormd_return_json($uploaded["url"]);
     }
 
     // 上传图片到sm.ms
     private function editormd_imagepaste_smms() {
-        $header = array(
-            "Content-type: multipart/form-data",
-        );
-
-        // 保存到临时目录
         $tempFile = $this->editormd_save_to_temp_dir();
+        if (false === $tempFile) {
+            Ajax::editormd_return_json("", "file_extension_error");
+        }
 
         // 获取用户配置中的图床校验码
         $authToken = Config::get_option("imagepaste_sm_token", "editor_basics");
-
+        $headers   = array();
         if ($authToken !== "") {
-            $header = array_merge($header, array(
-                "Authorization: " . $authToken
-            ));
+            $headers["Authorization"] = $authToken;
         }
 
-        list($result, $reqCode) = $this->editormd_curl_post_file(
-            // sm.ms 域名在大陆暂时无法访问，需要更换为 smms.app
-            "https://smms.app/api/v2/upload",
-            array(
-                "smfile" => new \CURLFile(realpath($tempFile)),
-                "format" => "json"
-            ),
-            $header
-        );
+        $multipart = $this->build_multipart_body($tempFile, basename($tempFile), array("format" => "json"));
+        wp_delete_file($tempFile);
 
-        switch($reqCode) {
+        if (false === $multipart) {
+            Ajax::editormd_return_json("", "unknown_error", "Failed to read image payload");
+        }
+
+        list($body, $contentType) = $multipart;
+        $headers["Content-Type"]  = $contentType;
+
+        $response = wp_remote_post("https://smms.app/api/v2/upload", array(
+            "timeout"     => 120,
+            "redirection" => 0,
+            "sslverify"   => true,
+            "headers"     => $headers,
+            "body"        => $body,
+        ));
+
+        if (is_wp_error($response)) {
+            Ajax::editormd_return_json("", "unknown_error", $response->get_error_message());
+        }
+
+        $reqCode = (int) wp_remote_retrieve_response_code($response);
+        $result  = wp_remote_retrieve_body($response);
+
+        switch ($reqCode) {
             case 200:
                 $data = json_decode($result, true);
-                // 对图片重复的情况进行特殊处理
-                if ($data["code"] == "image_repeated") {
-                    $imageUrl = $data["images"];
-                } else {
-                    $imageUrl = $data["data"]["url"];
+                if (! is_array($data)) {
+                    Ajax::editormd_return_json("", "unknown_error", "Invalid response from sm.ms");
                 }
+                // 对图片重复的情况进行特殊处理
+                if (isset($data["code"]) && $data["code"] === "image_repeated") {
+                    $imageUrl = isset($data["images"]) ? $data["images"] : "";
+                } else {
+                    $imageUrl = isset($data["data"]["url"]) ? $data["data"]["url"] : "";
+                }
+
+                if ("" === $imageUrl) {
+                    Ajax::editormd_return_json("", "unknown_error", $result);
+                }
+
                 Ajax::editormd_return_json($imageUrl, "", $result);
                 break;
             case 413:
@@ -140,59 +229,141 @@ class ImagePaste {
         }
     }
 
-    // 将当前读取的数据保存到临时目录
     private function editormd_save_to_temp_dir() {
-        $tempFile = $this->tempDir . $this->name . "." . $this->extension;
-        file_put_contents($tempFile, base64_decode($this->content));
-        $tempFile = $this->editormd_png2jpg($tempFile);
+        $binary = base64_decode($this->content, true);
+        if (false === $binary || "" === $binary) {
+            return false;
+        }
 
-        return $tempFile;
+        if (! function_exists("getimagesize")) {
+            return false;
+        }
+
+        $tempFile = $this->tempDir . $this->name . ".tmp";
+        if (false === @file_put_contents($tempFile, $binary)) {
+            return false;
+        }
+
+        $mime = $this->detect_image_mime($tempFile);
+        if (false === $mime) {
+            wp_delete_file($tempFile);
+            return false;
+        }
+
+        if ("image/jpeg" === $mime) {
+            $newFilename = preg_replace("/\.tmp$/", ".jpg", $tempFile);
+            if (false === @rename($tempFile, $newFilename)) {
+                wp_delete_file($tempFile);
+                return false;
+            }
+
+            return $newFilename;
+        }
+
+        $newFilename = $this->editormd_png2jpg($tempFile, true, $mime);
+
+        return $newFilename;
     }
 
-    // 将Base64生成的PNG保存为JPG以减小体积，加快上传和访问的速度
-    private function editormd_png2jpg($filePath, $deleteOldFile=true) {
-        $quality = 50;
-        $newFilename = str_replace(".png", ".jpg", $filePath);
+    private function detect_image_mime($file) {
+        $info = @getimagesize($file);
+        if (false === $info || empty($info["mime"])) {
+            return false;
+        }
 
-        $image = imagecreatefrompng($filePath);
-        $bg = imagecreatetruecolor(imagesx($image), imagesy($image));
+        if (! in_array($info["mime"], self::$allowed_mimes, true)) {
+            return false;
+        }
+
+        return $info["mime"];
+    }
+
+    private function editormd_png2jpg($filePath, $deleteOldFile = true, $mime = "image/png") {
+        $quality     = 50;
+        $newFilename = preg_replace("/\.(png|tmp)$/i", ".jpg", $filePath);
+
+        $image = $this->image_create_from($filePath, $mime);
+        if (false === $image) {
+            if ($deleteOldFile) {
+                wp_delete_file($filePath);
+            }
+            return false;
+        }
+
+        $width  = imagesx($image);
+        $height = imagesy($image);
+
+        $bg = imagecreatetruecolor($width, $height);
+        if (false === $bg) {
+            imagedestroy($image);
+            if ($deleteOldFile) {
+                wp_delete_file($filePath);
+            }
+            return false;
+        }
 
         imagefill($bg, 0, 0, imagecolorallocate($bg, 255, 255, 255));
-        imagealphablending($bg, TRUE);
-        imagecopy($bg, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+        imagealphablending($bg, true);
+        imagecopy($bg, $image, 0, 0, 0, 0, $width, $height);
         imagedestroy($image);
 
-        imagejpeg($bg, $newFilename, $quality);
+        $saved = imagejpeg($bg, $newFilename, $quality);
         imagedestroy($bg);
 
-        if ($deleteOldFile) {
-            unlink($filePath);
+        if (false === $saved) {
+            if ($deleteOldFile) {
+                wp_delete_file($filePath);
+            }
+            return false;
+        }
+
+        if ($deleteOldFile && file_exists($filePath) && $filePath !== $newFilename) {
+            wp_delete_file($filePath);
         }
 
         return $newFilename;
     }
 
-    // 使用curl发送post请求，可用于多种图床
-    private function editormd_curl_post_file($url, $postField, $header) {
-        $user_agent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.1750.146 Safari/537.36";
+    private function image_create_from($file, $mime) {
+        switch ($mime) {
+            case "image/png":
+                return @imagecreatefrompng($file);
+            case "image/jpeg":
+                return @imagecreatefromjpeg($file);
+            case "image/gif":
+                return @imagecreatefromgif($file);
+            case "image/webp":
+                if (function_exists("imagecreatefromwebp")) {
+                    return @imagecreatefromwebp($file);
+                }
+                return false;
+        }
 
-        $ch      = curl_init();
-        curl_setopt($ch, CURLOPT_URL,                $url);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER,     0);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,     0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER,     1);
-        curl_setopt($ch, CURLOPT_POST,               1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS,         $postField);
-        curl_setopt($ch, CURLOPT_USERAGENT,          $user_agent);
-        curl_setopt($ch, CURLOPT_HTTPHEADER,         $header);
+        return false;
+    }
 
-        curl_setopt($ch, CURLOPT_TIMEOUT_MS,        1000 * 120);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, 1000 * 30);
+    private function build_multipart_body($filePath, $fileName, $fields) {
+        $contents = file_get_contents($filePath);
+        if (false === $contents) {
+            return false;
+        }
 
-        $result  = curl_exec($ch);
+        $boundary = "----WPEditormdBoundary" . md5(microtime(true) . wp_rand());
+        $eol      = "\r\n";
+        $body     = "";
 
-        $reqCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        foreach ($fields as $key => $value) {
+            $body .= "--" . $boundary . $eol
+                . 'Content-Disposition: form-data; name="' . $key . '"' . $eol . $eol
+                . $value . $eol;
+        }
 
-        return array($result, $reqCode);
+        $body .= "--" . $boundary . $eol
+            . 'Content-Disposition: form-data; name="smfile"; filename="' . sanitize_file_name($fileName) . '"' . $eol
+            . 'Content-Type: image/jpeg' . $eol . $eol
+            . $contents . $eol
+            . "--" . $boundary . "--" . $eol;
+
+        return array($body, "multipart/form-data; boundary=" . $boundary);
     }
 }
