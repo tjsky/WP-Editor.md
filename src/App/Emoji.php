@@ -9,7 +9,7 @@ class Emoji {
 
         add_action("wp_enqueue_scripts", array($this, "emoji_enqueue_scripts"));
 
-        if(!in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
+        if (!isset($GLOBALS["pagenow"]) || !in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
             add_action("wp_print_footer_scripts", array($this, "emoji_enqueue_footer_js"));
         }
 
@@ -27,11 +27,12 @@ class Emoji {
     }
 
     public function emoji_enqueue_footer_js() {
+        $img_dir = Config::get_option('editor_addres','editor_style') . '/assets/Emojify.js/images/basic';
         ?>
         <script type="text/javascript">
-            window.onload = function () {
+            window.addEventListener("load", function () {
                 emojify.setConfig({
-                    img_dir: "<?php echo Config::get_option('editor_addres','editor_style') . '/assets/Emojify.js/images/basic' ?>",//前端emoji资源地址
+                    img_dir: <?php echo wp_json_encode( esc_url_raw( $img_dir ) ); ?>,//前端emoji资源地址
                     blacklist: {
                         "ids": [],
                         "classes": ["no-emojify"],
@@ -39,7 +40,7 @@ class Emoji {
                     }
                 });
                 emojify.run();
-            }
+            });
         </script>
         <?php
     }
@@ -85,9 +86,9 @@ class Emoji {
         if ("dns-prefetch" == $relation_type) {
 
             // Strip out any URLs referencing the WordPress.org emoji location
-            $emoji_svg_url_bit = "https://s.w.org/images/core/emoji/";
+            $emoji_svg_url_bit = "s.w.org/images/core/emoji/";
             foreach ($urls as $key => $url) {
-                if (strpos($url, $emoji_svg_url_bit) !== false) {
+                if (is_string($url) && strpos($url, $emoji_svg_url_bit) !== false) {
                     unset($urls[$key]);
                 }
             }

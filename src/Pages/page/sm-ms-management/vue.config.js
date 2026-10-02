@@ -2,7 +2,8 @@ const path = require("path");
 
 module.exports = {
   outputDir: "html",
-  publicPath: process.env.NODE_ENV === "development" ? "/" : "../wp-content/plugins/wp-editormd/src/Pages/page/sm-ms-management/html/",
+  productionSourceMap: false,
+  publicPath: "/__EDITORMD_ASSET_BASE__/src/Pages/page/sm-ms-management/html/",
   configureWebpack:{
     optimization: {
       splitChunks: {

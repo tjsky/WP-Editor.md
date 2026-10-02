@@ -104,7 +104,7 @@ class WPMarkdownParser extends MarkdownExtra {
             // Ignore comments before encoding html
             $text = $this->comment_hash($text);
 
-            $text = htmlspecialchars($text);
+            $text = htmlspecialchars($text, ENT_COMPAT);
             $text = $this->codeblock_hash($text);
         }
 

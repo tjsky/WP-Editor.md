@@ -57,9 +57,10 @@ class Controller {
         add_action("load-edit-comments.php", array($this, "enqueue_styles"));
         add_action("load-edit-comments.php", array($this, "enqueue_scripts"));
 
-        // WordPress 5.0 Gutenberg Editor
-        if ($GLOBALS["wp_version"] > "5.0") {
-            add_filter("use_block_editor_for_post", "__return_false", 5);
+        if (version_compare(get_bloginfo("version"), "5.0", ">=")) {
+            if (apply_filters("editormd_disable_block_editor", true)) {
+                add_filter("use_block_editor_for_post", "__return_false", 5);
+            }
         }
     }
 
@@ -94,8 +95,14 @@ class Controller {
         //JavaScript - Editormd
         wp_enqueue_script("Editormd", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
 
+        wp_enqueue_script("Editormd-Nonce", $this->front_static_url . "/assets/Config/editormd-nonce.js", array("jquery"), WP_EDITORMD_VER, true);
+        wp_localize_script("Editormd-Nonce", "_EditormdNonce", array(
+            "imagepasteNonce" => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"      => wp_create_nonce("wp_editormd_pages"),
+        ));
+
         //JavaScript - Config
-        wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd"), $this->version, true);
+        wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
@@ -142,7 +149,9 @@ class Controller {
             "imgUploading"      => __("Image Uploading...", $this->text_domain),
             "imgUploadeFailed"  => __("Failed To Upload The Image!", $this->text_domain),
             "supportComment"    => Config::get_option("support_front", "editor_basics"),         // 前端评论
-            "supportReply"      => Config::get_option("support_reply", "editor_basics")          // 后台回复评论
+            "supportReply"      => Config::get_option("support_reply", "editor_basics"),         // 后台回复评论
+            "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"        => wp_create_nonce("wp_editormd_pages")
         ));
     }
 

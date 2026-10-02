@@ -1,7 +1,7 @@
 // Third-party packages
 const path = require("path");
 const webpack = require("webpack");
-const ParallelUglifyPlugin = require("webpack-parallel-uglify-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 const MergeIntoSingleFilePlugin = require("webpack-merge-and-include-globally");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const RemoveEmptyScriptsPlugin = require("webpack-remove-empty-scripts");
@@ -53,13 +53,12 @@ module.exports = {
   devtool: false,
   optimization: {
     minimizer: [
-      new ParallelUglifyPlugin({
-        cacheDir: ".cache/",
-        sourceMap: isDevMode ? true : false,
-        uglifyJS: {
-          output: {
+      new TerserPlugin({
+        parallel: true,
+        extractComments: false,
+        terserOptions: {
+          format: {
             comments: false,
-            beautify: false,
             preamble: banner,
           },
           compress: {
@@ -202,9 +201,6 @@ module.exports = {
           },
           {
             loader: "sass-loader",
-            options: {
-              implementation: require("node-sass"),
-            },
           },
         ],
       },

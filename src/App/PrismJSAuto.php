@@ -9,7 +9,7 @@ class PrismJSAuto {
     public function __construct() {
         add_action("wp_enqueue_scripts", array($this, "prism_styles_scripts"));
 
-        if(!in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
+        if (!isset($GLOBALS["pagenow"]) || !in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
             add_action("wp_print_footer_scripts", array($this, "prism_wp_footer_scripts"));
         }
     }
@@ -85,9 +85,10 @@ class PrismJSAuto {
     }
 
     public function prism_wp_footer_scripts() {
+        $languages_path = Config::get_option('editor_addres','editor_style') . '/assets/Prism.js/components/';
         ?>
         <script type="text/javascript">
-            Prism.plugins.autoloader.languages_path = "<?php echo Config::get_option('editor_addres','editor_style') . '/assets/Prism.js/components/' ?>";
+            Prism.plugins.autoloader.languages_path = <?php echo wp_json_encode( esc_url_raw( $languages_path ) ); ?>;
         </script>
         <?php
     }

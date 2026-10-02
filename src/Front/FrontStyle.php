@@ -46,15 +46,8 @@ class FrontStyle {
      * 注册脚本文件
      */
     public function enqueue_front_scripts() {
-        //兼容模式 - jQuery
-        if (Config::get_option("jquery_compatible", "editor_advanced") !== "off") {
-            wp_enqueue_script("jquery", null, null, array(), false);
-            $jQueryName = "jquery";
-        } else {
-            wp_deregister_script("jquery");
-            wp_enqueue_script("jQuery-CDN", $this->front_static_url . "/assets/jQuery/jquery.min.js", array(), "1.12.4", true);
-            $jQueryName = "jQuery-CDN";
-        }
+        wp_enqueue_script("jquery");
+        $jQueryName = "jquery";
 
         wp_enqueue_style("Front_Style", $this->front_static_url . "/assets/FrontStyle/FrontStyle.min.css", array(), WP_EDITORMD_VER, "all");
         wp_enqueue_script("Front_Style", $this->front_static_url . "/assets/FrontStyle/FrontStyle.min.js", array($jQueryName), $this->version, true);
@@ -69,6 +62,18 @@ class FrontStyle {
      * Ref issue: https://github.com/LuRenJiasWorld/WP-Editor.md/issues/560
      */
     public function dequeue_bloat_scripts() {
+        if (function_exists("wp_is_block_theme") && wp_is_block_theme()) {
+            return;
+        }
+
+        if (is_singular() && function_exists("has_blocks") && has_blocks()) {
+            return;
+        }
+
+        if (! apply_filters("editormd_dequeue_block_styles", true)) {
+            return;
+        }
+
         wp_dequeue_style("wp-block-library");
         wp_dequeue_style("wp-block-library-theme");
         wp_dequeue_style("wc-blocks-style");

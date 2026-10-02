@@ -29,7 +29,7 @@ class Guide {
                 /* make sure pointers will actually work and have content */
                 if (typeof(jQuery().pointer) !== "undefined") {
                     $("#menu-settings").pointer({
-                        content: "<?php echo $pointer_content; ?>",
+                        content: <?php echo wp_json_encode( $pointer_content, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); ?>,
                         position: {
                             edge: "left",
                             align: "center"
@@ -37,7 +37,8 @@ class Guide {
                         close: function () {
                             $.post(ajaxurl, {
                                 pointer: "editormd",
-                                action: "dismiss-wp-pointer"
+                                action: "dismiss-wp-pointer",
+                                _ajax_nonce: <?php echo wp_json_encode( wp_create_nonce( "dismiss-pointer_editormd" ) ); ?>
                             });
                         }
                     }).pointer("open");

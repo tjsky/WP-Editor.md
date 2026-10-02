@@ -31,16 +31,21 @@ class Upgrader {
                 $this->upgrade_10_1_2_to_10_2_0();
             case "10.2.0":
                 $this->upgrade_10_2_0_to_10_2_1();
+            case "10.2.1":
+                $this->upgrade_10_2_1_to_10_3_0();
             default:
                 break;
         }
 
         $next_version = $this->get_current_version();
 
-        // 如果存在版本更新，则在更新完成后跳转到更新页面
-        if ($current_version !== $next_version) {
+        if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    private function upgrade_10_2_1_to_10_3_0() {
+        $this->update_to_version("10.3.0");
     }
 
     private function upgrade_10_2_0_to_10_2_1() {
@@ -76,7 +81,9 @@ class Upgrader {
         Config::update_option("open_in_new_tab", "editor_basics", "off");
 
         // 新建版本号字段
-        add_option("editor_version", []);
+        if (false === get_option("editor_version")) {
+            add_option("editor_version", array());
+        }
 
         // 升级到指定版本号
         $this->update_to_version("10.1.0");
@@ -88,7 +95,9 @@ class Upgrader {
      * @return string
      */
     private function get_current_version() {
-        return Config::get_option("wp_editormd_ver", "editor_version");
+        $version = Config::get_option("wp_editormd_ver", "editor_version");
+
+        return is_scalar($version) ? (string) $version : "";
     }
 
     /**
@@ -99,13 +108,23 @@ class Upgrader {
      * @return boolean
      */
     private function update_to_version($version) {
-        Config::update_option("wp_editormd_ver", "editor_version", $version);
+        return Config::update_option("wp_editormd_ver", "editor_version", $version);
     }
 
     private function update_changelog_page($version) {
-        // 跳转到发行注记页面（302跳转）
-        // somesite.com/wp-admin/options-general.php?page=wp-editormd-settings&action=release&version=x.x.x
-        wp_redirect(admin_url("options-general.php?page=wp-editormd-settings&action=release&version=" . $version), 302);
-        exit();
+        if (is_admin() && ! wp_doing_ajax() && current_user_can("manage_options")) {
+            $flag = "editormd_upgraded_to_" . $version;
+            if (get_transient($flag)) {
+                return;
+            }
+
+            set_transient($flag, 1, DAY_IN_SECONDS);
+
+            wp_redirect(
+                admin_url("options-general.php?page=wp-editormd-settings&action=release&version=" . rawurlencode($version)),
+                302
+            );
+            exit();
+        }
     }
 }

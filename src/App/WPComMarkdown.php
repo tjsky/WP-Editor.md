@@ -18,6 +18,8 @@ class WPComMarkdown {
     public $posts_to_uncache = array();
     private $monitoring = array("post" => array(), "parent" => array());
 
+    private $kses = false;
+
     /**
      * Singleton silence is golden
      */
@@ -224,6 +226,10 @@ class WPComMarkdown {
      * Remove KSES if it's there. Store the result to manually invoke later if needed.
      */
     public function maybe_remove_kses() {
+        if (! is_user_logged_in() || ! current_user_can("unfiltered_html")) {
+            return;
+        }
+
         // Filters return true if they existed before you removed them
         if ($this->is_posting_enabled()) {
             $this->kses = remove_filter("content_filtered_save_pre", "wp_filter_post_kses") && remove_filter("content_save_pre", "wp_filter_post_kses");
@@ -712,6 +718,11 @@ class WPComMarkdown {
      */
     protected function check_for_early_methods() {
         $raw_post_data = file_get_contents("php://input");
+
+        if (false === $raw_post_data || "" === $raw_post_data) {
+            return;
+        }
+
         if (false === strpos($raw_post_data, "metaWeblog.getPost")
              && false === strpos($raw_post_data, "wp.getPage")) {
             return;

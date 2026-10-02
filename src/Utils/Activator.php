@@ -6,45 +6,42 @@ use EditormdUtils\Upgrader as Upgrader;
 
 class Activator {
 
-    public static function activate() {
-        // 初次载入插件写入默认数据 => 判断本地是否存在数据 不存在写入数据即可
-        if (get_option("editor_basics") == false) {
-            add_option("editor_basics", Activator::$defaultOptionsBasics, "", "yes");
+    public static function activate($network_wide = false) {
+        if ($network_wide && is_multisite()) {
+            $site_ids = get_sites(array("fields" => "ids", "number" => 0));
+
+            foreach ($site_ids as $site_id) {
+                switch_to_blog($site_id);
+                self::activate_site();
+                restore_current_blog();
+            }
+
+            return;
         }
 
-        if (get_option("editor_style") == false) {
-            add_option("editor_style", Activator::$defaultOptionsStyle, "", "yes");
+        self::activate_site();
+    }
+
+    private static function activate_site() {
+        $defaults = array(
+            "editor_basics"       => self::$defaultOptionsBasics,
+            "editor_style"        => self::$defaultOptionsStyle,
+            "syntax_highlighting" => self::$defaultOptionsSyntax,
+            "editor_emoji"        => self::$defaultOptionsEmoji,
+            "editor_toc"          => self::$defaultOptionsToc,
+            "editor_latex"        => self::$defaultOptionsKatex,
+            "editor_mermaid"      => self::$defaultOptionsMermaid,
+            "editor_mindmap"      => self::$defaultOptionsMindMap,
+            "editor_advanced"     => self::$defaultOptionsAdvanced,
+        );
+
+        foreach ($defaults as $option_name => $default_value) {
+            if (false === get_option($option_name)) {
+                add_option($option_name, $default_value, "", "yes");
+            }
         }
 
-        if (get_option("syntax_highlighting") == false) {
-            add_option("syntax_highlighting", Activator::$defaultOptionsSyntax, "", "yes");
-        }
-
-        if (get_option("editor_emoji") == false) {
-            add_option("editor_emoji", Activator::$defaultOptionsEmoji, "", "yes");
-        }
-
-        if (get_option("editor_toc") == false) {
-            add_option("editor_toc", Activator::$defaultOptionsToc, "", "yes");
-        }
-
-        if (get_option("editor_latex") == false) {
-            add_option("editor_latex", Activator::$defaultOptionsKatex, "", "yes");
-        }
-
-        if (get_option("editor_mermaid") == false) {
-            add_option("editor_mermaid", Activator::$defaultOptionsKatex, "", "yes");
-        }
-
-        if (get_option("editor_mindmap") == false) {
-            add_option("editor_mindmap", Activator::$defaultOptionsMindMap, "", "yes");
-        }
-
-        if (get_option("editor_advanced") == false) {
-            add_option("editor_advanced", Activator::$defaultOptionsAdvanced, "", "yes");
-        }
-
-        if (get_option("editor_version") == false) {
+        if (false === get_option("editor_version")) {
             add_option("editor_version", array("wp_editormd_ver" => WP_EDITORMD_VER), "", "yes");
         }
 

@@ -109,8 +109,21 @@ class Main {
     public function init_cookie() {
         // 语言配置
         $language = get_bloginfo("language");
-        if (!isset($_COOKIE["wp-editormd-lang"]) || $_COOKIE["wp-editormd-lang"] !== $language) {
-            setcookie("wp-editormd-lang", $language, 0, "/");
+
+        $cookie_lang = isset($_COOKIE["wp-editormd-lang"])
+            ? sanitize_text_field(wp_unslash($_COOKIE["wp-editormd-lang"]))
+            : "";
+
+        if ($cookie_lang === $language) {
+            return;
         }
+
+        setcookie("wp-editormd-lang", $language, array(
+            "expires"  => 0,
+            "path"     => "/",
+            "secure"   => is_ssl(),
+            "httponly" => false,
+            "samesite" => "Lax",
+        ));
     }
 }

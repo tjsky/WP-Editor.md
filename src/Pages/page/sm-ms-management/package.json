@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@intlify/vue-i18n-loader": "1.0.0",
-    "@types/webpack": "^4.4.0",
+    "@types/webpack": "^5.28.0",
     "@typescript-eslint/eslint-plugin": "^2.33.0",
     "@typescript-eslint/parser": "^2.33.0",
     "@vue/cli-plugin-babel": "5.0.6",
@@ -50,7 +50,7 @@
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.0",
     "eslint-plugin-vue": "^6.2.2",
-    "node-sass": "^8.0.0",
+    "sass": "^1.77.0",
     "sass-loader": "^13.2.0",
     "less": "^3.0.4",
     "less-loader": "^4.1.0",

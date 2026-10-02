@@ -42,10 +42,30 @@ class FrontEditor {
         add_action("wp_enqueue_scripts", array($this, "enqueue_front_scripts"));
     }
 
+    private function front_editor_needed() {
+        $needed = false;
+
+        if (Config::get_option("support_front", "editor_basics") === "on") {
+            if (is_singular() && comments_open()) {
+                $needed = true;
+            }
+        }
+
+        if (Config::get_option("support_other_text", "editor_basics") !== "") {
+            $needed = true;
+        }
+
+        return (bool) apply_filters("editormd_front_editor_needed", $needed);
+    }
+
     /**
      * 注册样式文件
      */
     public function enqueue_front_styles() {
+        if (! $this->front_editor_needed()) {
+            return;
+        }
+
         //Style - Editor.md
         wp_enqueue_style("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.css", array(), WP_EDITORMD_VER, "all");
     }
@@ -54,19 +74,21 @@ class FrontEditor {
      * 注册脚本文件
      */
     public function enqueue_front_scripts() {
-
-        //兼容模式 - jQuery
-        if (Config::get_option("jquery_compatible", "editor_advanced") !== "off") {
-            wp_enqueue_script("jquery", null, null, array(), false);
-            wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
-        } else {
-            wp_deregister_script("jquery");
-            wp_enqueue_script("jQuery-CDN", $this->front_static_url . "/assets/jQuery/jquery.min.js", array(), "1.12.4", true);
-            wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jQuery-CDN"), WP_EDITORMD_VER, true);
+        if (! $this->front_editor_needed()) {
+            return;
         }
 
+        wp_enqueue_script("jquery");
+        wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
+
+        wp_enqueue_script("Editormd-Nonce_Front", $this->front_static_url . "/assets/Config/editormd-nonce.js", array("jquery"), WP_EDITORMD_VER, true);
+        wp_localize_script("Editormd-Nonce_Front", "_EditormdNonce", array(
+            "imagepasteNonce" => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"      => wp_create_nonce("wp_editormd_pages"),
+        ));
+
         //JavaScript - Config
-        wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front"), $this->version, true);
+        wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front", "Editormd-Nonce_Front"), $this->version, true);
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
@@ -115,6 +137,8 @@ class FrontEditor {
             "imgUploadeFailed"  => __("Failed To Upload The Image!", $this->text_domain),
             "supportComment"    => Config::get_option("support_front", "editor_basics"),         // 前端评论
             "supportOther"      => Config::get_option("support_other_text", "editor_basics"),    // 前端编辑器ID
+            "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"        => wp_create_nonce("wp_editormd_pages"),
         ));
     }
 

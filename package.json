@@ -1,16 +1,16 @@
 {
   "name": "wp-editor.md",
-  "version": "10.2.1",
+  "version": "10.3.0",
   "description": "Perhaps this is the best and most perfect Markdown editor in WordPress",
   "scripts": {
-    "build-prod": "NODE_ENV=production webpack --config webpack.prod.js",
-    "build-dev": "NODE_ENV=development webpack --config webpack.dev.js",
-    "analyze-prod": "NODE_ENV=production ANALYZE=true webpack --config webpack.dev.js",
-    "analyze-dev": "NODE_ENV=development ANALYZE=true webpack --config webpack.dev.js"
+    "build-prod": "webpack --config webpack.prod.js",
+    "build-dev": "webpack --config webpack.dev.js",
+    "analyze-prod": "ANALYZE=true webpack --config webpack.dev.js",
+    "analyze-dev": "ANALYZE=true webpack --config webpack.dev.js"
   },
   "engines": {
     "npm": ">=8.0.0",
-    "node": ">=14.0.0"
+    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
@@ -36,11 +36,12 @@
     "eslint": "^8.35.0",
     "eslint-webpack-plugin": "^4.0.0",
     "mini-css-extract-plugin": "^2.7.2",
-    "node-sass": "^8.0.0",
     "postcss": "^8.4.21",
     "postcss-loader": "^7.0.2",
+    "sass": "^1.77.0",
     "sass-loader": "^13.2.0",
     "style-loader": "^3.3.1",
+    "terser-webpack-plugin": "^5.3.10",
     "thread-loader": "^3.0.4",
     "uglify-js": "^3.17.4",
     "webpack": "^5.75.0",
@@ -48,7 +49,6 @@
     "webpack-cli": "^5.0.1",
     "webpack-merge": "^5.8.0",
     "webpack-merge-and-include-globally": "^2.3.4",
-    "webpack-parallel-uglify-plugin": "^2.0.0",
     "webpack-remove-empty-scripts": "^1.0.1"
   },
   "browserslist": [

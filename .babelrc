@@ -1,15 +1,17 @@
 {
   "presets": [
     [
-      "babel-preset-env",
+      "@babel/preset-env",
       {
-        "useBuiltIns": "usage"
+        "targets": {
+          "browsers": ["> 1%", "Chrome > 60", "Firefox > 60", "not ie <= 10"]
+        },
+        "useBuiltIns": false
       }
     ]
   ],
   "ignore": [
     "assets/CodeMirror/addon/*/*.js",
     "assets/CodeMirror/mode/*/*.js"
-  ],
-  "plugins": ["transform-runtime"]
+  ]
 }
