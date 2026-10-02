@@ -109,8 +109,24 @@ class Main {
     public function init_cookie() {
         // 语言配置
         $language = get_bloginfo("language");
-        if (!isset($_COOKIE["wp-editormd-lang"]) || $_COOKIE["wp-editormd-lang"] !== $language) {
-            setcookie("wp-editormd-lang", $language, 0, "/");
+
+        // 安全加固：原实现未设置 SameSite / Secure，且读取 $_COOKIE 时未做净化。
+        // 该 Cookie 仅用于前端语言判断，不含敏感信息，但这里仍补全安全属性。
+        // 注意：不设置 httponly —— sm-ms 管理页前端应用（Vue）需要读取它来决定界面语言。
+        $cookie_lang = isset($_COOKIE["wp-editormd-lang"])
+            ? sanitize_text_field(wp_unslash($_COOKIE["wp-editormd-lang"]))
+            : "";
+
+        if ($cookie_lang === $language) {
+            return;
         }
+
+        setcookie("wp-editormd-lang", $language, array(
+            "expires"  => 0,
+            "path"     => "/",
+            "secure"   => is_ssl(),
+            "httponly" => false,
+            "samesite" => "Lax",
+        ));
     }
 }

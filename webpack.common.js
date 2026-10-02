@@ -1,7 +1,9 @@
 // Third-party packages
 const path = require("path");
 const webpack = require("webpack");
-const ParallelUglifyPlugin = require("webpack-parallel-uglify-plugin");
+// 构建链现代化：webpack-parallel-uglify-plugin 已停止维护且与 webpack 5 兼容性不佳，
+// 改用 webpack 5 官方推荐的 terser-webpack-plugin（并行压缩在内部完成）。
+const TerserPlugin = require("terser-webpack-plugin");
 const MergeIntoSingleFilePlugin = require("webpack-merge-and-include-globally");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const RemoveEmptyScriptsPlugin = require("webpack-remove-empty-scripts");
@@ -53,13 +55,12 @@ module.exports = {
   devtool: false,
   optimization: {
     minimizer: [
-      new ParallelUglifyPlugin({
-        cacheDir: ".cache/",
-        sourceMap: isDevMode ? true : false,
-        uglifyJS: {
-          output: {
+      new TerserPlugin({
+        parallel: true,
+        extractComments: false,
+        terserOptions: {
+          format: {
             comments: false,
-            beautify: false,
             preamble: banner,
           },
           compress: {
@@ -202,9 +203,9 @@ module.exports = {
           },
           {
             loader: "sass-loader",
-            options: {
-              implementation: require("node-sass"),
-            },
+            // 构建链现代化：原实现强制指定 node-sass（LibSass）作为 sass 实现，
+            // 而 node-sass 8 仅支持 Node ≤18，且需要本地编译，是「现代 Node 下无法构建」的根因。
+            // 这里移除该指定，sass-loader 会自动使用 dart-sass（sass 包）。
           },
         ],
       },

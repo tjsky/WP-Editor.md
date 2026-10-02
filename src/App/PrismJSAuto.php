@@ -9,7 +9,8 @@ class PrismJSAuto {
     public function __construct() {
         add_action("wp_enqueue_scripts", array($this, "prism_styles_scripts"));
 
-        if(!in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
+        // 兼容性修复：$GLOBALS["pagenow"] 在部分上下文（CLI、REST）并不存在，补 isset 兜底
+        if (!isset($GLOBALS["pagenow"]) || !in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
             add_action("wp_print_footer_scripts", array($this, "prism_wp_footer_scripts"));
         }
     }
@@ -85,9 +86,12 @@ class PrismJSAuto {
     }
 
     public function prism_wp_footer_scripts() {
+        // 安全修复：原实现把资源地址直接 echo 进 JS 双引号字符串，
+        // 改用 wp_json_encode() 输出，避免地址中的引号/换行破坏脚本或注入代码。
+        $languages_path = Config::get_option('editor_addres','editor_style') . '/assets/Prism.js/components/';
         ?>
         <script type="text/javascript">
-            Prism.plugins.autoloader.languages_path = "<?php echo Config::get_option('editor_addres','editor_style') . '/assets/Prism.js/components/' ?>";
+            Prism.plugins.autoloader.languages_path = <?php echo wp_json_encode( esc_url_raw( $languages_path ) ); ?>;
         </script>
         <?php
     }

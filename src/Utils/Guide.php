@@ -29,7 +29,11 @@ class Guide {
                 /* make sure pointers will actually work and have content */
                 if (typeof(jQuery().pointer) !== "undefined") {
                     $("#menu-settings").pointer({
-                        content: "<?php echo $pointer_content; ?>",
+                        // 安全修复：原实现把翻译串直接 echo 进 JS 双引号字符串，
+                        // 语言包内容一旦包含引号或 </script> 即可造成脚本注入。
+                        // 改用 wp_json_encode() 并开启 HEX_TAG 等选项，彻底阻断闭合标签与引号逃逸，
+                        // 同时保持指针内容中的 HTML 正常渲染。
+                        content: <?php echo wp_json_encode( $pointer_content, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); ?>,
                         position: {
                             edge: "left",
                             align: "center"
@@ -37,7 +41,8 @@ class Guide {
                         close: function () {
                             $.post(ajaxurl, {
                                 pointer: "editormd",
-                                action: "dismiss-wp-pointer"
+                                action: "dismiss-wp-pointer",
+                                _ajax_nonce: <?php echo wp_json_encode( wp_create_nonce( "dismiss-pointer_editormd" ) ); ?>
                             });
                         }
                     }).pointer("open");

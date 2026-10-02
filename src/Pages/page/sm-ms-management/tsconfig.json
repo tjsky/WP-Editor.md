@@ -10,10 +10,14 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
+    // 构建链修复：webpack 5 自带的 types.d.ts 使用了比本项目锁定的 TypeScript 3.9
+    // 更新的语法，会被 tsc 报 TS1128 导致构建失败。skipLibCheck 跳过所有
+    // 声明文件（.d.ts）的类型检查，是处理该问题的标准做法，且不影响运行时行为。
+    "skipLibCheck": true,
     "baseUrl": ".",
+    // 原types列表重复且显式引入了 "webpack"（@types/webpack@5 只是转发到 webpack
+    // 自身类型，TS 3.9 无法解析），这里只保留运行时确实需要的 webpack-env。
     "types": [
-      "webpack-env",
-      "webpack",
       "webpack-env"
     ],
     "paths": {

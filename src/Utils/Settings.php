@@ -24,6 +24,68 @@ class Settings {
 
     private $settings_api;
 
+    /**
+     * @var string|null 静态资源包版本号（惰性加载）
+     */
+    private $static_file_ver = null;
+
+    /**
+     * @var array 各分组的字段类型表，用于统一净化写入值
+     */
+    private static $field_types = array(
+        "editor_basics"       => array(
+            "task_list"           => "onoff",
+            "imagepaste"          => "onoff",
+            "imagepaste_sm"       => "onoff",
+            "imagepaste_sm_token" => "text",
+            "image_link"          => "onoff",
+            "open_in_new_tab"     => "onoff",
+            "live_preview"        => "onoff",
+            "sync_scrolling"      => "onoff",
+            "html_decode"         => "onoff",
+            "support_front"       => "onoff",
+            "support_reply"       => "onoff",
+            "support_other_text"  => "text",
+        ),
+        "editor_style"        => array(
+            "theme_style"   => "key",
+            "code_style"    => "key",
+            "editor_addres" => "url",
+        ),
+        "syntax_highlighting" => array(
+            "highlight_mode_auto"     => "onoff",
+            "line_numbers"            => "onoff",
+            "show_language"           => "onoff",
+            "copy_clipboard"          => "onoff",
+            "highlight_library_style" => "key",
+            "customize_my_style"      => "text",
+        ),
+        "editor_emoji"        => array(
+            "support_emoji" => "onoff",
+        ),
+        "editor_toc"          => array(
+            "support_toc" => "onoff",
+        ),
+        "editor_latex"        => array(
+            "support_latex" => "key",
+        ),
+        "editor_mermaid"      => array(
+            "support_mermaid" => "onoff",
+            "mermaid_config"  => "json",
+        ),
+        "editor_mindmap"      => array(
+            "support_mindmap"   => "onoff",
+            "customize_mindmap" => "url",
+        ),
+        "editor_advanced"     => array(
+            "jquery_compatible" => "onoff",
+            "hide_ads"          => "onoff",
+        ),
+        "editor_version"      => array(
+            "wp_editormd_ver" => "version",
+        ),
+    );
+
     function __construct($plugin_name, $version, $text_domain) {
         $this->plugin_name = $plugin_name;
         $this->text_domain = $text_domain;
@@ -35,41 +97,177 @@ class Settings {
         add_action("admin_init", array($this, "admin_init"));
         add_action("admin_menu", array($this, "admin_menu"));
 
-        // 只在插件设置页面加载相关静态资源
-        if (isset($_GET["page"]) && $_GET["page"] == "wp-editormd-settings") {
-            add_action("admin_enqueue_scripts", array($this, "code_mirror_script"));
-    
-            wp_enqueue_style("jQuery.Modal", Config::get_option("editor_addres","editor_style") . "/assets/jQuery.Modal/jquery.modal.min.css", array(), WP_EDITORMD_VER, "all");
-            wp_enqueue_script("jQuery.Modal", Config::get_option("editor_addres","editor_style") . "/assets/jQuery.Modal/jquery.modal.min.js", array("jquery"), WP_EDITORMD_VER, true);
+        // 安全加固：统一净化写入值
+        // 第三方设置库 SettingsApi::sanitize_options() 只会对「显式声明了
+        // sanitize_callback 的字段」调用回调，未声明的一律原样入库；而本插件
+        // 一个字段都没声明，等于净化完全失效。这里不依赖该机制，改为挂
+        // pre_update_option_{section} 过滤器，对所有写入路径（设置页保存、
+        // Config::update_option()、升级器）统一兜底。
+        foreach (array_keys(self::$field_types) as $section) {
+            add_filter("pre_update_option_" . $section, array($this, "sanitize_section"), 10, 3);
         }
+
+        // 兼容性修复：原实现在构造函数（插件加载期，早于 admin_enqueue_scripts）
+        // 直接 wp_enqueue_style/script，WordPress 6.3 起会触发 _doing_it_wrong 提示。
+        add_action("admin_enqueue_scripts", array($this, "enqueue_settings_assets"));
+    }
+
+    /**
+     * 加载设置页专用静态资源
+     */
+    public function enqueue_settings_assets() {
+        if (! $this->is_settings_page()) {
+            return;
+        }
+
+        $this->code_mirror_script();
+
+        $base = Config::get_option("editor_addres", "editor_style");
+        wp_enqueue_style("jQuery.Modal", $base . "/assets/jQuery.Modal/jquery.modal.min.css", array(), WP_EDITORMD_VER, "all");
+        wp_enqueue_script("jQuery.Modal", $base . "/assets/jQuery.Modal/jquery.modal.min.js", array("jquery"), WP_EDITORMD_VER, true);
+    }
+
+    /**
+     * 当前是否为本插件设置页
+     *
+     * @return bool
+     */
+    private function is_settings_page() {
+        $page = isset($_GET["page"]) ? sanitize_key(wp_unslash($_GET["page"])) : "";
+
+        return "wp-editormd-settings" === $page;
+    }
+
+    /**
+     * 统一净化某一分组的写入值（pre_update_option_{$section} 回调）
+     *
+     * @param mixed  $value     新值
+     * @param mixed  $old_value 旧值
+     * @param string $option    分组名
+     *
+     * @return array
+     */
+    public function sanitize_section($value, $old_value, $option) {
+        if (! is_array($value)) {
+            return is_array($old_value) ? $old_value : array();
+        }
+
+        $allowed = isset(self::$field_types[$option]) ? self::$field_types[$option] : array();
+        $old     = is_array($old_value) ? $old_value : array();
+        $clean   = array();
+
+        foreach ($value as $key => $item) {
+            // 丢弃未在白名单中声明的键，避免选项注入
+            if (! array_key_exists($key, $allowed)) {
+                continue;
+            }
+
+            $type = $allowed[$key];
+            $old_item = isset($old[$key]) ? $old[$key] : "";
+
+            switch ($type) {
+                case "onoff":
+                    $clean[$key] = ("on" === $item) ? "on" : "off";
+                    break;
+                case "key":
+                    // 枚举值：theme_style / code_style / highlight_library_style / support_latex
+                    $clean[$key] = sanitize_key((string) $item);
+                    break;
+                case "url":
+                    // 需兼容协议相对地址（//cdn.example.com/...），esc_url_raw 可正确处理
+                    $clean[$key] = esc_url_raw(trim((string) $item));
+                    break;
+                case "json":
+                    $decoded = json_decode((string) $item, true);
+                    // JSON 非法时保留旧值，避免把坏配置写进去导致前端 mermaid.initialize() 报错
+                    $clean[$key] = (JSON_ERROR_NONE === json_last_error()) ? (string) $item : (string) $old_item;
+                    break;
+                case "version":
+                    $clean[$key] = preg_match("/^[0-9]{1,3}\.[0-9]{1,2}\.[0-9]{1,2}$/", (string) $item)
+                        ? (string) $item
+                        : (string) $old_item;
+                    break;
+                case "text":
+                default:
+                    $clean[$key] = sanitize_text_field((string) $item);
+                    break;
+            }
+        }
+
+        // 合并未提交的其它已知字段（例如设置页只提交当前分组的隐藏域）
+        foreach ($old as $key => $item) {
+            if (! array_key_exists($key, $clean) && array_key_exists($key, $allowed)) {
+                $clean[$key] = $item;
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * 插件静态资源默认地址（插件自带本地资源）
+     *
+     * 调整说明：原实现默认从 jsdelivr CDN 加载编辑器的 JS/CSS，后台因此会向第三方
+     * CDN 发起请求，存在供应链与隐私风险。现改为默认使用插件自带的本地资源。
+     *
+     * @return string
+     */
+    public static function default_static_address() {
+        return WP_EDITORMD_URL;
+    }
+
+    /**
+     * 思维导图库默认地址
+     *
+     * @return string
+     */
+    public static function default_mindmap_address() {
+        return WP_EDITORMD_URL . "/assets/MindMap/mindMap.min.js";
     }
 
     function admin_init() {
-        //检查编辑器静态资源，如果是默认配置选项提前条件下，不符合最新版资源强制升级
-        $option = get_option("editor_style");
-        $addres = $option["editor_addres"];
-        // is_ssl 判断网站是否启用ssl不准确
-        $jsdelivrLatest = "https://cdn.jsdelivr.net/wp/wp-editormd/tags/" . WP_EDITORMD_VER;
-
-        // 判断本地选项是否jsdelivr地址，如果是则判断是否最新地址
-        // jsdelivr始终提供https地址，所以，我们无需管用户当前是否启用ssl，一律加载https的jsdelivr
-        // 否则由于is_ssl的判断失误，导致https的网站尝试去加载http的jsdelivr而被浏览器安全策略阻止
-        // 同时，http网页加载https资源更安全，无法被运营商劫持
-        $addresResult = preg_match("/cdn\.jsdelivr\.net/i",$addres);
-        if ($addresResult && $addres !== $jsdelivrLatest) {
-            $option["editor_addres"] =  $jsdelivrLatest;
-            update_option("editor_style",$option);
+        // 资源地址校正与一次性迁移
+        $style_option = get_option("editor_style");
+        if (! is_array($style_option)) {
+            // 兼容性修复：原实现直接 $option["editor_addres"] 取值，
+            // 选项缺失时会触发 PHP 8 的 Undefined array key 与 preg_match(null) 弃用告警
+            $style_option = array();
         }
-        //如果空值填入最新CDN地址 - 编辑器静态地址
+
+        $addres = isset($style_option["editor_addres"]) ? (string) $style_option["editor_addres"] : "";
+
+        // 历史配置里若指向 jsdelivr CDN，一次性迁移为本地资源
+        if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net#i", $addres)) {
+            $style_option["editor_addres"] = self::default_static_address();
+            update_option("editor_style", $style_option);
+        }
+
+        // 空值填入默认（本地）地址 - 编辑器静态地址
         if (Config::get_option("editor_addres", "editor_style") === "") {
-            $option["editor_addres"] =  $jsdelivrLatest;
-            update_option("editor_style",$option);
+            $style_option["editor_addres"] = self::default_static_address();
+            update_option("editor_style", $style_option);
         }
 
-        //如果空值填入最新CDN地址 - 思维导图
+        // 空值填入默认（本地）地址 - 思维导图
+        //
+        // 数据损坏修复：原实现复用了上面取自 editor_style 的 $option 变量，
+        // 随后 update_option("editor_mindmap", $option) —— 这会把 editor_style 的
+        // 整个数组写进 editor_mindmap，导致 support_mindmap 等键丢失、思维导图功能失效。
+        // 现改用独立的 $mindmap_option。
+        $mindmap_option = get_option("editor_mindmap");
+        if (! is_array($mindmap_option)) {
+            $mindmap_option = array();
+        }
+
+        $mindmap_address = isset($mindmap_option["customize_mindmap"]) ? (string) $mindmap_option["customize_mindmap"] : "";
+        if ("" !== $mindmap_address && preg_match("#cdn\.jsdelivr\.net#i", $mindmap_address)) {
+            $mindmap_option["customize_mindmap"] = self::default_mindmap_address();
+            update_option("editor_mindmap", $mindmap_option);
+        }
+
         if (Config::get_option("customize_mindmap", "editor_mindmap") === "") {
-            $option["customize_mindmap"] =  $jsdelivrLatest . "/assets/MindMap/mindMap.min.js";
-            update_option("editor_mindmap",$option);
+            $mindmap_option["customize_mindmap"] = self::default_mindmap_address();
+            update_option("editor_mindmap", $mindmap_option);
         }
 
         //set the settings
@@ -78,8 +276,6 @@ class Settings {
 
         //initialize settings
         $this->settings_api->admin_init();
-
-        // 检查是否携带需要弹出Modal的参数
     }
 
     function admin_menu() {
@@ -116,55 +312,116 @@ class Settings {
         );
     }
 
+    /**
+     * 读取远程文本内容
+     *
+     * 安全修复：原实现用 @file_get_contents() 读取，失败后再用 curl 兜底，且 URL 完全
+     * 由管理员选项 editor_addres 拼接而成 —— file_get_contents 对 file:// 等非 http 协议
+     * 同样有效，因此构成盲 SSRF / 本地文件读取面；同时该方法在 admin_init 中被同步调用，
+     * 每个后台请求（含 admin-ajax.php）最坏要阻塞 3 秒 × 2 次。
+     *
+     * 现改为：仅允许 http/https、使用 WordPress 官方 HTTP API（自带超时与证书校验）、
+     * 且结果由调用方通过 transient 缓存。
+     *
+     * @param string $url
+     *
+     * @return string
+     */
     function file_get_content($url) {
-        $timeout = 3;
-        if (function_exists("file_get_contents")) {
-            $ctx = stream_context_create(
-                [ 'http' => [ 'timeout' => $timeout ] ]
-            );
+        if (! is_string($url) || "" === $url) {
+            return "";
+        }
 
-            $file_contents = @file_get_contents($url, false, $ctx);
+        $parts = wp_parse_url($url);
+        if (empty($parts["scheme"]) || ! in_array(strtolower($parts["scheme"]), array("http", "https"), true)) {
+            return "";
         }
-        if ($file_contents == "") {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-            $file_contents = curl_exec($ch);
-            curl_close($ch);
+
+        $response = wp_remote_get($url, array(
+            "timeout"     => 5,
+            "redirection" => 3,
+            "sslverify"   => true,
+        ));
+
+        if (is_wp_error($response)) {
+            return "";
         }
-        return $file_contents;
+
+        return (string) wp_remote_retrieve_body($response);
+    }
+
+    /**
+     * 获取静态资源包版本号
+     *
+     * 优先读取插件自带的本机文件，避免任何网络往返；仅在配置指向外部地址时
+     * 才发起一次远程请求，并用 transient 缓存 12 小时。
+     *
+     * @return string
+     */
+    private function get_static_file_ver() {
+        if (null !== $this->static_file_ver) {
+            return $this->static_file_ver;
+        }
+
+        $cached = get_transient("editormd_static_file_ver");
+        if (false !== $cached && is_string($cached) && "" !== $cached) {
+            $this->static_file_ver = $cached;
+
+            return $this->static_file_ver;
+        }
+
+        $version  = "0.0.0";
+        $localFile = WP_EDITORMD_PATH . "/assets/version.json";
+
+        if (file_exists($localFile)) {
+            $editormd = json_decode((string) file_get_contents($localFile), true);
+        } else {
+            $address  = (string) Config::get_option("editor_addres", "editor_style");
+            $editormd = json_decode($this->file_get_content(trailingslashit($address) . "assets/version.json"), true);
+        }
+
+        if (is_array($editormd) && ! empty($editormd["version"]) && is_scalar($editormd["version"])) {
+            $version = (string) $editormd["version"];
+        }
+
+        set_transient("editormd_static_file_ver", $version, 12 * HOUR_IN_SECONDS);
+
+        $this->static_file_ver = $version;
+
+        return $version;
+    }
+
+    /**
+     * 返回资源版本状态
+     *
+     * 兼容性修复：原实现是定义在 get_settings_sections() 方法体内的嵌套函数
+     * function upgradeEditormdFile()，方法被调用两次就会 "Cannot redeclare function" 致命错误；
+     * 同时用 define() 声明 WP_EDITORMD_STATIC_FILE_VER，重复调用也会告警。
+     * 现改为类方法 + 惰性取值。
+     *
+     * @return string
+     */
+    public function upgrade_editormd_file() {
+        if ($this->get_static_file_ver() !== WP_EDITORMD_VER) {
+            add_action("admin_notices", function () {
+                $message = __("The resources used by the plugin check are outdated. Please upgrade the latest resources.", "editormd");
+                printf('<div class="error"><p>%1$s</p></div>', esc_html($message));
+            });
+
+            return '<span class="error">' . esc_html__('Status: Please Update!', 'editormd') . '</span> '
+                . '<a href="https://github.com/tjsky/WP-Editor.md/releases/latest" rel="noopener">' . esc_html__('Downaload', 'editormd') . '</a>';
+        }
+
+        return '<span class="updated">' . esc_html__('Status: Latest', 'editormd') . '</span>';
     }
 
     function get_settings_sections() {
-        //判断资源版本
-        $file_json = Config::get_option("editor_addres","editor_style") . "/assets/version.json";
-        $json_string = $this->file_get_content($file_json);
-        $editormd = json_decode($json_string, true);
-        if ($editormd != null) {
-            $file_version = $editormd["version"];
-            define("WP_EDITORMD_STATIC_FILE_VER", $file_version); //编辑器静态资源版本
-        } else {
-            define("WP_EDITORMD_STATIC_FILE_VER", "0.0.0"); //编辑器静态资源版本
+        // 判断资源版本（结果带 12 小时缓存，且优先读本地文件，不再每次后台请求都外联）
+        if ("0.0.0" === $this->get_static_file_ver()) {
             add_action("admin_notices", function () {
                 $message = __("The resource package is corrupt, please download again!", "editormd");
                 printf('<div class="error"><p>%1$s</p></div>', esc_html($message));
             });
-        }
-        /**
-         * 返回资源版本状态
-         * @return string
-         */
-        function upgradeEditormdFile() {
-            if (WP_EDITORMD_STATIC_FILE_VER !== WP_EDITORMD_VER) {
-                add_action("admin_notices", function () {
-                    $message = __("The resources used by the plugin check are outdated. Please upgrade the latest resources.", "editormd");
-                    printf('<div class="error"><p>%1$s</p></div>', esc_html($message));
-                });
-                return '<span class="error">'. __('Status: Please Update!', 'editormd') .'</span><a href="https://github.com/LuRenJiasWorld/WP-Editor.md/releases/latest">'. __('Downaload', 'editormd') .'</a>';
-            } else {
-                return '<span class="updated">'. __('Status: Latest', 'editormd') .'</span>';
-            }
         }
 
         $sections = array(
@@ -452,9 +709,10 @@ class Settings {
                 array(
                     'name'    => 'editor_addres',
                     'label'   => __('Editor.md Static Resource Addres', $this->text_domain),
-                    'desc'    => __('Please make sure the resources are up to date.<br/>' , $this->text_domain) . __('Please upload the resource (the unzipped folder name is "assets") to your server or cdn. If your resource address is: "http(s)://example.com/myfile/assets", you should fill in: "http(s)://example.com/myfile ". <br/>',$this->text_domain) . upgradeEditormdFile(),
+                    'desc'    => __('Please make sure the resources are up to date.<br/>' , $this->text_domain) . __('Please upload the resource (the unzipped folder name is "assets") to your server or cdn. If your resource address is: "http(s)://example.com/myfile/assets", you should fill in: "http(s)://example.com/myfile ". <br/>',$this->text_domain) . $this->upgrade_editormd_file(),
                     'type'    => 'text',
-                    'default' => '//cdn.jsdelivr.net/wp/wp-editormd/tags/' . WP_EDITORMD_VER
+                    // 默认使用插件自带的本地资源（原默认值为 jsdelivr CDN 地址）
+                    'default' => self::default_static_address()
                 ),
             ),
             'syntax_highlighting' => array(
@@ -590,7 +848,7 @@ class Settings {
                     'name'    => 'customize_mindmap',
                     'label'   => __('Customize MindMap Library', $this->text_domain),
                     'type'    => 'text',
-                    'default' => Config::get_option('editor_addres','editor_style') . '/assets/MindMap/mindMap.min.js'
+                    'default' => self::default_mindmap_address()
                 ),
            ),
             'editor_advanced'     => array(
@@ -668,7 +926,8 @@ class Settings {
 
     private function script_style() {
         $editor_style_base_address = Config::get_option("editor_addres", "editor_style");
-        include "Settings/settings.css.php";
-        include "Settings/settings.js.php";
+        // 兼容性修复：原先使用相对路径 include("Settings/...")，依赖 include_path/CWD 解析，比较脆弱
+        include __DIR__ . "/Settings/settings.css.php";
+        include __DIR__ . "/Settings/settings.js.php";
     }
 }

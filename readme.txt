@@ -1,11 +1,11 @@
 === WP Editor.md - The Perfect WordPress Markdown Editor ===
-Contributors: LuRenJiasWorld
+Contributors: LuRenJiasWorld, tjsky
 Donate link: https://untitled.pw/
-Tags: Editor,Markdown,Markdown Edit,Jetpack,LaTeX,KaTeX,PrismJS,Mermaid
-Requires at least: 5.0.0
-Tested up to: 6.1.1
-Stable tag: 10.2.1
-Requires PHP: 5.6.0
+Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
+Requires at least: 5.0
+Tested up to: 7.1
+Stable tag: 10.3.0
+Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -17,15 +17,33 @@ WP Editor.md is a beautiful and practical Markdown document editor.
 
 Build support for the WordPress on Editor.md.
 
-The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) for parsing and saving content.Thank for Jetpack modules.
+The plugin parses and stores Markdown with a **bundled** fork of Automattic's Jetpack Markdown
+module (`src/App/WPComMarkdown.php` + `src/App/WPMarkdownParser.php`). Jetpack itself is
+**not** required — the parser has been vendored into this plugin since 8.x, and Jetpack has
+long since dropped its own Markdown module.
+
+=== 10.3.0 安全加固与兼容性说明 ==
+
+本版本由 tjsky 在原作者停止维护（最后版本 10.2.1）后继续维护，主要修复安全问题并适配
+WordPress 7.1 / PHP 8.4：
+
+* 修复 KaTeX 公式渲染链路的存储型 XSS（`src/App/KaTeX.php`）。该问题与公开披露的
+  CVE-2025-31035（Stored XSS，影响 <= 10.2.1）属同类，且受影响的权限门槛更低。
+* 修复图片粘贴上传接口（`src/App/ImagePaste.php`）：补齐权限与 nonce 校验、按文件内容
+  校验真实图片类型、限制体积、改用 WordPress 官方 API 落盘、开启图床上传的 TLS 校验。
+* 修复 sm.ms 图床代理的 SSRF / 开放代理问题，改为固定上游白名单并开启证书校验。
+* 修复设置页 `editor_mindmap` 选项被 `editor_style` 数组覆盖导致思维导图失效的数据损坏缺陷。
+* 修复后台每个请求都会同步发起外部 HTTP 请求（最坏阻塞 6 秒）的问题。
+* 修复携带特定 Cookie 即可触发致命错误（白屏）的缺陷；修复插件卸载时的语法级致命错误。
+* 默认静态资源改由插件本地提供，不再默认从第三方 CDN 加载编辑器脚本与样式。
+* 移除会 `wp_deregister_script("jquery")` 并改用 jQuery 1.12.4 的分支，统一使用 WordPress 自带 jQuery。
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/plugin-name` directory, or install the plugin through the WordPress plugins screen directly.
-1. Activate the plugin through the 'Plugins' screen in WordPress
-1. Use the Settings->Editor.MD screen to configure the plugin
-1. (Make your instructions match the desired user flow for activating and installing your plugin. Include any steps that might be needed for explanatory purposes)
-
+1. Upload the plugin files to the `/wp-content/plugins/wp-editormd` directory, or install
+   the plugin through the WordPress plugins screen directly.
+2. Activate the plugin through the 'Plugins' screen in WordPress.
+3. Use the Settings -> WP Editor.md screen to configure the plugin.
 
 == Frequently Asked Questions ==
 
@@ -52,12 +70,24 @@ We recommend that you enable plugins in a clean environment (please disable othe
 
 == Changelog ==
 
+= 10.3.0 =
+* 安全修复：KaTeX 公式渲染的存储型 XSS（CVE-2025-31035 同类问题）
+* 安全修复：图片粘贴接口缺失权限/CSRF 校验、任意文件写入、无体积上限
+* 安全修复：sm.ms 图床代理 SSRF / 开放代理、TLS 证书校验被关闭
+* 安全修复：后台设置页与调试面板的输出未转义、sm.ms 令牌经 URL 泄漏
+* 缺陷修复：editor_mindmap 选项被 editor_style 覆盖导致思维导图失效
+* 缺陷修复：后台每个请求同步外联（最坏 6 秒）、登录用户每请求重跑升级器
+* 缺陷修复：携带 wp-editormd-dev-logmode Cookie 触发致命错误（白屏）
+* 缺陷修复：卸载插件时的文件级 static 语法错误
+* 兼容性：适配 WordPress 7.1 与 PHP 8.4（动态属性、null 传参、htmlspecialchars 默认值变更等）
+* 兼容性：不再默认从第三方 CDN 加载静态资源；移除 jQuery 1.12.4 分支
+* 构建：node-sass 迁移至 dart-sass，移除已停止维护的 webpack-parallel-uglify-plugin
+
 = 10.2.1 =
+* 请参见 https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md
 
-* 参考 [https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md](https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md)
-* Please see [https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md](https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md)
-* 參照 [https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md](https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md)
+= 10.2.0 =
+* 请参见 https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md
 
-注意：如果使用插件请不要使用Gutenberg编辑器，会出现文章数据丢失的问题。
-
-More changlog please see the [Github CHANGELOG.md](https://github.com/LuRenJiasWorld/WP-Editor.md/blob/master/CHANGELOG.md)
+注意：如果使用插件请不要使用 Gutenberg 区块编辑器，会出现文章数据丢失的问题。
+本版本默认继续禁用区块编辑器，如需放开可使用 `editormd_disable_block_editor` 过滤器。

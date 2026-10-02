@@ -19,6 +19,14 @@ class WPComMarkdown {
     private $monitoring = array("post" => array(), "parent" => array());
 
     /**
+     * @var bool KSES 过滤器是否曾被移除
+     *
+     * 兼容性修复：maybe_remove_kses() 中会写 $this->kses，但该属性从未声明，
+     * PHP 8.2 起「创建动态属性」已弃用，故在此显式声明。
+     */
+    private $kses = false;
+
+    /**
      * Singleton silence is golden
      */
     public function __construct($text_domain) {
@@ -224,6 +232,15 @@ class WPComMarkdown {
      * Remove KSES if it's there. Store the result to manually invoke later if needed.
      */
     public function maybe_remove_kses() {
+        // 安全说明：本方法在当前代码中**没有任何调用点**（属历史遗留的死代码），因此不影响运行。
+        // 原实现会在「Markdown 写作开启」时无条件移除 content_save_pre / content_filtered_save_pre
+        // 上的 wp_filter_post_kses，即关闭文章保存期的内容过滤——这是典型的存储型 XSS 放大面。
+        // 为杜绝后续被误接线的风险，这里加上硬性护栏：仅对拥有 unfiltered_html 能力的用户（通常是
+        // 单站点管理员）才允许移除，其余用户一律保留 KSES。
+        if (! is_user_logged_in() || ! current_user_can("unfiltered_html")) {
+            return;
+        }
+
         // Filters return true if they existed before you removed them
         if ($this->is_posting_enabled()) {
             $this->kses = remove_filter("content_filtered_save_pre", "wp_filter_post_kses") && remove_filter("content_save_pre", "wp_filter_post_kses");
@@ -712,6 +729,13 @@ class WPComMarkdown {
      */
     protected function check_for_early_methods() {
         $raw_post_data = file_get_contents("php://input");
+
+        // 兼容性修复：读取 php://input 失败时返回 false，
+        // 原实现直接把 false 传给 strpos()，PHP 8.1 起会触发弃用告警。
+        if (false === $raw_post_data || "" === $raw_post_data) {
+            return;
+        }
+
         if (false === strpos($raw_post_data, "metaWeblog.getPost")
              && false === strpos($raw_post_data, "wp.getPage")) {
             return;

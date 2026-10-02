@@ -22,7 +22,8 @@ class KaTeX {
         //前端加载资源
         add_action("wp_enqueue_scripts", array($this, "katex_enqueue_scripts"));
 
-        if (! in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
+        // 兼容性修复：$GLOBALS["pagenow"] 在部分上下文（CLI、REST）并不存在，补 isset 兜底
+        if (! isset($GLOBALS["pagenow"]) || ! in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
             //执行公式渲染操作
             add_action("wp_print_footer_scripts", array($this, "katex_wp_footer_scripts"));
         }
@@ -127,7 +128,10 @@ class KaTeX {
 
         $katex = $this->katex_entity_decode_editormd($katex);
 
-        return '<span class="katex math inline">' . trim($katex) . '</span>';
+        // 安全修复：katex_entity_decode_editormd() 会把 &lt; / &gt; / &quot; / &#039; 还原为真实字符，
+        // 若不转义即拼接输出，会形成存储型 XSS（the_content / comment_text 均晚于保存期 kses，故 wp_kses 拦不住）。
+        // KaTeX 前端以 .text() 取值渲染，浏览器会自行还原实体，因此这里 esc_html() 不影响公式渲染。
+        return '<span class="katex math inline">' . esc_html( trim( $katex ) ) . '</span>';
     }
 
     public function katex_markup_double($content) {
@@ -222,7 +226,8 @@ class KaTeX {
 
         $katex = $this->katex_entity_decode_editormd($katex);
 
-        return '<span class="katex math multi-line">' . trim($katex) . '</span>';
+        // 安全修复：同 katex_markup_single，输出必须转义，否则实体还原后可注入 HTML。
+        return '<span class="katex math multi-line">' . esc_html( trim( $katex ) ) . '</span>';
     }
 
     public function katex_src_replace($matches) {
@@ -244,12 +249,11 @@ class KaTeX {
      * @return string|null
      */
     public function code_katex_src_replace($matches) {
-        $matches = func_get_arg(0);
-
         if (! empty($matches[1])) {
             $katex = $matches[1];
             $katex = $this->katex_entity_decode_editormd($katex);
-            return '<span class="katex math inline">' . trim($katex) . '</span>';
+            // 安全修复：输出转义（同上）。
+            return '<span class="katex math inline">' . esc_html( trim( $katex ) ) . '</span>';
         }
 
         return null;
@@ -289,13 +293,10 @@ class KaTeX {
 
     public function katex_enqueue_scripts() {
 
-        //兼容模式 - jQuery
-        if (Config::get_option("jquery_compatible", "editor_advanced") !== "off") {
-            wp_enqueue_script("jquery", null, null, array(), false);
-        } else {
-            wp_deregister_script("jquery");
-            wp_enqueue_script("jQuery-CDN", Config::get_option("editor_addres","editor_style") . "/assets/jQuery/jquery.min.js", array(), WP_EDITORMD_VER, true);
-        }
+        // jQuery 统一使用 WordPress 自带版本。
+        // 安全修复：原「非兼容模式」会 wp_deregister_script("jquery") 并改为加载 jQuery 1.12.4，
+        // 该版本存在已知 XSS 漏洞（如 CVE-2015-9251），且会破坏依赖 core jQuery 的其它插件，故移除该分支。
+        wp_enqueue_script("jquery");
 
         wp_enqueue_style("Katex", Config::get_option("editor_addres","editor_style") . "/assets/KaTeX/katex.min.css", array(), WP_EDITORMD_VER, "all");
         wp_enqueue_script("Katex", Config::get_option("editor_addres","editor_style") . "/assets/KaTeX/katex.min.js", array(), WP_EDITORMD_VER, true);
@@ -315,7 +316,7 @@ class KaTeX {
                             try {
                                 katex.render(texTxt, el);
                             } catch (err) {
-                                $(this).html("<span class=\"err\">" + err);
+                                $(this).text(err);
                             }
                         } else {
                             $(this).parent().text($(this).parent().text());
@@ -327,7 +328,7 @@ class KaTeX {
                         try {
                             katex.render(texTxt, el, {displayMode: true})
                         } catch (err) {
-                            $(this).html("<span class=\"err\">" + err)
+                            $(this).text(err)
                         }
                     });
                 })

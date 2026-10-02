@@ -1,5 +1,136 @@
 # WP Editor.md
 
+### Version 10.3.0
+
+> 本版由 [@tjsky](https://github.com/tjsky) 在原作者停止维护后继续维护。
+> 上游自 10.2.1 起长期未更新，且该插件已于 2025-04-09 因安全问题被 WordPress.org 下架
+> （关联 **CVE-2025-31035**，Stored XSS，影响 `<= 10.2.1`，上游无修复版本）。
+> 本版**仅做安全加固与新版兼容性适配，未改动功能设计与数据结构，升级无需迁移**。
+
+#### 1. 安全修复
+
+* 修复 KaTeX 公式渲染链路的**存储型 XSS**（`src/App/KaTeX.php`）。实体编码的公式内容会被解码回真实字符后未转义直接输出，而 `the_content` 与 `comment_text` 均晚于保存期 kses，因此 kses 无法拦截。在文章或评论中投递 `$ &lt; img src=x onerror=... &gt; $` 即可执行脚本；因评论路径同样受影响，可利用门槛低于公开披露的同批问题
+* 修复图片粘贴接口（`src/App/ImagePaste.php`）的**无鉴权任意文件写入**：补齐 `upload_files` 能力校验与 nonce（CSRF）校验；改为按文件内容判定真实图片类型；限制单次负载体积；改用 WordPress 官方 API 落盘并在失败时清理残留；图床上传开启 TLS 证书校验
+* 修复 sm.ms 图床代理的 **SSRF / 开放代理**（`src/Pages/page/sm-ms-management/`）：上游地址改为固定白名单（仅 `https://smms.app/api/v2/*`），仅透传 `Authorization` 头，开启证书校验，补超时与响应体积上限，补同源校验
+* 修复后台管理页渲染器的**授权缺陷**（`src/Pages/Pages.php`）：能力校验由角色名改为 `manage_options`，修掉一处恒真的授权分支，`page` / `entry` 参数改为白名单分发以消除路径穿越，`$_GET` 补 `isset` 与 `sanitize_key`，消除 ReDoS 正则
+* 修复设置页**选项写入净化完全失效**（`src/Utils/Settings.php`）：第三方设置库只对显式声明 `sanitize_callback` 的字段生效，此前一个都未声明，等于全部选项未经净化即入库。改为挂 `pre_update_option_*` 按字段类型统一兜底
+* 修复**盲 SSRF 与后台卡顿**：设置页初始化会同步拉取远端 `version.json`，使每个后台请求最坏阻塞数秒。改为 `wp_remote_get` + 白名单 + 缓存，并移出后台同步路径
+* 修复携带 `wp-editormd-dev-logmode` Cookie 即触发致命错误（白屏）的缺陷
+* 修复插件卸载时的语法级致命错误（文件顶层非法使用 `static`）
+* 修复日志组件空实现导致所有日志调用抛异常的问题
+* 修复调试与设置页面的输出未转义与令牌经 GET 泄漏问题
+* 默认不再从第三方 CDN 加载编辑器脚本与样式，改由插件本地提供
+
+#### 2. 兼容性
+
+* `Tested up to` 更新为 WordPress 7.1，`Requires PHP` 明确为 7.4，实测通过 7.4 ~ 8.4
+* 修复**插件主文件在插件加载期调用用户上下文函数导致整站白屏**的问题（`pluggable.php` 尚未加载）
+* 修复 PHP 8.1+ `htmlspecialchars()` 默认 flags 变化影响存量内容渲染的问题（显式传入 flags 冻结行为）
+* 修复 `$GLOBALS['pagenow']` 未定义、Mermaid 配置为空时生成非法 JS、思维导图地址为空时误加载当前页等问题
+* 版本号比较改用 `version_compare`；移除会注销 WordPress 自带 jQuery 并改用 1.12.4 的分支
+* 多站点激活与卸载改为逐站点处理
+
+#### 3. 构建链
+
+* `node-sass`（仅支持 Node ≤ 18）更换为 `dart-sass`，项目因此可在现代 Node 下构建
+* 停止维护的 `webpack-parallel-uglify-plugin` 更换为 `terser-webpack-plugin`
+* Vue 子项目修复 `tsconfig`、`peerDependencies` 与 `publicPath` 硬编码插件目录名的问题
+* 清理 `assets/FrontStyle/FrontStyle.scss` 中一行残缺语句（libsass 静默忽略，dart-sass 会构建失败）
+* 新增 GitHub Actions 发布流程，打 tag 即从源码构建并自动附加可安装 zip
+
+#### 4. 顺带修复的历史遗留缺陷
+
+* `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
+* Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+
+------
+
+### Version 10.3.0
+
+> Maintained by [@tjsky](https://github.com/tjsky) after the original author stopped maintaining this project.
+> The plugin was **removed from WordPress.org on 2025-04-09 for a security issue** (related to
+> **CVE-2025-31035**, Stored XSS, affecting `<= 10.2.1`), and upstream has never released a fix.
+> This release contains **security hardening and compatibility fixes only** — no functional or
+> data-structure changes, so upgrading requires no migration.
+
+#### 1. Security Fixes
+
+* Fixed a **stored XSS** in the KaTeX rendering path (`src/App/KaTeX.php`). Entity-encoded formula content is decoded back to real characters and then emitted without escaping; both `the_content` and `comment_text` run *after* save-time kses, so kses cannot stop it. Posting `$ &lt; img src=x onerror=... &gt; $` in a post **or a comment** executes script
+* Fixed **unauthenticated arbitrary file write** in the image paste endpoint (`src/App/ImagePaste.php`): added `upload_files` capability and nonce (CSRF) checks, real image type detection by content, payload size limit, WordPress-native file handling with cleanup on failure, and TLS verification for remote uploads
+* Fixed **SSRF / open proxy** in the sm.ms image host proxy: upstream is now a strict allowlist (`https://smms.app/api/v2/*`), only the `Authorization` header is forwarded, TLS verification is enabled, and timeouts/size limits/same-origin checks were added
+* Fixed **authorization flaws** in the admin page renderer (`src/Pages/Pages.php`): capability check now uses `manage_options` instead of a role name, a permanently-true authorization branch was removed, `page`/`entry` are dispatched via an explicit allowlist (removing path traversal), and `$_GET` is validated/sanitized
+* Fixed **completely ineffective option sanitization** (`src/Utils/Settings.php`): the bundled settings library only sanitizes fields with an explicit `sanitize_callback`, and none were declared. Now enforced centrally via `pre_update_option_*`
+* Fixed **blind SSRF and admin slowdown**: settings init fetched a remote `version.json` synchronously on every admin request. Now uses `wp_remote_get` with an allowlist and caching, outside the admin sync path
+* Fixed a fatal error (white screen) triggered by a specific cookie
+* Fixed a syntax-level fatal error on plugin uninstall (illegal top-level `static`)
+* Fixed an empty logger implementation that made every logging call throw
+* Fixed unescaped output and token leakage in the debug/settings pages
+* Editor scripts and styles are no longer loaded from a third-party CDN by default
+
+#### 2. Compatibility
+
+* `Tested up to` is now WordPress 7.1; `Requires PHP` is 7.4, verified on 7.4 – 8.4
+* Fixed a **full-site white screen caused by calling user-context functions at plugin load time**
+* Fixed `htmlspecialchars()` default-flag changes (PHP 8.1+) altering existing content rendering
+* Fixed undefined `$GLOBALS['pagenow']`, invalid JS when Mermaid config is empty, and mind map script URL falling back to the current page
+* Version comparison now uses `version_compare`; removed the branch that deregistered WordPress' bundled jQuery in favor of 1.12.4
+* Multisite activation/uninstall now handled per site
+
+#### 3. Build Chain
+
+* `node-sass` (Node ≤ 18 only) → **`dart-sass`**, so the project builds on modern Node
+* Unmaintained `webpack-parallel-uglify-plugin` → **`terser-webpack-plugin`**
+* Vue sub-project: fixed `tsconfig`, peer dependencies, and hardcoded plugin-directory `publicPath`
+* Removed a malformed statement in `assets/FrontStyle/FrontStyle.scss` (ignored by libsass, fatal for dart-sass)
+* Added a GitHub Actions release workflow that builds from source and attaches an installable zip
+
+#### 4. Other Latent Bugs Fixed
+
+* `editor_mindmap` option was overwritten by the `editor_style` array, breaking the mind map feature
+* Mermaid's default config was mistakenly written with KaTeX's defaults
+
+------
+
+### Version 10.3.0
+
+> 本版本由 [@tjsky](https://github.com/tjsky) 在原作者停止維護後繼續維護。
+> 本外掛已於 2025-04-09 因安全問題遭 WordPress.org 下架（對應 **CVE-2025-31035**，
+> Stored XSS，影響 `<= 10.2.1`），上游並無修復版本。
+> 本版**僅進行安全強化與新版相容性調整，未更動功能設計與資料結構，升級無需遷移**。
+
+#### 1. 安全性修正
+
+* 修正 KaTeX 公式渲染路徑的**儲存型 XSS**（`src/App/KaTeX.php`）。實體編碼的公式內容會被解碼回真實字元後未轉義直接輸出，而 `the_content` 與 `comment_text` 皆晚於儲存期 kses，故 kses 無法攔阻。於文章**或留言**中投遞 `$ &lt; img src=x onerror=... &gt; $` 即可執行腳本
+* 修正圖片貼上介面的**未授權任意檔案寫入**：補上 `upload_files` 能力與 nonce（CSRF）檢查、依檔案內容判定真實圖片類型、限制酬載大小、改用 WordPress 官方 API 寫入並於失敗時清理、遠端上傳啟用 TLS 憑證檢查
+* 修正 sm.ms 圖床代理的 **SSRF / 開放代理**：上游位址改為固定白名單、僅轉送 `Authorization` 標頭、啟用憑證檢查、補上逾時與大小限制及同源檢查
+* 修正後台管理頁渲染器的**授權缺陷**：能力檢查由角色名改為 `manage_options`、移除一處恆真的授權分支、`page` / `entry` 改為白名單分派以消除路徑穿越
+* 修正設定頁**選項寫入淨化完全失效**的問題，改以 `pre_update_option_*` 統一依欄位型別處理
+* 修正**盲 SSRF 與後台卡頓**：設定頁初始化會同步抓取遠端 `version.json`，改為 `wp_remote_get` 加白名單與快取
+* 修正特定 Cookie 即觸發致命錯誤（白畫面）、外掛移除時的語法級致命錯誤、日誌元件空實作導致所有日誌呼叫拋出例外
+* 預設不再自第三方 CDN 載入編輯器腳本與樣式
+
+#### 2. 相容性
+
+* `Tested up to` 更新為 WordPress 7.1，`Requires PHP` 明確為 7.4，實測通過 7.4 ~ 8.4
+* 修正**外掛主檔於載入期呼叫使用者情境函式導致整站白畫面**的問題
+* 修正 PHP 8.1+ `htmlspecialchars()` 預設 flags 變更影響既有內容渲染的問題
+* 版本號比較改用 `version_compare`；移除會註銷 WordPress 內建 jQuery 的分支
+* 多站點啟用與移除改為逐站處理
+
+#### 3. 建置鏈
+
+* `node-sass` 更換為 `dart-sass`，專案因此可在現代 Node 下建置
+* 停止維護的 `webpack-parallel-uglify-plugin` 更換為 `terser-webpack-plugin`
+* Vue 子專案修正 `tsconfig`、同儕依賴與寫死外掛目錄的 `publicPath`
+* 新增 GitHub Actions 發行流程，推送 tag 即自原始碼建置並附上可安裝 zip
+
+#### 4. 一併修正的歷史缺陷
+
+* `editor_mindmap` 選項被 `editor_style` 陣列覆蓋，導致心智圖功能失效
+* Mermaid 的預設設定被誤寫入 KaTeX 的預設值
+
+------
+
 ### Version 10.2.1
 
 #### 1. BUG修复

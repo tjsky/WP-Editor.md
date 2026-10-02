@@ -6,45 +6,57 @@ use EditormdUtils\Upgrader as Upgrader;
 
 class Activator {
 
-    public static function activate() {
+    /**
+     * 激活插件：写入默认选项并执行版本升级
+     *
+     * @param bool $network_wide 是否为多站点「网络启用」
+     */
+    public static function activate($network_wide = false) {
+        // 多站点支持：网络启用时 WordPress 只调用一次激活钩子，
+        // 原实现会使除当前站点外的其它子站都缺少默认选项，故在此逐站写入。
+        if ($network_wide && is_multisite()) {
+            $site_ids = get_sites(array("fields" => "ids", "number" => 0));
+
+            foreach ($site_ids as $site_id) {
+                switch_to_blog($site_id);
+                self::activate_site();
+                restore_current_blog();
+            }
+
+            return;
+        }
+
+        self::activate_site();
+    }
+
+    /**
+     * 单站点激活逻辑
+     */
+    private static function activate_site() {
         // 初次载入插件写入默认数据 => 判断本地是否存在数据 不存在写入数据即可
-        if (get_option("editor_basics") == false) {
-            add_option("editor_basics", Activator::$defaultOptionsBasics, "", "yes");
+        $defaults = array(
+            "editor_basics"       => self::$defaultOptionsBasics,
+            "editor_style"        => self::$defaultOptionsStyle,
+            "syntax_highlighting" => self::$defaultOptionsSyntax,
+            "editor_emoji"        => self::$defaultOptionsEmoji,
+            "editor_toc"          => self::$defaultOptionsToc,
+            "editor_latex"        => self::$defaultOptionsKatex,
+            // 修复：原实现在这里误用了 self::$defaultOptionsKatex，导致
+            // editor_mermaid 选项里装的是 KaTeX 的默认值（support_latex），
+            // Mermaid 的 support_mermaid / mermaid_config 从未被写入。
+            "editor_mermaid"      => self::$defaultOptionsMermaid,
+            "editor_mindmap"      => self::$defaultOptionsMindMap,
+            "editor_advanced"     => self::$defaultOptionsAdvanced,
+        );
+
+        foreach ($defaults as $option_name => $default_value) {
+            // 严格比较：原实现使用 `== false`，空数组同样会被判为「未设置」而被覆盖
+            if (false === get_option($option_name)) {
+                add_option($option_name, $default_value, "", "yes");
+            }
         }
 
-        if (get_option("editor_style") == false) {
-            add_option("editor_style", Activator::$defaultOptionsStyle, "", "yes");
-        }
-
-        if (get_option("syntax_highlighting") == false) {
-            add_option("syntax_highlighting", Activator::$defaultOptionsSyntax, "", "yes");
-        }
-
-        if (get_option("editor_emoji") == false) {
-            add_option("editor_emoji", Activator::$defaultOptionsEmoji, "", "yes");
-        }
-
-        if (get_option("editor_toc") == false) {
-            add_option("editor_toc", Activator::$defaultOptionsToc, "", "yes");
-        }
-
-        if (get_option("editor_latex") == false) {
-            add_option("editor_latex", Activator::$defaultOptionsKatex, "", "yes");
-        }
-
-        if (get_option("editor_mermaid") == false) {
-            add_option("editor_mermaid", Activator::$defaultOptionsKatex, "", "yes");
-        }
-
-        if (get_option("editor_mindmap") == false) {
-            add_option("editor_mindmap", Activator::$defaultOptionsMindMap, "", "yes");
-        }
-
-        if (get_option("editor_advanced") == false) {
-            add_option("editor_advanced", Activator::$defaultOptionsAdvanced, "", "yes");
-        }
-
-        if (get_option("editor_version") == false) {
+        if (false === get_option("editor_version")) {
             add_option("editor_version", array("wp_editormd_ver" => WP_EDITORMD_VER), "", "yes");
         }
 

@@ -46,15 +46,11 @@ class FrontStyle {
      * 注册脚本文件
      */
     public function enqueue_front_scripts() {
-        //兼容模式 - jQuery
-        if (Config::get_option("jquery_compatible", "editor_advanced") !== "off") {
-            wp_enqueue_script("jquery", null, null, array(), false);
-            $jQueryName = "jquery";
-        } else {
-            wp_deregister_script("jquery");
-            wp_enqueue_script("jQuery-CDN", $this->front_static_url . "/assets/jQuery/jquery.min.js", array(), "1.12.4", true);
-            $jQueryName = "jQuery-CDN";
-        }
+        // jQuery 统一使用 WordPress 自带版本。
+        // 安全修复：原「非兼容模式」会 wp_deregister_script("jquery") 并改为加载 jQuery 1.12.4，
+        // 该版本存在已知 XSS 漏洞（如 CVE-2015-9251），且会破坏依赖 core jQuery 的其它插件。
+        wp_enqueue_script("jquery");
+        $jQueryName = "jquery";
 
         wp_enqueue_style("Front_Style", $this->front_static_url . "/assets/FrontStyle/FrontStyle.min.css", array(), WP_EDITORMD_VER, "all");
         wp_enqueue_script("Front_Style", $this->front_static_url . "/assets/FrontStyle/FrontStyle.min.js", array($jQueryName), $this->version, true);
@@ -67,8 +63,26 @@ class FrontStyle {
     /**
      * 禁用不需要的脚本文件（Gutenberg引入）
      * Ref issue: https://github.com/LuRenJiasWorld/WP-Editor.md/issues/560
+     *
+     * 兼容性修复：原实现无条件移除 wp-block-library / wp-block-library-theme / wc-blocks-style，
+     * 在区块主题（block theme）或内容本身含区块的站点上会直接破坏前台样式。
+     * 现改为：仅在「非区块主题」且当前请求不是区块渲染上下文时才移除，
+     * 并允许通过 editormd_dequeue_block_styles 过滤器关闭该行为。
      */
     public function dequeue_bloat_scripts() {
+        if (function_exists("wp_is_block_theme") && wp_is_block_theme()) {
+            return;
+        }
+
+        // 单篇内容若包含区块，同样需要保留区块样式
+        if (is_singular() && function_exists("has_blocks") && has_blocks()) {
+            return;
+        }
+
+        if (! apply_filters("editormd_dequeue_block_styles", true)) {
+            return;
+        }
+
         wp_dequeue_style("wp-block-library");
         wp_dequeue_style("wp-block-library-theme");
         wp_dequeue_style("wc-blocks-style");

@@ -104,7 +104,10 @@ class WPMarkdownParser extends MarkdownExtra {
             // Ignore comments before encoding html
             $text = $this->comment_hash($text);
 
-            $text = htmlspecialchars($text);
+            // 兼容性修复：原实现未显式传 flags，而 PHP 8.1 起 htmlspecialchars() 的默认值
+            // 已由 ENT_COMPAT 变为 ENT_QUOTES|ENT_SUBSTITUTE|ENT_HTML401——单引号会被转义成
+            // &#039;，会改变存量内容的渲染结果。这里显式传 ENT_COMPAT 以冻结既有行为。
+            $text = htmlspecialchars($text, ENT_COMPAT);
             $text = $this->codeblock_hash($text);
         }
 

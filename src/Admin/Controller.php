@@ -57,9 +57,14 @@ class Controller {
         add_action("load-edit-comments.php", array($this, "enqueue_styles"));
         add_action("load-edit-comments.php", array($this, "enqueue_scripts"));
 
-        // WordPress 5.0 Gutenberg Editor
-        if ($GLOBALS["wp_version"] > "5.0") {
-            add_filter("use_block_editor_for_post", "__return_false", 5);
+        // WordPress 5.0+ 的 Gutenberg 区块编辑器与本插件的 Markdown 写入链路不兼容
+        // （见 readme.txt 数据丢失说明），因此默认禁用，但允许通过过滤器放开。
+        // 兼容性修复：原先使用 $GLOBALS["wp_version"] > "5.0" 做字符串松散比较，
+        // 该写法在版本号进入两位数（例如 "10.0"）时会得到错误结果，故改用 version_compare()。
+        if (version_compare(get_bloginfo("version"), "5.0", ">=")) {
+            if (apply_filters("editormd_disable_block_editor", true)) {
+                add_filter("use_block_editor_for_post", "__return_false", 5);
+            }
         }
     }
 
@@ -94,8 +99,18 @@ class Controller {
         //JavaScript - Editormd
         wp_enqueue_script("Editormd", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
 
+        //JavaScript - AJAX nonce 注入垫片
+        // 安全加固：图片粘贴上传接口现已强制校验 nonce。本垫片免构建、独立加载，
+        // 通过 $.ajaxPrefilter 为本插件的 AJAX 请求自动补上 _wpnonce，
+        // 因此无需重新编译 assets/Config/editormd.min.js 也能让 CSRF 防护生效。
+        wp_enqueue_script("Editormd-Nonce", $this->front_static_url . "/assets/Config/editormd-nonce.js", array("jquery"), WP_EDITORMD_VER, true);
+        wp_localize_script("Editormd-Nonce", "_EditormdNonce", array(
+            "imagepasteNonce" => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"      => wp_create_nonce("wp_editormd_pages"),
+        ));
+
         //JavaScript - Config
-        wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd"), $this->version, true);
+        wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
@@ -142,7 +157,10 @@ class Controller {
             "imgUploading"      => __("Image Uploading...", $this->text_domain),
             "imgUploadeFailed"  => __("Failed To Upload The Image!", $this->text_domain),
             "supportComment"    => Config::get_option("support_front", "editor_basics"),         // 前端评论
-            "supportReply"      => Config::get_option("support_reply", "editor_basics")          // 后台回复评论
+            "supportReply"      => Config::get_option("support_reply", "editor_basics"),         // 后台回复评论
+            // 安全加固：AJAX 接口的 CSRF nonce（由 assets/Config/editormd-nonce.js 垫片消费）
+            "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"        => wp_create_nonce("wp_editormd_pages")
         ));
     }
 

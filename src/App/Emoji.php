@@ -9,7 +9,8 @@ class Emoji {
 
         add_action("wp_enqueue_scripts", array($this, "emoji_enqueue_scripts"));
 
-        if(!in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
+        // 兼容性修复：$GLOBALS["pagenow"] 在部分上下文（CLI、REST）并不存在，补 isset 兜底
+        if (!isset($GLOBALS["pagenow"]) || !in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
             add_action("wp_print_footer_scripts", array($this, "emoji_enqueue_footer_js"));
         }
 
@@ -27,11 +28,15 @@ class Emoji {
     }
 
     public function emoji_enqueue_footer_js() {
+        // 兼容性修复：原实现使用 window.onload = function () {...}，属覆盖式赋值，
+        // 会把页面上其它脚本注册的 onload 处理器一并冲掉；改用 addEventListener。
+        // 安全修复：资源地址原样 echo 进 JS 双引号字符串，改用 wp_json_encode 输出。
+        $img_dir = Config::get_option('editor_addres','editor_style') . '/assets/Emojify.js/images/basic';
         ?>
         <script type="text/javascript">
-            window.onload = function () {
+            window.addEventListener("load", function () {
                 emojify.setConfig({
-                    img_dir: "<?php echo Config::get_option('editor_addres','editor_style') . '/assets/Emojify.js/images/basic' ?>",//前端emoji资源地址
+                    img_dir: <?php echo wp_json_encode( esc_url_raw( $img_dir ) ); ?>,//前端emoji资源地址
                     blacklist: {
                         "ids": [],
                         "classes": ["no-emojify"],
@@ -39,7 +44,7 @@ class Emoji {
                     }
                 });
                 emojify.run();
-            }
+            });
         </script>
         <?php
     }
@@ -85,9 +90,10 @@ class Emoji {
         if ("dns-prefetch" == $relation_type) {
 
             // Strip out any URLs referencing the WordPress.org emoji location
-            $emoji_svg_url_bit = "https://s.w.org/images/core/emoji/";
+            $emoji_svg_url_bit = "s.w.org/images/core/emoji/";
             foreach ($urls as $key => $url) {
-                if (strpos($url, $emoji_svg_url_bit) !== false) {
+                // 兼容性修复：$url 不一定是字符串，直接传给 strpos() 在 PHP 8 下会报类型错误
+                if (is_string($url) && strpos($url, $emoji_svg_url_bit) !== false) {
                     unset($urls[$key]);
                 }
             }

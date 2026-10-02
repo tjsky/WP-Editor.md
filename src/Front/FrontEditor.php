@@ -43,9 +43,43 @@ class FrontEditor {
     }
 
     /**
+     * 判断当前请求是否真的需要加载前端编辑器资源
+     *
+     * 兼容性/性能修复：原实现只要本类被实例化，就会在**每一个**前台页面
+     * 无条件加载整套编辑器 CSS/JS（数百 KB）。
+     * 现改为按需加载：
+     *   - 开启「前端评论」时：仅在单篇内容页且评论开放时加载；
+     *   - 配置了「其它编辑器目标元素 ID」时：保持全站加载（目标元素可能出现在任何页面，
+     *     无法在服务端可靠预判）。
+     * 如需恢复旧的「全站加载」行为，可用过滤器强制返回 true：
+     *   add_filter("editormd_front_editor_needed", "__return_true");
+     *
+     * @return bool
+     */
+    private function front_editor_needed() {
+        $needed = false;
+
+        if (Config::get_option("support_front", "editor_basics") === "on") {
+            if (is_singular() && comments_open()) {
+                $needed = true;
+            }
+        }
+
+        if (Config::get_option("support_other_text", "editor_basics") !== "") {
+            $needed = true;
+        }
+
+        return (bool) apply_filters("editormd_front_editor_needed", $needed);
+    }
+
+    /**
      * 注册样式文件
      */
     public function enqueue_front_styles() {
+        if (! $this->front_editor_needed()) {
+            return;
+        }
+
         //Style - Editor.md
         wp_enqueue_style("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.css", array(), WP_EDITORMD_VER, "all");
     }
@@ -54,19 +88,25 @@ class FrontEditor {
      * 注册脚本文件
      */
     public function enqueue_front_scripts() {
-
-        //兼容模式 - jQuery
-        if (Config::get_option("jquery_compatible", "editor_advanced") !== "off") {
-            wp_enqueue_script("jquery", null, null, array(), false);
-            wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
-        } else {
-            wp_deregister_script("jquery");
-            wp_enqueue_script("jQuery-CDN", $this->front_static_url . "/assets/jQuery/jquery.min.js", array(), "1.12.4", true);
-            wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jQuery-CDN"), WP_EDITORMD_VER, true);
+        if (! $this->front_editor_needed()) {
+            return;
         }
 
+        // jQuery 统一使用 WordPress 自带版本。
+        // 安全修复：原「非兼容模式」会 wp_deregister_script("jquery") 并改为加载 jQuery 1.12.4，
+        // 该版本存在已知 XSS 漏洞（如 CVE-2015-9251），且会破坏依赖 core jQuery 的其它插件，故移除该分支。
+        wp_enqueue_script("jquery");
+        wp_enqueue_script("Editormd_Front", $this->front_static_url . "/assets/Editormd/editormd.min.js", array("jquery"), WP_EDITORMD_VER, true);
+
+        //JavaScript - AJAX nonce 注入垫片（免构建，见 assets/Config/editormd-nonce.js）
+        wp_enqueue_script("Editormd-Nonce_Front", $this->front_static_url . "/assets/Config/editormd-nonce.js", array("jquery"), WP_EDITORMD_VER, true);
+        wp_localize_script("Editormd-Nonce_Front", "_EditormdNonce", array(
+            "imagepasteNonce" => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"      => wp_create_nonce("wp_editormd_pages"),
+        ));
+
         //JavaScript - Config
-        wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front"), $this->version, true);
+        wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front", "Editormd-Nonce_Front"), $this->version, true);
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
@@ -115,6 +155,9 @@ class FrontEditor {
             "imgUploadeFailed"  => __("Failed To Upload The Image!", $this->text_domain),
             "supportComment"    => Config::get_option("support_front", "editor_basics"),         // 前端评论
             "supportOther"      => Config::get_option("support_other_text", "editor_basics"),    // 前端编辑器ID
+            // 安全加固：AJAX 接口的 CSRF nonce（由 assets/Config/editormd-nonce.js 垫片消费）
+            "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
+            "pagesNonce"        => wp_create_nonce("wp_editormd_pages"),
         ));
     }
 
