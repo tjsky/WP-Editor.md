@@ -16,8 +16,8 @@
 > | 修改性质 | **以安全加固与新版兼容性为主；另新增一项小功能（图片尺寸语法），未做功能重构** |
 >
 > 依据本项目的授权协议 **GNU General Public License v3**（或更新版本）第 5 条要求，
-> 修改后的版本必须带有**显著的修改声明与日期**，故在此说明。逐项差异见
-> [与上游的差异](#与上游的差异修改清单)。
+> 修改后的版本必须带有**显著的修改声明与日期**，故在此说明。修改要点见
+> [与上游的差异](#与上游的差异)，逐项明细见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
 
 [![GitHub issues](https://img.shields.io/github/issues/tjsky/WP-Editor.md.svg)](https://github.com/tjsky/WP-Editor.md/issues)
 [![GitHub stars](https://img.shields.io/github/stars/tjsky/WP-Editor.md.svg)](https://github.com/tjsky/WP-Editor.md/stargazers)
@@ -45,108 +45,22 @@ The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) 
 
 ---
 
-## 与上游的差异（修改清单）
+## 与上游的差异
 
-### 1. 安全修复 —— 本次维护的主要原因
+本分支只做**必要的安全加固与兼容适配**，没有改动功能设计与数据结构，**升级不需要迁移**。
+下面只列要点，逐项明细见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
 
-| # | 问题 | 位置 | 修复方式 |
-| --- | --- | --- | --- |
-| 1 | **存储型 XSS（严重）**：公式内容中的 HTML 实体会被解码回真实字符后**未转义**直接输出，`the_content` / `comment_text` 均晚于保存期 kses，因此 kses 拦不住。在文章或**评论**中投递 `$ &lt; img src=x onerror=... &gt; $` 即可执行脚本 | `src/App/KaTeX.php` | 三处输出补 `esc_html()`；前端错误提示由 `.html()` 改为 `.text()`。保留实体解码表以免影响公式渲染 |
-| 2 | **无鉴权任意文件写入（高）**：图片粘贴接口没有能力校验、没有 nonce，base64 内容直接写盘 | `src/App/ImagePaste.php` | 补 `current_user_can('upload_files')` 与 nonce 校验；按文件内容判定真实图片类型；限制体积；改用 WordPress 官方 API 落盘并在失败时清理；图床上传开启 TLS 校验 |
-| 3 | **SSRF / 开放代理（高）**：图床代理接受请求体中的任意 URL 与任意请求头，且显式关闭了证书校验 | `src/Pages/page/sm-ms-management/` | 上游地址改为固定白名单（仅 `https://smms.app/api/v2/*`）；仅透传 `Authorization` 头；开启证书校验；补超时与响应体积上限；补同源校验 |
-| 4 | **授权缺陷（高）**：能力校验把「角色名」当「能力名」；另有一处恒真的授权分支；`page` 参数直接进文件路径 | `src/Pages/Pages.php` | 改为 `manage_options`；修掉恒真分支；`page`/`entry` 改为显式白名单分发；`$_GET` 补 `isset` + `sanitize_key`；消除 ReDoS 正则 |
-| 5 | **选项写入净化完全失效（高）**：第三方设置库只对显式声明 `sanitize_callback` 的字段生效，本插件一个都没声明，等于所有选项未经净化即入库 | `src/Utils/Settings.php` | 改为挂 `pre_update_option_*` 按字段类型统一兜底，覆盖设置页保存、`Config::update_option()`、升级器三条写入路径 |
-| 6 | **盲 SSRF + 后台卡顿（高）**：设置页初始化时同步拉取远端 `version.json`，每个后台请求与 AJAX 都可能阻塞数秒 | `src/Utils/Settings.php` | 改为 `wp_remote_get` + scheme/host 白名单 + transient 缓存，并移出后台同步路径 |
-| 7 | **任意 Cookie 触发致命错误（中）**：`wp-editormd-dev-logmode` Cookie 的处理代码位于自动加载器注册**之前**，任何携带该 Cookie 的访客都会白屏 | `wp-editormd.php` | 移入 `plugins_loaded` 钩子，补充净化、管理员限定与异常兜底 |
-| 8 | **卸载时语法级致命错误（中）** | `uninstall.php` | 删除文件顶层的非法 `static`（PHP 只允许在函数内使用） |
-| 9 | **日志组件空实现（中）**：`save_log()` 是空方法，任何日志调用都会抛异常 | `src/Utils/Logger.php` | 补齐实现，写入 PHP error_log |
-| 10 | **输出未转义与令牌泄漏（中）** | `src/Utils/Debugger.php`、`settings.js.php` | 全部值 `esc_html()`；令牌打码；令牌由 GET 改为服务端注入 |
-| 11 | **默认从第三方 CDN 加载资源（供应链风险）** | 多处 | 默认改由插件本地提供编辑器脚本与样式 |
+* **安全修复**（本次维护的主要原因）—— 修复 KaTeX 公式渲染的**存储型 XSS**（同类问题即已公开的
+  **CVE-2025-31035**），以及图片粘贴接口的任意文件写入、图床代理的 SSRF、后台管理页的授权缺陷、
+  选项保存未净化、设置页盲 SSRF、携带特定 Cookie 即白屏等一批漏洞；默认不再从第三方 CDN 加载资源
+* **兼容性** —— 适配 **WordPress 7.1** 与 **PHP 7.4 ~ 8.4**，含「插件加载期调用用户上下文函数
+  导致前台后台同时白屏」这类致命问题
+* **构建链** —— 替换已无法使用的 `node-sass`、`uglify` 插件，项目恢复可构建；新增 GitHub Actions 自动打包
+* **顺带修复** —— 思维导图设置项丢失、Mermaid 默认值串到 KaTeX 等历史遗留缺陷
+* **公式解析重写**（10.4.0）—— 修复代码块里的 `$` 被当公式、块级公式重复渲染、正文误配对的 `$` 被渲染
+* **新增（可选）**（10.4.0）—— 图片尺寸语法 `![说明](图片地址 =600)`，不写尺寸时渲染结果与原来完全一致
 
-> 关于漏洞 1：它与公开披露的 **CVE-2025-31035**（Stored XSS，影响 `<= 10.2.1`）属于同类问题。
-> 本分支在真实 WordPress 7.1.2 环境做过对照实验 —— 上游原始代码确实会渲染出可执行的
-> `<img src=x onerror=alert(1)>`（文章正文、评论、多行公式、代码块公式四条路径均命中），
-> 修复后四条路径全部阻断，而正常公式（`E=mc^2`、`a^2+b^2=c^2`、`\frac{1}{2}`）渲染结果逐字节一致。
-
-### 2. WordPress / PHP 兼容性
-
-* `Tested up to` 更新为 **WordPress 7.1**；`Requires PHP` 明确为 **7.4**，实测通过 7.4 ~ 8.4
-* 修复 **插件主文件在插件加载期调用用户上下文函数导致整站白屏** —— WordPress 在 `wp-settings.php`
-  中先加载活动插件、之后才加载 `pluggable.php`，因此插件文件顶层调用 `current_user_can()` 等函数会
-  抛出 `Call to undefined function wp_get_current_user()`，前台与后台同时白屏
-* 修复 PHP 8.1+ `htmlspecialchars()` 默认 flags 变化会改变存量内容渲染的问题（显式传入 flags 冻结行为）
-* 修复 `$GLOBALS['pagenow']` 未定义提示、Mermaid 配置为空时生成非法 JS、思维导图地址为空时误把当前页当脚本加载等问题
-* 版本号比较改用 `version_compare`，不再用字符串比较
-* 移除会 `wp_deregister_script('jquery')` 并改用 jQuery 1.12.4 的分支，统一使用 WordPress 自带 jQuery
-* 多站点（Network）激活与卸载改为逐站点处理
-
-### 3. 构建链（原项目「无法构建」的根因）
-
-* `node-sass`（仅支持 Node ≤ 18，且需要本地编译）→ **`dart-sass`**，项目因此可在 Node 22 下构建
-* 停止维护的 `webpack-parallel-uglify-plugin` → **`terser-webpack-plugin`**
-* Vue 子项目（sm.ms 图片管理页）修复 `tsconfig`、`peerDependencies`、以及 `publicPath` 硬编码插件目录名的问题
-  （改为构建期占位符 + 运行期替换，重命名插件目录不再导致 404）
-* 清理 `assets/FrontStyle/FrontStyle.scss` 中一行残缺语句（libsass 静默忽略，dart-sass 会直接构建失败）
-* 新增 **GitHub Actions 发布流程**：打 tag 即从源码构建并自动生成可安装 zip
-
-### 4. 顺带修复的历史遗留缺陷（非安全）
-
-* `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
-* Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
-
-### 5. 公式解析重写与图片尺寸语法（10.4.0）
-
-**公式解析**（`src/App/KaTeX.php`）
-
-原实现有两个结构性问题，这是上游被反复反馈的痛点来源：
-
-| 问题 | 原因 | 后果 |
-| --- | --- | --- |
-| 代码块里的 `$` 被当成公式 | 跳过逻辑写的是 `htmlspecialchars_decode($element) === "<pre>"`，而真实代码块是 `<pre class="...">` 或 `<pre><code>`，精确等值判断永远不成立 | 代码块内容被吃掉或显示异常 |
-| 块级公式渲染两次 | `katex_markup_double`（优先级 8）输出的 class 是 `katex math multi-line`，而 `katex_markup_single`（优先级 9）判断「是否已处理」时找的是 `<div class="katex math`，判断永远不成立 | 公式重复渲染；三次遍历也带来多余开销 |
-| 正文误配对的 `$` 被渲染成公式 | 只跳过行首为 `<` 的元素，`function update( $a, $b )`、`价格从 $100 到 $200` 都会中招 | 正文被误当公式渲染 |
-
-现改为：**单次遍历 + 单条正则**（`$$` 分支优先），跳过区域用「标签白名单（`pre`/`code`/`style`/`script`/`textarea`）
-+ 嵌套深度计数」维护；内联公式另加两道误渲染防护 —— 定界符须紧贴内容、内容须含字母/数字/反斜杠。
-两道防护都可用过滤器关闭（`editormd_katex_require_tight_delimiters`）。
-
-> 参考了上游 [PR #603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的思路，
-> 但**未直接合并**：该 PR 的输出处仍没有转义（合并会回退本分支的 XSS 修复），
-> 且它「定界符内有空格就跳过渲染」的规则可被绕过 —— 把空格移入内容中间即可
-> （`$p &lt; img src=x onerror=alert(1) &gt; q$` 仍会被渲染）。本实现把安全落在输出侧的 `esc_html()`，
-> 不依赖该规则。
-
-**图片尺寸语法**（`src/App/WPMarkdownParser.php`）
-
-    ![alt](image.jpg =600)                    仅宽度（推荐：高度按原图比例自动）
-    ![alt](image.jpg =600x400)                宽度 + 高度
-    ![alt](image.jpg =x400)                   仅高度
-    ![alt](image.jpg "title" =600x400){#id .class}    可与 title、属性语法共存
-
-不写尺寸时输出与原来**完全一致**（已用基线与父类逐字节比对验证）。
-
-> 语法参考上游 [PR #602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602)，
-> 同样**未直接合并**：该 PR 复制了旧版 php-markdown 的整套实现，占用了 `{#id .class}` 所在的捕获组，
-> 会丢失属性语法与引用式图片的 `ref_attr` 支持。本实现把尺寸放在独立捕获组，原有能力不减。
-
-**为什么尺寸用内联样式而不是只给属性**：多数主题（含 Bootstrap）会对正文图片声明
-`img { width: auto }` 或类似的宽度规则，而 CSS 声明的优先级高于 HTML 的 `width`/`height` 属性 ——
-只输出属性的话，尺寸设置会被主题直接忽略。因此输出形如
-`style="width:600px;max-width:100%;height:auto"`（同时指定宽高时另加 `aspect-ratio`）：
-
-* 宽屏下即设定的尺寸；
-* 窄屏下宽度受容器限制、高度等比缩放，**不会变形**（若只给属性，宽度被压缩而高度不变，会拉伸）；
-* 对看图插件（如 Medium Zoom）**无影响** —— 它通过 `getBoundingClientRect()` 读取渲染后的矩形来定位动画，
-  并 `cloneNode()` 原图取 `src`，不读写原图的样式。
-
-若你的主题本身有更强的图片规则（例如 `max-height`），最终呈现以主题为准。
-需要用别的方式输出尺寸时，过滤 `editormd_image_size_style` 即可；让它返回空字符串就退化为「只输出属性」。
-
-### 本次维护「没有做」的事
-
-为避免影响面扩大，以下**有意未改**：编辑器前端行为、数据存储结构、既有选项的命名与取值。
-10.4.0 新增的图片尺寸语法是**可选**的（不写尺寸则渲染结果与原来一致），
-因此升级到本版本**不需要迁移数据**，设置项保持原样即可。
+有意**未做**的事：为避免影响面扩大，编辑器前端行为、数据存储结构、既有选项的命名与取值均保持不变。
 
 ---
 
