@@ -11,14 +11,13 @@ use EditormdUtils\Config;
 
 class KaTeX {
 
+    private $skip_tags = array("pre", "code", "style", "script", "textarea");
+
     public function __construct() {
 
-        //单个$或者双个$$符号匹配
-        add_filter("the_content", array($this, "katex_markup_single"), 9);
-        add_filter("comment_text", array($this, "katex_markup_single"), 9);
+        add_filter("the_content", array($this, "katex_markup"), 9);
+        add_filter("comment_text", array($this, "katex_markup"), 9);
 
-        add_filter("the_content", array($this, "katex_markup_double"), 8);
-        add_filter("comment_text", array($this, "katex_markup_double"), 8);
         //前端加载资源
         add_action("wp_enqueue_scripts", array($this, "katex_enqueue_scripts"));
 
@@ -29,217 +28,84 @@ class KaTeX {
 
     }
 
-    public function katex_markup_single($content) {
-        // 匹配单行LaTeX
-        $regexTeXInline = '
-        %
-        \$
-            ((?:
-                [^$]+ # Not a dollar
-                |
-                (?<=(?<!\\\\)\\\\)\$ # Dollar preceded by exactly one slash
-                )+)
-            (?<!\\\\)
-        \$ # Dollar preceded by zero slashes
-        %ix';
+    public function katex_markup($content) {
+        if (! is_string($content) || false === strpos($content, '$')) {
+            return $content;
+        }
 
-        // 简易版本，可能存在误判，但尽可能简单，以避免上面这个LaTeX引起的性能问题
-        $regexTeXMultilineLite = "/\$[\S\ ]+?\$/ix";
-        
-        $content = preg_replace_callback($regexTeXMultilineLite, array($this, "katex_src_replace"), $content);
+        $regex = '/\$\$([^$]+?)\$\$|\$([^$]+?)\$/s';
 
         $textarr = wp_html_split($content);
 
-        // 需要跳过的行数
-        $count = 0;
-        // 是否需要跳过LaTeX解析
-        $pass  = false;
-        // 是否在代码块内
-        $isInCodeBlock = false;
+        $skip_depth = 0;
 
         foreach ($textarr as &$element) {
-            // 默认进行LaTeX解析，如果满足下面的判断条件，则跳过
-            $pass = false;
-
-            // 判断已经跳过的行数
-            if ($count > 0) {
-                ++ $count;
-            }
-
-            /**
-             * 1. 判断是否满足如下规则，如果是则不进行LaTeX解析
-             * <pre>
-             * </pre>
-             */
-            // 判断是否是<pre>然后开始计数，此时为第一行
-            if (htmlspecialchars_decode($element) == "<pre>") {
-                $isInCodeBlock = true;
-                $pass = true;
-            }
-
-            // 如果发现是</pre>标签，则表示代码部分结束，继续处理
-            if (htmlspecialchars_decode($element) == "</pre>") {
-                $isInCodeBlock = false;
-                $pass = false;
-            }
-
-            /**
-             * 2. 对于使用```katex的多行LaTeX，不在里面进行单行LaTeX的重复解析
-             */
-            if (strpos(htmlspecialchars_decode($element), '<div class="katex math') === 0) {
-                $count = 1;
-                $pass = true;
-            }
-            
-            if ($count == 3 && htmlspecialchars_decode($element) == "</div>") {
-                $count = 0;
-                $pass = false;
-            }
-
-            /**
-             * 3. 对于其他空行或可能为HTML单行标签的行，直接跳过
-             */
-            if ($element == "" || $element[0] == "<" || stripos($element, "$") === false) {
-                $pass = true;
-            }
-
-            /**
-             * 4. 如果当前还在代码块内，继续跳过
-             */
-            if ($isInCodeBlock) {
-                $pass = true;
-            }
-
-            // 如果存在需要跳过LaTeX解析的情况，在这里跳过
-            if ($pass) {
+            if (isset($element[0]) && "<" === $element[0]) {
+                if (preg_match('/^<\/?([a-z0-9]+)/i', $element, $m)
+                     && in_array(strtolower($m[1]), $this->skip_tags, true)) {
+                    $skip_depth = ("/" === substr($element, 1, 1))
+                        ? max(0, $skip_depth - 1)
+                        : $skip_depth + 1;
+                }
                 continue;
-            } else {
-                $element = preg_replace_callback($regexTeXInline, array($this, "katex_src_inline"), $element);
+            }
+
+            if ($skip_depth > 0 || "" === $element || false === strpos($element, '$')) {
+                continue;
+            }
+
+            $replaced = preg_replace_callback($regex, array($this, "katex_universal_replace"), $element);
+
+            if (null !== $replaced) {
+                $element = $replaced;
             }
         }
+        unset($element);
 
         return implode("", $textarr);
     }
 
-    public function katex_src_inline($matches) {
+    public function katex_universal_replace($matches) {
+        $whole = $matches[0];
 
-        $katex = $matches[1];
+        $is_multiline = (0 === strpos($whole, '$$'));
+        $content      = $is_multiline
+            ? (isset($matches[1]) ? $matches[1] : '')
+            : (isset($matches[2]) ? $matches[2] : '');
 
-        $katex = $this->katex_entity_decode_editormd($katex);
+        if ('' === $content) {
+            return $whole;
+        }
 
-        return '<span class="katex math inline">' . esc_html( trim( $katex ) ) . '</span>';
+        $content = str_replace(array("<em>", "</em>"), "_", $content);
+
+        if (! $is_multiline && ! $this->katex_looks_like_formula($content)) {
+            return $whole;
+        }
+
+        $katex = $this->katex_entity_decode_editormd($content);
+
+        return '<span class="katex math ' . ($is_multiline ? 'multi-line' : 'inline') . '">'
+            . esc_html( trim( $katex ) )
+            . '</span>';
     }
 
-    public function katex_markup_double($content) {
+    private function katex_looks_like_formula($content) {
 
-        // 匹配多行LaTeX
-        // 尽管只是多了一个$符号，却会引起指数级的回溯
-        $regexTeXMultiline = '
-        %
-        \$\$
-            ((?:
-                [^$]+ # Not a dollar
-                |
-                (?<=(?<!\\\\)\\\\)\$ # Dollar preceded by exactly one slash
-                )+)
-            (?<!\\\\)
-        \$\$ # Dollar preceded by zero slashes
-        %ix';
-
-        // 简易版本，可能存在误判，但尽可能简单，以避免上面这个LaTeX引起的性能问题
-        $regexTeXMultilineLite = '
-        %
-		\$\$
-			([\S\s]+?)
-		\$\$
-        %ix';
-
-        $content = preg_replace_callback($regexTeXMultilineLite, array($this, "katex_src_replace"), $content);
-
-        $textarr = wp_html_split($content);
-
-        // 需要跳过的行数
-        $count = 0;
-        // 是否需要跳过LaTeX解析
-        $pass  = false;
-        // 是否在代码块内
-        $isInCodeBlock = false;
-
-        foreach ($textarr as &$element) {
-            // 默认进行LaTeX解析，如果满足下面的判断条件，则跳过
-            $pass = false;
-
-            // 判断已经跳过的行数
-            if ($count > 0) {
-                ++ $count;
-            }
-
-            /**
-             * 1. 判断是否满足如下规则，如果是则不进行LaTeX解析
-             * <pre>
-             * </pre>
-             */
-            // 判断是否是<pre>然后开始计数，此时为第一行
-            if (htmlspecialchars_decode($element) == "<pre>") {
-                $isInCodeBlock = true;
-                $pass = true;
-            }
-
-            // 如果发现是</pre>标签，则表示代码部分结束，继续处理
-            if (htmlspecialchars_decode($element) == "</pre>") {
-                $isInCodeBlock = false;
-                $pass = false;
-            }
-
-            /**
-             * 2. 对于其他空行或可能为HTML单行标签的行，直接跳过
-             */
-            if ($element == "" || $element[0] == "<" || !stripos($element, "$$")) {
-                $pass = true;
-            }
-
-            /**
-             * 3. 如果当前还在代码块内，继续跳过
-             */
-            if ($isInCodeBlock) {
-                $pass = true;
-            }
-
-            // 如果存在需要跳过LaTeX解析的情况，在这里跳过
-            if ($pass) {
-                continue;
-            } else {
-                $element = preg_replace_callback($regexTeXMultiline, array($this, "katex_src_multiline"), $element);
+        if (apply_filters("editormd_katex_require_tight_delimiters", true)) {
+            if (ctype_space(substr($content, 0, 1)) || ctype_space(substr($content, -1))) {
+                return false;
             }
         }
 
-        return implode("", $textarr);
-    }
+        if (! preg_match('/[A-Za-z0-9\\\\]/', $content)) {
+            return false;
+        }
 
-    public function katex_src_multiline($matches) {
-
-        $katex = $matches[1];
-
-        $katex = $this->katex_entity_decode_editormd($katex);
-
-        return '<span class="katex math multi-line">' . esc_html( trim( $katex ) ) . '</span>';
-    }
-
-    public function katex_src_replace($matches) {
-
-        //在如果公式含有_则会被Markdown解析，所以现在需要转换过来
-        $content = str_replace(
-            array("<em>", "</em>"),
-            array("_", "_"),
-            $matches[0]
-        );
-
-        return $content;
+        return true;
     }
 
     /**
-     * code 内公式渲染
-     * @param $matches
      *
      * @return string|null
      */
