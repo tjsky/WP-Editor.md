@@ -580,4 +580,128 @@ class WPMarkdownParser extends MarkdownExtra {
 
         return implode("", $parts);
     }
+
+    ###  Images (with optional size)  ###
+
+    protected function doImages($text) {
+        $text = preg_replace_callback('{
+            (				# wrap whole match in $1
+              !\[
+                (' . $this->nested_brackets_re . ')		# alt text = $2
+              \]
+
+              [ ]?				# one optional space
+              (?:\n[ ]*)?		# one optional newline followed by spaces
+
+              \[
+                (.*?)		# id = $3
+              \]
+
+            )
+            }xs',
+            array($this, '_doImages_reference_callback'), $text);
+
+        $text = preg_replace_callback('{
+            (				# wrap whole match in $1
+              !\[
+                (' . $this->nested_brackets_re . ')		# alt text = $2
+              \]
+              \s?			# One optional whitespace character
+              \(			# literal paren
+                [ \n]*
+                (?:
+                    <(\S*)>	# src url = $3
+                |
+                    (' . $this->nested_url_parenthesis_re . ')	# src url = $4
+                )
+                [ \n]*
+                (			# $5
+                  ([\'"])	# quote char = $6
+                  (.*?)		# title = $7
+                  \6		# matching quote
+                  [ \n]*
+                )?			# title is optional
+                (?:			# optional size block
+                    [ \n]+	# 必须与 URL 之间有空白，避免误伤 URL 中的 =（如 ?a=b）
+                    =
+                    [ \n]*
+                    (?:
+                        (\d{1,5})			# $8 width（=W / =Wx / =WxH）
+                        (?:[ \n]* [xX] [ \n]* (\d{1,5})? )?	# $9 height（可省略）
+                      |
+                        [xX] [ \n]* (\d{1,5})	# $10 height（=xH）
+                    )
+                )?
+              \)
+              (?:[ ]? ' . $this->id_class_attr_catch_re . ' )?	 # $11 = id/class attributes
+            )
+            }xs',
+            array($this, '_doImages_inline_callback'), $text);
+
+        return $text;
+    }
+
+    protected function _doImages_inline_callback($matches) {
+        $alt_text    = $matches[2];
+        $url         = $matches[3] === '' ? $matches[4] : $matches[3];
+        $title_quote =& $matches[6];
+        $title       =& $matches[7];
+
+        $attr = $this->doExtraAttributes("img", $dummy =& $matches[11]);
+
+        $width  = (isset($matches[8]) && '' !== $matches[8]) ? (int) $matches[8] : 0;
+        $height = 0;
+        if (isset($matches[9]) && '' !== $matches[9]) {
+            $height = (int) $matches[9];
+        }
+        if (isset($matches[10]) && '' !== $matches[10]) {
+            $height = (int) $matches[10];
+        }
+
+        $alt_text = $this->encodeAttribute($alt_text);
+        $url      = $this->encodeURLAttribute($url);
+        $result   = "<img src=\"$url\" alt=\"$alt_text\"";
+        if (isset($title) && $title_quote) {
+            $title   = $this->encodeAttribute($title);
+            $result .= " title=\"$title\""; // $title already quoted
+        }
+        $result .= $attr;
+
+        if (preg_match('/\swidth\s*=/i', $attr)) {
+            $width = 0;
+        }
+        if (preg_match('/\sheight\s*=/i', $attr)) {
+            $height = 0;
+        }
+
+        $style = "";
+        if ($width > 0 && $height > 0) {
+            $style = sprintf(
+                "width:%dpx;max-width:100%%;height:auto;aspect-ratio:%d/%d",
+                $width,
+                $width,
+                $height
+            );
+        } elseif ($width > 0) {
+            $style = sprintf("width:%dpx;max-width:100%%;height:auto", $width);
+        } elseif ($height > 0) {
+            $style = sprintf("height:%dpx;width:auto;max-width:100%%", $height);
+        }
+
+        $style = apply_filters("editormd_image_size_style", $style, $width, $height, $url);
+
+        if ($width > 0) {
+            $result .= ' width="' . $width . '"';
+        }
+        if ($height > 0) {
+            $result .= ' height="' . $height . '"';
+        }
+        if ("" !== $style) {
+            $result .= ' style="' . esc_attr($style) . '"';
+        }
+
+        $result .= $this->empty_element_suffix;
+
+        return $this->hashPart($result);
+    }
 }
