@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.3.0
+Stable tag: 10.4.0
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,15 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.0 =
+* 安全修复：KaTeX 公式解析的输出转义（存储型 XSS，CVE-2025-31035 同类问题）
+* 缺陷修复：代码块 / 行内代码中的 $ 被误当公式渲染（上游长期反馈问题）
+* 缺陷修复：正文里误配对的 $ 被渲染成公式（如 function update( $a, $b )）
+* 缺陷修复：块级公式被内联规则二次解析导致重复渲染
+* 缺陷修复：xmlrpc 请求下抛出 Class 'EditormdApp\IXR_Message' not found（采纳上游 PR #546）
+* 新功能：图片尺寸语法 ![alt](img.jpg =600) / =600x400 / =x400
+* 兼容性：公式解析改为「标签白名单 + 嵌套深度」跳过，代码块内的 $ 不再被处理
 
 = 10.3.0 =
 * 安全修复：KaTeX 公式渲染的存储型 XSS（CVE-2025-31035 同类问题）

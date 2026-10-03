@@ -16,7 +16,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.3.0' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.0' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
