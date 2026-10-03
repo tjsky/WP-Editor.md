@@ -583,4 +583,199 @@ class WPMarkdownParser extends MarkdownExtra {
 
         return implode("", $parts);
     }
+
+    ###  Images (with optional size)  ###
+
+    /**
+     * 重载父类 MarkdownExtra::doImages()，增加图片尺寸语法支持。
+     *
+     * 语法（尺寸块放在右括号之前，可与 title 共存）：
+     *   ![alt](img.jpg =600)              仅宽度
+     *   ![alt](img.jpg =600x)             仅宽度（等价写法）
+     *   ![alt](img.jpg =600x400)          宽度 + 高度
+     *   ![alt](img.jpg =x400)             仅高度
+     *   ![alt](img.jpg "title" =600x400){#id .class}
+     *
+     * 与上游 PR #602 的差别（#602 未采纳）：
+     *   该 PR 直接复制了旧版 php-markdown 的整套实现，占用了父类用于
+     *   {#id .class} 的 $matches[8]，并顺带丢掉了 MarkdownExtra 的
+     *   属性语法（doExtraAttributes）与引用式图片的 ref_attr 支持。
+     *   本实现把尺寸放到 $8/$9/$10，属性块顺移到 $11，能力不减。
+     *
+     * 为什么只输出 HTML 属性、不写内联 style：
+     *   1. 属性优先级低于主题 CSS，主题的 img{max-width:100%;height:auto}
+     *      仍然生效 —— 大图在小屏不会溢出，这是移动端最要紧的一点；
+     *   2. 属性在图片加载完成前就给出尺寸占位，减少布局抖动（CLS）；
+     *   3. 不干扰基于 getBoundingClientRect() 计算起点与终点的看图插件
+     *      （如 Medium Zoom）：缩放动画依据的是元素实际渲染出来的矩形，
+     *      属性只是决定了这个矩形的大小，语义上是「缩略图多大」。
+     *   若某个主题需要强制尺寸，可用 editormd_image_size_attributes 过滤器改写。
+     *
+     * @param string $text
+     *
+     * @return string
+     */
+    protected function doImages($text) {
+        // 引用式图片 ![alt][id] 交由父类处理 —— 该语法没有括号，无处书写尺寸
+        $text = preg_replace_callback('{
+            (				# wrap whole match in $1
+              !\[
+                (' . $this->nested_brackets_re . ')		# alt text = $2
+              \]
+
+              [ ]?				# one optional space
+              (?:\n[ ]*)?		# one optional newline followed by spaces
+
+              \[
+                (.*?)		# id = $3
+              \]
+
+            )
+            }xs',
+            array($this, '_doImages_reference_callback'), $text);
+
+        // 行内图片：在父类正则基础上，于 ) 之前插入可选的尺寸块
+        $text = preg_replace_callback('{
+            (				# wrap whole match in $1
+              !\[
+                (' . $this->nested_brackets_re . ')		# alt text = $2
+              \]
+              \s?			# One optional whitespace character
+              \(			# literal paren
+                [ \n]*
+                (?:
+                    <(\S*)>	# src url = $3
+                |
+                    (' . $this->nested_url_parenthesis_re . ')	# src url = $4
+                )
+                [ \n]*
+                (			# $5
+                  ([\'"])	# quote char = $6
+                  (.*?)		# title = $7
+                  \6		# matching quote
+                  [ \n]*
+                )?			# title is optional
+                (?:			# optional size block
+                    [ \n]+	# 必须与 URL 之间有空白，避免误伤 URL 中的 =（如 ?a=b）
+                    =
+                    [ \n]*
+                    (?:
+                        (\d{1,5})			# $8 width（=W / =Wx / =WxH）
+                        (?:[ \n]* [xX] [ \n]* (\d{1,5})? )?	# $9 height（可省略）
+                      |
+                        [xX] [ \n]* (\d{1,5})	# $10 height（=xH）
+                    )
+                )?
+              \)
+              (?:[ ]? ' . $this->id_class_attr_catch_re . ' )?	 # $11 = id/class attributes
+            )
+            }xs',
+            array($this, '_doImages_inline_callback'), $text);
+
+        return $text;
+    }
+
+    /**
+     * 行内图片回调：在父类实现基础上补输出 width / height。
+     *
+     * @param array $matches
+     *
+     * @return string
+     */
+    protected function _doImages_inline_callback($matches) {
+        $alt_text    = $matches[2];
+        $url         = $matches[3] === '' ? $matches[4] : $matches[3];
+        $title_quote =& $matches[6];
+        $title       =& $matches[7];
+
+        // 属性块在父类中是 $8，此处被尺寸块占用，故顺移到 $11
+        $attr = $this->doExtraAttributes("img", $dummy =& $matches[11]);
+
+        // 尺寸：$8 宽；$9 高（=WxH 写法）；$10 高（=xH 写法）
+        $width  = (isset($matches[8]) && '' !== $matches[8]) ? (int) $matches[8] : 0;
+        $height = 0;
+        if (isset($matches[9]) && '' !== $matches[9]) {
+            $height = (int) $matches[9];
+        }
+        if (isset($matches[10]) && '' !== $matches[10]) {
+            $height = (int) $matches[10];
+        }
+
+        $alt_text = $this->encodeAttribute($alt_text);
+        $url      = $this->encodeURLAttribute($url);
+        $result   = "<img src=\"$url\" alt=\"$alt_text\"";
+        if (isset($title) && $title_quote) {
+            $title   = $this->encodeAttribute($title);
+            $result .= " title=\"$title\""; // $title already quoted
+        }
+        $result .= $attr;
+
+        // 属性块里显式写了 width / height 时以它为准
+        // （MarkdownExtra 支持 key=value 属性，如 ![alt](u.jpg =600){#id width=999}）
+        if (preg_match('/\swidth\s*=/i', $attr)) {
+            $width = 0;
+        }
+        if (preg_match('/\sheight\s*=/i', $attr)) {
+            $height = 0;
+        }
+
+        /**
+         * 尺寸输出采用「内联 style + width/height 属性」的组合。
+         *
+         * 为什么必须用内联 style：
+         *   多数主题会对正文图片声明 width，例如
+         *     .view-content img { width: auto; max-width: 90% }
+         *   CSS 声明的优先级高于 HTML 的 width/height 属性，属性会被直接忽略，
+         *   只输出属性的话尺寸功能在这类主题下完全不起作用。
+         *
+         * 各写法说明：
+         *   max-width:100%  —— 窄屏不溢出（主题若已有更强规则则以主题为准）
+         *   height:auto     —— 避免「宽度被 max-width 压缩、高度保持原值」造成变形
+         *   aspect-ratio:W/H —— 高度随宽度等比缩放，宽屏下恰好等于指定高度；
+         *                       现代浏览器支持，老浏览器降级为原图比例
+         * 只给高度时不加 aspect-ratio（缺少宽度无从推导），此时以精确高度为准。
+         *
+         * 与 Medium Zoom 的关系：
+         *   该库通过 getBoundingClientRect() 读取元素渲染后的矩形来定位放大动画，
+         *   并 cloneNode() 原图取 src，不读写原图的 style，因此内联样式无副作用。
+         */
+        $style = "";
+        if ($width > 0 && $height > 0) {
+            $style = sprintf(
+                "width:%dpx;max-width:100%%;height:auto;aspect-ratio:%d/%d",
+                $width,
+                $width,
+                $height
+            );
+        } elseif ($width > 0) {
+            $style = sprintf("width:%dpx;max-width:100%%;height:auto", $width);
+        } elseif ($height > 0) {
+            $style = sprintf("height:%dpx;width:auto;max-width:100%%", $height);
+        }
+
+        /**
+         * 过滤尺寸样式，便于主题或用户接管（返回空串即改为只输出属性）。
+         *
+         * @param string $style  默认样式串
+         * @param int    $width  指定宽度，未指定为 0
+         * @param int    $height 指定高度，未指定为 0
+         * @param string $url    已编码的图片地址
+         */
+        $style = apply_filters("editormd_image_size_style", $style, $width, $height, $url);
+
+        // 属性同时输出：供不支持 aspect-ratio 的浏览器作降级，并便于主题/插件读取
+        if ($width > 0) {
+            $result .= ' width="' . $width . '"';
+        }
+        if ($height > 0) {
+            $result .= ' height="' . $height . '"';
+        }
+        if ("" !== $style) {
+            $result .= ' style="' . esc_attr($style) . '"';
+        }
+
+        $result .= $this->empty_element_suffix;
+
+        return $this->hashPart($result);
+    }
 }
