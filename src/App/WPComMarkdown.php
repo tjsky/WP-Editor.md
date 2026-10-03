@@ -741,7 +741,14 @@ class WPComMarkdown {
             return;
         }
         include_once(ABSPATH . WPINC . "/class-IXR.php");
-        $message = new IXR_Message($raw_post_data);
+
+        // Bug 修复（采纳上游 PR #546，作者 @VincentYuan-hub）：
+        // 本文件声明了 namespace EditormdApp，因此裸写 IXR_Message 会被解析成
+        // EditormdApp\IXR_Message（不存在）；而上一步 include 进来的 IXR_Message
+        // 位于全局命名空间（wp-includes/IXR/class-IXR-message.php）。
+        // 缺少前导反斜杠时，xmlrpc 请求会抛
+        // "Class 'EditormdApp\IXR_Message' not found" 并白屏。
+        $message = new \IXR_Message($raw_post_data);
         $message->parse();
         $post_id_position = "metaWeblog.getPost" === $message->methodName ? 0 : 1;
         $this->prime_post_cache($message->params[$post_id_position]);
