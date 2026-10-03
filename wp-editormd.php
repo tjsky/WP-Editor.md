@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.3.0
+ * Version:           10.4.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -14,11 +14,19 @@
  * Text Domain:       editormd
  * Domain Path:       /languages
  *
- * 10.3.0 安全加固与兼容性改造：
+ * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.3.0 —— 安全加固与兼容性
  *   - 修复 KaTeX 渲染链路的存储型 XSS（对应 CVE-2025-31035 同类问题）；
  *   - 修复图片粘贴接口缺失权限与 CSRF 校验、任意文件写入、图床代理 SSRF 等问题；
  *   - 修复设置页选项数据被相互覆盖、后台每个请求同步外联等缺陷；
- *   - 兼容 WordPress 7.0 与 PHP 8.4。
+ *   - 兼容 WordPress 7.1 与 PHP 8.4。
+ *
+ * 10.4.0 —— 公式解析与图片尺寸
+ *   - 修复代码块 / 行内代码中的 $ 被误当公式渲染（上游长期反馈问题）；
+ *   - 修复正文中误配对的 $ 被渲染成公式、块级公式被内联规则二次解析；
+ *   - 修复 xmlrpc 请求下抛出 Class 'EditormdApp\IXR_Message' not found（采纳上游 PR #546）；
+ *   - 新增图片尺寸语法：![alt](img.jpg =600) / =600x400 / =x400。
  */
 
 namespace EditormdRoot;
@@ -28,7 +36,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.3.0' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.0' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

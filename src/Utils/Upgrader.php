@@ -15,6 +15,11 @@ use EditormdUtils\Config;
  *   3. update_changelog_page() 原实现无条件在 init 上 wp_redirect + exit，
  *      若选项写入失败（版本号没变）就会每次请求都 302，前台也会被跳到 wp-admin；
  *      现改为「仅在后台、非 AJAX、且确实发生了版本变化时跳转」，并加一次性闸门。
+ *
+ * 10.4.0 补充：
+ *   迁移链新增 10.3.0 → 10.4.0。本版无数据结构变更，但必须推进版本号，
+ *   否则从旧版升级上来的站点 editor_version 会停在上一个版本，
+ *   使 wp-editormd.php 中「版本不一致」的判断长期成立、激活流程被反复执行。
  */
 class Upgrader {
     function __construct() {
@@ -50,6 +55,9 @@ class Upgrader {
             case "10.2.1":
                 $this->upgrade_10_2_1_to_10_3_0();
                 // no break
+            case "10.3.0":
+                $this->upgrade_10_3_0_to_10_4_0();
+                // no break
             default:
                 break;
         }
@@ -61,6 +69,19 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.3.0 → 10.4.0
+     *
+     * 本版没有数据结构变更，只需把 editor_version 推进到新版本号。
+     * 这一步不能省：wp-editormd.php 用
+     *   $installed['wp_editormd_ver'] !== WP_EDITORMD_VER
+     * 判断是否需要重跑激活流程，若版本号停在上一个版本，
+     * 该条件会长期成立，导致每次请求都重复执行 Activator::activate()。
+     */
+    private function upgrade_10_3_0_to_10_4_0() {
+        $this->update_to_version("10.4.0");
     }
 
     /**

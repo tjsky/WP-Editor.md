@@ -1,5 +1,46 @@
 # WP Editor.md
 
+### Version 10.4.0
+
+> 本版继续由 [@tjsky](https://github.com/tjsky) 维护。相较 10.3.0，本版修复了公式解析与
+> xmlrpc 的长期缺陷，并新增可选的图片尺寸语法。**不写尺寸的图片渲染结果与之前完全一致，
+> 升级无需迁移。**
+
+#### 1. 公式解析
+
+* 修复**代码块 / 行内代码中的 `$` 被当成公式渲染**：原实现的跳过判断写作
+  `htmlspecialchars_decode($element) === "<pre>"`，而真实代码块是 `<pre class="...">` 或
+  `<pre><code>`，精确等值判断永远不成立。现改为「标签白名单（`pre`/`code`/`style`/`script`/`textarea`）
+  + 嵌套深度计数」。这是上游被长期反复反馈的一类问题
+* 修复**块级公式被二次解析导致重复渲染**：两个过滤器分别处理 `$$...$$` 与 `$...$`，
+  后者判断「是否已处理」时查找的 class 名与实际输出的不一致。现改为单条正则、单次遍历
+* 修复**正文中误配对的 `$` 被渲染成公式**：例如 `function update( $a, $b )`、
+  `价格从 $100 涨到 $200`。内联公式增加两道防护 —— 定界符须紧贴内容、内容须含字母/数字/反斜杠
+  （可用过滤器 `editormd_katex_require_tight_delimiters` 关闭）
+* 输出侧的 `esc_html()` 转义保持并扩展到新的统一回调中，10.3.0 修复的存储型 XSS 不会回退
+
+#### 2. 缺陷修复
+
+* 修复 **xmlrpc 请求下抛出 `Class 'EditormdApp\IXR_Message' not found`**
+  （`src/App/WPComMarkdown.php`）。该文件声明了命名空间，而 include 进来的 `IXR_Message`
+  位于全局命名空间，需要前导反斜杠。**采纳上游 [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)** 的修法
+
+#### 3. 新功能
+
+* 新增**图片尺寸语法**（可选）：`![alt](img.jpg =600)` / `=600x400` / `=x400`，
+  可与 `"title"` 及 `{#id .class}` 共存。尺寸以
+  `width` + `max-width:100%` + `height:auto`（同时指定宽高时另加 `aspect-ratio`）的内联样式输出，
+  因此宽屏按设定尺寸显示、窄屏等比缩放不变形，且不影响 Medium Zoom 一类看图插件
+* 上游 PR [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) 与
+  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的**思路被参考但未直接合并**：
+  #602 会丢失 `{#id .class}` 属性语法与 `ref_attr` 支持；#603 的输出处缺少转义，
+  合并会回退 10.3.0 的安全修复，且其防护规则可被绕过
+
+#### 4. 升级
+
+* 升级器新增 `10.3.0 → 10.4.0` 迁移，仅推进版本号，无数据变更
+
+------
 ### Version 10.3.0
 
 > 本版由 [@tjsky](https://github.com/tjsky) 在原作者停止维护后继续维护。
@@ -45,6 +86,53 @@
 
 ------
 
+### Version 10.4.0
+
+> Maintained by [@tjsky](https://github.com/tjsky). Compared with 10.3.0, this release fixes
+> long-standing issues in formula parsing and xmlrpc, and adds an optional image size syntax.
+> **Images without a size are rendered exactly as before, so upgrading requires no migration.**
+
+#### 1. Formula Parsing
+
+* Fixed **`$` inside code blocks / inline code being parsed as formulas**. The original skip check was
+  `htmlspecialchars_decode($element) === "<pre>"`, while real code blocks render as
+  `<pre class="...">` or `<pre><code>` — an exact-match test that never succeeds. It now uses a
+  tag whitelist (`pre`/`code`/`style`/`script`/`textarea`) with nesting-depth counting.
+  This was among the most frequently reported issues upstream
+* Fixed **block formulas being parsed twice (duplicate rendering)**: two filters handled `$$...$$` and
+  `$...$` separately, and the class name the latter looked for never matched the emitted markup.
+  Now a single regex in a single pass
+* Fixed **mismatched `$` pairs in body text being rendered as formulas**, e.g.
+  `function update( $a, $b )` or `price from $100 to $200`. Two guards were added for inline formulas:
+  delimiters must be tight against the content, and the content must contain a letter, digit or backslash
+  (disable via the `editormd_katex_require_tight_delimiters` filter)
+* The output-side `esc_html()` escaping is retained and carried over to the new unified callback, so the
+  stored XSS fixed in 10.3.0 cannot regress
+
+#### 2. Bug Fixes
+
+* Fixed **`Class 'EditormdApp\IXR_Message' not found` on xmlrpc requests**
+  (`src/App/WPComMarkdown.php`). The file declares a namespace while the included `IXR_Message`
+  lives in the global namespace, so a leading backslash is required.
+  **Adopts the fix from upstream [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)**
+
+#### 3. New Feature
+
+* Added an **optional image size syntax**: `![alt](img.jpg =600)` / `=600x400` / `=x400`,
+  combinable with `"title"` and `{#id .class}`. Sizes are emitted as an inline style of
+  `width` + `max-width:100%` + `height:auto` (plus `aspect-ratio` when both dimensions are given), so
+  images render at the requested size on wide screens, scale proportionally on narrow ones without
+  distortion, and do not interfere with zoom plugins such as Medium Zoom
+* The approaches of upstream PRs [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) and
+  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) were **taken as reference but not merged
+  directly**: #602 drops `{#id .class}` attribute syntax and `ref_attr` support, while #603 lacks output
+  escaping (merging it would regress the 10.3.0 security fixes) and its guard can be bypassed
+
+#### 4. Upgrade
+
+* The upgrader gains a `10.3.0 → 10.4.0` migration; it only advances the version number, no data changes
+
+------
 ### Version 10.3.0
 
 > Maintained by [@tjsky](https://github.com/tjsky) after the original author stopped maintaining this project.
@@ -91,6 +179,47 @@
 
 ------
 
+### Version 10.4.0
+
+> 本版繼續由 [@tjsky](https://github.com/tjsky) 維護。相較 10.3.0，本版修正了公式解析與
+> xmlrpc 的長期缺陷，並新增可選的圖片尺寸語法。**不寫尺寸的圖片呈現結果與之前完全一致，
+> 升級無需遷移。**
+
+#### 1. 公式解析
+
+* 修正**程式碼區塊 / 行內程式碼中的 `$` 被當成公式渲染**：原實作的跳過判斷寫成
+  `htmlspecialchars_decode($element) === "<pre>"`，而真實程式碼區塊是 `<pre class="...">` 或
+  `<pre><code>`，精確等值判斷永遠不成立。現改為「標籤白名單（`pre`/`code`/`style`/`script`/`textarea`）
+  + 巢狀深度計數」。這是上游長期反覆被回報的一類問題
+* 修正**區塊公式被二次解析導致重複渲染**：兩個過濾器分別處理 `$$...$$` 與 `$...$`，
+  後者判斷「是否已處理」時查找的 class 名與實際輸出的不一致。現改為單條正規表示式、單次走訪
+* 修正**正文中誤配對的 `$` 被渲染成公式**：例如 `function update( $a, $b )`、
+  `價格從 $100 漲到 $200`。行內公式增加兩道防護 —— 定界符須緊貼內容、內容須含字母/數字/反斜線
+  （可用過濾器 `editormd_katex_require_tight_delimiters` 關閉）
+* 輸出側的 `esc_html()` 轉義保持並擴展到新的統一回呼中，10.3.0 修正的儲存型 XSS 不會回退
+
+#### 2. 缺陷修正
+
+* 修正 **xmlrpc 請求下拋出 `Class 'EditormdApp\IXR_Message' not found`**
+  （`src/App/WPComMarkdown.php`）。該檔宣告了命名空間，而 include 進來的 `IXR_Message`
+  位於全域命名空間，需要前置反斜線。**採用上游 [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)** 的修法
+
+#### 3. 新功能
+
+* 新增**圖片尺寸語法**（可選）：`![alt](img.jpg =600)` / `=600x400` / `=x400`，
+  可與 `"title"` 及 `{#id .class}` 共存。尺寸以
+  `width` + `max-width:100%` + `height:auto`（同時指定寬高時另加 `aspect-ratio`）的行內樣式輸出，
+  因此寬螢幕依設定尺寸顯示、窄螢幕等比縮放不變形，且不影響 Medium Zoom 一類看圖外掛
+* 上游 PR [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) 與
+  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的**思路被參考但未直接合併**：
+  #602 會遺失 `{#id .class}` 屬性語法與 `ref_attr` 支援；#603 的輸出處缺少轉義，
+  合併會回退 10.3.0 的安全性修正，且其防護規則可被繞過
+
+#### 4. 升級
+
+* 升級器新增 `10.3.0 → 10.4.0` 遷移，僅推進版本號，無資料變更
+
+------
 ### Version 10.3.0
 
 > 本版本由 [@tjsky](https://github.com/tjsky) 在原作者停止維護後繼續維護。

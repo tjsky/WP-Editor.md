@@ -13,7 +13,7 @@
 > | 本分支 | [tjsky/WP-Editor.md](https://github.com/tjsky/WP-Editor.md) |
 > | 修改者 | tjsky |
 > | 修改日期 | 起始 **2026-10-02**；后续变更见 [CHANGELOG](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md) |
-> | 修改性质 | **仅做安全加固与新版兼容性适配，未做功能重构** |
+> | 修改性质 | **以安全加固与新版兼容性为主；另新增一项小功能（图片尺寸语法），未做功能重构** |
 >
 > 依据本项目的授权协议 **GNU General Public License v3**（或更新版本）第 5 条要求，
 > 修改后的版本必须带有**显著的修改声明与日期**，故在此说明。逐项差异见
@@ -94,10 +94,59 @@ The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) 
 * `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
 
+### 5. 公式解析重写与图片尺寸语法（10.4.0）
+
+**公式解析**（`src/App/KaTeX.php`）
+
+原实现有两个结构性问题，这是上游被反复反馈的痛点来源：
+
+| 问题 | 原因 | 后果 |
+| --- | --- | --- |
+| 代码块里的 `$` 被当成公式 | 跳过逻辑写的是 `htmlspecialchars_decode($element) === "<pre>"`，而真实代码块是 `<pre class="...">` 或 `<pre><code>`，精确等值判断永远不成立 | 代码块内容被吃掉或显示异常 |
+| 块级公式渲染两次 | `katex_markup_double`（优先级 8）输出的 class 是 `katex math multi-line`，而 `katex_markup_single`（优先级 9）判断「是否已处理」时找的是 `<div class="katex math`，判断永远不成立 | 公式重复渲染；三次遍历也带来多余开销 |
+| 正文误配对的 `$` 被渲染成公式 | 只跳过行首为 `<` 的元素，`function update( $a, $b )`、`价格从 $100 到 $200` 都会中招 | 正文被误当公式渲染 |
+
+现改为：**单次遍历 + 单条正则**（`$$` 分支优先），跳过区域用「标签白名单（`pre`/`code`/`style`/`script`/`textarea`）
++ 嵌套深度计数」维护；内联公式另加两道误渲染防护 —— 定界符须紧贴内容、内容须含字母/数字/反斜杠。
+两道防护都可用过滤器关闭（`editormd_katex_require_tight_delimiters`）。
+
+> 参考了上游 [PR #603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的思路，
+> 但**未直接合并**：该 PR 的输出处仍没有转义（合并会回退本分支的 XSS 修复），
+> 且它「定界符内有空格就跳过渲染」的规则可被绕过 —— 把空格移入内容中间即可
+> （`$p &lt; img src=x onerror=alert(1) &gt; q$` 仍会被渲染）。本实现把安全落在输出侧的 `esc_html()`，
+> 不依赖该规则。
+
+**图片尺寸语法**（`src/App/WPMarkdownParser.php`）
+
+    ![alt](image.jpg =600)                    仅宽度（推荐：高度按原图比例自动）
+    ![alt](image.jpg =600x400)                宽度 + 高度
+    ![alt](image.jpg =x400)                   仅高度
+    ![alt](image.jpg "title" =600x400){#id .class}    可与 title、属性语法共存
+
+不写尺寸时输出与原来**完全一致**（已用基线与父类逐字节比对验证）。
+
+> 语法参考上游 [PR #602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602)，
+> 同样**未直接合并**：该 PR 复制了旧版 php-markdown 的整套实现，占用了 `{#id .class}` 所在的捕获组，
+> 会丢失属性语法与引用式图片的 `ref_attr` 支持。本实现把尺寸放在独立捕获组，原有能力不减。
+
+**为什么尺寸用内联样式而不是只给属性**：多数主题（含 Bootstrap）会对正文图片声明
+`img { width: auto }` 或类似的宽度规则，而 CSS 声明的优先级高于 HTML 的 `width`/`height` 属性 ——
+只输出属性的话，尺寸设置会被主题直接忽略。因此输出形如
+`style="width:600px;max-width:100%;height:auto"`（同时指定宽高时另加 `aspect-ratio`）：
+
+* 宽屏下即设定的尺寸；
+* 窄屏下宽度受容器限制、高度等比缩放，**不会变形**（若只给属性，宽度被压缩而高度不变，会拉伸）；
+* 对看图插件（如 Medium Zoom）**无影响** —— 它通过 `getBoundingClientRect()` 读取渲染后的矩形来定位动画，
+  并 `cloneNode()` 原图取 `src`，不读写原图的样式。
+
+若你的主题本身有更强的图片规则（例如 `max-height`），最终呈现以主题为准。
+需要用别的方式输出尺寸时，过滤 `editormd_image_size_style` 即可；让它返回空字符串就退化为「只输出属性」。
+
 ### 本次维护「没有做」的事
 
-为避免影响面扩大，以下**有意未改**：功能设计与交互逻辑、编辑器前端行为、数据存储结构、
-既有选项的命名与取值。升级到本版本**不需要迁移数据**，设置项保持原样即可。
+为避免影响面扩大，以下**有意未改**：编辑器前端行为、数据存储结构、既有选项的命名与取值。
+10.4.0 新增的图片尺寸语法是**可选**的（不写尺寸则渲染结果与原来一致），
+因此升级到本版本**不需要迁移数据**，设置项保持原样即可。
 
 ---
 
@@ -138,7 +187,7 @@ cd -
 for po in languages/*.po; do msgfmt -o "${po%.po}.mo" "$po"; done
 
 # 5. 打包成可安装 zip
-python3 .github/scripts/build_package.py . dist/wp-editormd-10.3.0.zip 10.3.0
+python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.0.zip 10.4.0
 ```
 
 环境要求：Node.js ≥ 18（推荐 22）、PHP ≥ 7.4、Composer、gettext（`msgfmt`）、Python 3。
@@ -171,6 +220,14 @@ python3 .github/scripts/build_package.py . dist/wp-editormd-10.3.0.zip 10.3.0
 
 请参考上游 Wiki（部分内容可能已过期）：
 <https://github.com/LuRenJiasWorld/WP-Editor.md/wiki>
+
+**图片尺寸语法（10.4.0 新增，可选）**：在图片地址后加 `=宽x高`，可只写一维：
+
+    ![说明](图片地址 =600)        显示宽度 600px，高度按原图比例
+    ![说明](图片地址 =600x400)    显示为 600×400
+    ![说明](图片地址 =x400)       显示高度 400px
+
+留空即按原尺寸显示。窄屏下会自动等比缩小，不会变形。
 
 ### 更新日志 ChangeLog
 

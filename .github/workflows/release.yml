@@ -197,12 +197,23 @@ jobs:
             该 zip 已包含 `vendor/` 与全部前端编译产物，**可直接安装**。
             请勿使用 GitHub 自动生成的 Source code 压缩包 —— 它缺少这些运行期必需文件。
 
-            ## 本版要点
+            ## 本版变更
+
+            本版本的逐项变更见
+            [CHANGELOG 的 ${{ steps.ver.outputs.version }} 条目](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)；
+            下方的自动生成说明列出了本次提交。
+
+            ## 维护分支累计改动
 
             * 修复 KaTeX 公式渲染链路的**存储型 XSS**（与 CVE-2025-31035 同类）
-            * 修复图片粘贴接口缺失权限与 CSRF 校验、任意文件写入的问题
-            * 修复 sm.ms 图床代理的 SSRF / 开放代理问题
+            * 修复图片粘贴接口缺失权限与 CSRF 校验、任意文件写入
+            * 修复 sm.ms 图床代理的 SSRF / 开放代理
+            * 修复后台管理页渲染器的授权缺陷、设置项净化失效
             * 修复设置页选项互相覆盖导致思维导图失效的数据损坏缺陷
+            * 修复代码块 / 行内代码中的 `$` 被误当公式渲染（10.4.0）
+            * 修复块级公式被二次解析导致重复渲染（10.4.0）
+            * 修复 xmlrpc 请求下 `IXR_Message` 类未找到（10.4.0，采纳上游 PR #546）
+            * 新增可选的图片尺寸语法 `![alt](img.jpg =600x400)`（10.4.0）
             * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
 
             完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异修改清单)
