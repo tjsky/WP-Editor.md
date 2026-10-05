@@ -40,6 +40,53 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "本次构建版本：$V"
 
+      # 为什么单独校验插件头：
+      #   后台「插件 → 上传插件」界面显示的版本 / 作者 / 所需 WP / 所需 PHP，
+      #   以及 update 检查依赖的 Version，都来自插件主文件的头部注释。
+      #   这些行形态上与注释续行一模一样（都以 " * " 开头），一旦被格式化工具
+      #   或注释清理脚本误删，语法校验与 token 流比对**都发现不了**
+      #   （注释本就被排除在 token 比对之外），但用户在后台会直接看到字段缺失。
+      #   2026-10-05 的 10.3.0 / 10.4.0 就踩过这个坑，故在此设闸。
+      - name: 校验插件头元数据
+        env:
+          EXPECT_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          text = open("wp-editormd.php", encoding="utf-8").read()
+          m = re.search(r"/\*\*(.*?)\*/", text, re.S)
+          if not m:
+              sys.exit("未找到插件主文件的头部注释块")
+
+          header = {}
+          for line in m.group(1).splitlines():
+              mm = re.match(r"^\s*\*+\s*([A-Za-z][A-Za-z ]*?)\s*:\s*(\S.*?)\s*$", line)
+              if mm:
+                  header[mm.group(1)] = mm.group(2)
+
+          print("插件头字段：")
+          for k, v in header.items():
+              print("  %-20s %s" % (k, v))
+
+          required = [
+              "Plugin Name", "Version", "Author",
+              "Requires at least", "Requires PHP", "Tested up to",
+          ]
+          missing = [f for f in required if not header.get(f)]
+          if missing:
+              sys.exit("插件头缺少必需字段：%s" % "、".join(missing))
+
+          expect = os.environ["EXPECT_VERSION"]
+          if header["Version"] != expect:
+              sys.exit("插件头 Version=%s，与本次构建版本 %s 不一致"
+                       % (header["Version"], expect))
+
+          print("插件头元数据校验通过（Version=%s）" % expect)
+          PY
+
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
@@ -216,7 +263,7 @@ jobs:
             * 新增可选的图片尺寸语法 `![alt](img.jpg =600x400)`（10.4.0）
             * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
 
-            完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异修改清单)
+            完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异)
             与 [CHANGELOG](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
 
             ## 授权
