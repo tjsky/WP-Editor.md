@@ -1,8 +1,14 @@
 <?php
 /**
  * Plugin Name:       WP Editor.md
- * Plugin URI:        https://github.com/LuRenJiasWorld/WP-Editor.md
+ * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
+ * Version:           10.4.0
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * Tested up to:      7.1
+ * Author:            LuRenJiasWorld (maintained fork by tjsky)
+ * Author URI:        https://github.com/tjsky/WP-Editor.md
  * License:           GPL-3.0+
  * License URI:       http://www.gnu.org/licenses/gpl-3.0.txt
  * Text Domain:       editormd
