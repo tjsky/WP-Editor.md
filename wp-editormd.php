@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.0
+ * Version:           10.4.1
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,13 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.4.1 —— 修复发布的包在后台不显示插件信息
+ *   - 上一版（10.3.0 / 10.4.0）的 GitHub 包中，插件头里的 Version / Author /
+ *     Author URI / Requires at least / Requires PHP / Tested up to 被注释剥离脚本
+ *     误删（这些行与块注释续行形态一致，且所在 diff hunk 的 -/+ 行数不等，
+ *     「还原基线原文」的兜底未触发），导致后台「上传插件」界面缺字段、更新检查拿不到版本号。
+ *     已按修复后的工具重新生成，并补上专用校验与 CI 闸门。
  *
  * 10.3.0 —— 安全加固与兼容性
  *   - 修复 KaTeX 渲染链路的存储型 XSS（对应 CVE-2025-31035 同类问题）；
@@ -36,7 +43,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.0' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.1' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

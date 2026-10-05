@@ -1,5 +1,26 @@
 # WP Editor.md
 
+### Version 10.4.1
+
+> 本版修正 10.3.0 / 10.4.0 发布包的一处元数据缺陷，**无代码逻辑与数据结构变更，升级无需迁移**。
+
+#### 缺陷修复
+
+* 修复**发布包在后台不显示插件信息**：插件主文件头部注释中的
+  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
+  丢失，导致「插件 → 上传插件」界面看不到版本、作者与所需环境，更新检查也拿不到版本号
+* 成因：这些行与块注释续行形态一致（都以 ` * ` 开头），被注释清理脚本当成新增注释删除 ——
+  它们所在的 diff hunk 中 `-` / `+` 行数不等（-3 / +6），
+  「成对改写则还原基线原文」的兜底因此没有触发
+* 语法校验与 token 流比对都发现不了（注释本就被排除在 token 比对之外），
+  故本次一并补上**插件头字段校验脚本**与 **CI 闸门**（缺字段、或 Version 与构建版本不符即失败）
+
+#### 升级
+
+* 升级器新增 `10.4.0 → 10.4.1` 迁移，仅推进版本号，无数据变更
+
+------
+
 ### Version 10.4.0
 
 > 本版继续由 [@tjsky](https://github.com/tjsky) 维护。相较 10.3.0，本版修复了公式解析与
@@ -83,6 +104,33 @@
 
 * `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+
+------
+
+### Version 10.4.1
+
+> Fixes a metadata defect in the 10.3.0 / 10.4.0 packages. **No logic or data-structure
+> changes, so upgrading requires no migration.**
+
+#### Bug Fixes
+
+* Fixed **the released package not showing plugin information in the admin**. The
+  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
+  fields of the plugin file header were missing, so the
+  "Plugins → Add New → Upload Plugin" screen showed no version, author, or required
+  environment, and the update check could not read the version
+* Cause: those lines look exactly like block-comment continuation lines (they start with ` * `),
+  so the comment-stripping script deleted them as newly added comments — the hunk they lived in
+  had unequal `-` / `+` counts (-3 / +6), so the "paired rewrite → restore the upstream line"
+  fallback never fired
+* Neither the syntax check nor the token-stream comparison could catch this (comments are
+  excluded from the token comparison by design), so this release adds a **plugin header field
+  checker** and a **CI gate** (fails when a field is missing or when Version does not match the
+  build version)
+
+#### Upgrade
+
+* The upgrader gains a `10.4.0 → 10.4.1` migration; it only advances the version number, no data changes
 
 ------
 
@@ -176,6 +224,27 @@
 
 * `editor_mindmap` option was overwritten by the `editor_style` array, breaking the mind map feature
 * Mermaid's default config was mistakenly written with KaTeX's defaults
+
+------
+
+### Version 10.4.1
+
+> 本版修正 10.3.0 / 10.4.0 發布包的一處中繼資料缺陷，**無程式邏輯與資料結構變更，升級無需遷移**。
+
+#### 缺陷修正
+
+* 修正**發布包在後台不顯示外掛資訊**：外掛主檔頭部註解中的
+  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
+  遺失，導致「外掛 → 安裝外掛 → 上傳外掛」介面看不到版本、作者與所需環境，更新檢查也讀不到版本號
+* 成因：這些行與區塊註解續行形態一致（都以 ` * ` 開頭），被註解清理腳本當成新增註解刪除 ——
+  它們所在的 diff hunk 中 `-` / `+` 行數不等（-3 / +6），
+  「成對改寫則還原基線原文」的兜底因此沒有觸發
+* 語法檢查與 token 流比對都無法發現（註解本就被排除在 token 比對之外），
+  故本次一併補上**外掛頭欄位檢查腳本**與 **CI 閘門**（缺欄位、或 Version 與建置版本不符即失敗）
+
+#### 升級
+
+* 升級器新增 `10.4.0 → 10.4.1` 遷移，僅推進版本號，無資料變更
 
 ------
 

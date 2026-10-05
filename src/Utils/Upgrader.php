@@ -58,6 +58,9 @@ class Upgrader {
             case "10.3.0":
                 $this->upgrade_10_3_0_to_10_4_0();
                 // no break
+            case "10.4.0":
+                $this->upgrade_10_4_0_to_10_4_1();
+                // no break
             default:
                 break;
         }
@@ -69,6 +72,16 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.0 → 10.4.1
+     *
+     * 本版只修复了插件包的元数据（插件头字段），没有数据结构变更，
+     * 这里同样只需把 editor_version 推进到新版本号 —— 理由见上一段。
+     */
+    private function upgrade_10_4_0_to_10_4_1() {
+        $this->update_to_version("10.4.1");
     }
 
     /**

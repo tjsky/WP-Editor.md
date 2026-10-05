@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.0
+Stable tag: 10.4.1
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,11 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.1 =
+* 缺陷修复：插件头缺少 Version / Author / Requires at least / Requires PHP / Tested up to
+  （后台「上传插件」界面不显示版本、作者与所需环境，更新检查拿不到版本号）
+* 构建：注释剥离工具增加插件头字段保护，并新增插件头校验与 CI 闸门，防止复发
 
 = 10.4.0 =
 * 安全修复：KaTeX 公式解析的输出转义（存储型 XSS，CVE-2025-31035 同类问题）
