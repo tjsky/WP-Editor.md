@@ -18,6 +18,8 @@ use EditormdUtils\Ajax;
  *  3. file_repeated: 文件重复，常见于第三方图床，返回正确的图片地址
  *  4. unknown_error: 未知错误，详见detail
  *  5. permission_denied: 当前用户无上传权限（本次安全加固新增）
+ *  6. rate_limited: 短时间内上传过于频繁（10.4.2 新增）
+ *  7. image_too_large: 图片体积或像素数超出预算（10.4.2 新增）
  * 
  * - detail : 其他信息，可能为以下几种格式：
  *  1. 在第三方图床请求正常的情况下，返回第三方图床返回的raw数据
@@ -35,6 +37,51 @@ class ImagePaste {
      * 单次粘贴允许的最大载荷长度（base64 字符串长度上限，约对应 6MB 二进制）
      */
     const MAX_PAYLOAD_BYTES = 8388608;
+
+    /*
+     * base64 解码后的二进制上限。
+     *
+     * 安全修复（10.4.2）：文件大小限制 ≠ 解码后的内存占用，
+     * 但至少要先把「明文体积」卡住，避免把超大负载送进后续流程。
+     */
+    const MAX_BINARY_BYTES = 6291456;
+
+    /*
+     * 像素预算：进入 GD 解码前就拒绝超预算图片。
+     *
+     * 安全修复（10.4.2）：原实现只限制请求体积，一张几 MB 的高压缩 PNG
+     * 可以展开成数百 MB 的像素缓冲区；解码一次还需要再造一张同尺寸背景画布，
+     * 峰值内存约为像素数的 8 倍，足以打爆 PHP-FPM worker。
+     */
+    const MAX_PIXELS = 10000000;
+
+    /*
+     * 单边像素上限（防止 100000x10 这类「面积不大但单边极大」的输入）
+     */
+    const MAX_SIDE = 8192;
+
+    /*
+     * 解码时需要预留的内存余量（字节），用于内存预算判断
+     */
+    const MEMORY_HEADROOM_BYTES = 16777216;
+
+    /*
+     * sm.ms 上游请求超时。
+     *
+     * 安全修复（10.4.2）：原实现 timeout=120，一个慢请求可以占住
+     * PHP-FPM worker 两分钟，配合并发即可造成 502/504。
+     */
+    const UPLOAD_TIMEOUT  = 10;
+    const CONNECT_TIMEOUT = 3;
+
+    /*
+     * 单用户速率限制（次 / 窗口秒）
+     *
+     * 安全修复（10.4.2）：图片处理本身是重操作，且可触发外部请求，
+     * 这里按用户做最基本的限流，避免单人刷爆 worker。
+     */
+    const RATE_LIMIT_MAX    = 30;
+    const RATE_LIMIT_WINDOW = 60;
 
     /*
      * 允许的图片 MIME 白名单（以文件内容探测结果为准，不信任客户端声明）
@@ -65,6 +112,14 @@ class ImagePaste {
      * 原实现直接写 $this->result 但未声明该属性，PHP 8.2 起「创建动态属性」已弃用
      */
     private $result = array();
+
+    /**
+     * @var string 最近一次处理失败的原因（用于返回更精确的错误码）
+     *
+     * 10.4.2 新增：原先所有失败都笼统返回 file_extension_error，
+     * 体积/像素超预算这类「不是格式问题」的拒绝也被报成扩展名错误，排障困难。
+     */
+    private $last_error = "";
 
     public function __construct() {
         add_action("wp_ajax_wp_editormd_imagepaste", array($this, "editormd_imagepaste_action_callback"));
@@ -142,6 +197,12 @@ class ImagePaste {
 
         check_ajax_referer("wp_editormd_imagepaste", "_wpnonce");
 
+        // 2.5 速率限制（安全修复 10.4.2）：图片解码/转换与外部图床上传都是重操作，
+        //     单个账号高频调用即可打满 worker，这里按用户做一个最基础的限流。
+        if ($this->editormd_rate_limit_exceeded()) {
+            Ajax::editormd_return_json("", "rate_limited", "");
+        }
+
         // 3. 选择上传目的地
         try {
             switch (Config::get_option("imagepaste_sm", "editor_basics")) {
@@ -162,7 +223,8 @@ class ImagePaste {
     private function editormd_imagepaste_save() {
         $tempFile = $this->editormd_save_to_temp_dir();
         if (false === $tempFile) {
-            Ajax::editormd_return_json("", "file_extension_error");
+            // 使用 parse 阶段记录的具体原因（体积 / 像素超预算 / 格式非法）
+            Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
         }
 
         $this->extension = "jpg";
@@ -196,7 +258,8 @@ class ImagePaste {
     private function editormd_imagepaste_smms() {
         $tempFile = $this->editormd_save_to_temp_dir();
         if (false === $tempFile) {
-            Ajax::editormd_return_json("", "file_extension_error");
+            // 同上：区分体积 / 像素超预算与格式非法
+            Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
         }
 
         // 获取用户配置中的图床校验码
@@ -219,13 +282,25 @@ class ImagePaste {
         // 安全修复：改用 WordPress 官方 HTTP API（wp_remote_post），
         // 自带证书校验与超时控制。原实现使用 curl 并显式关闭了
         // CURLOPT_SSL_VERIFYPEER / CURLOPT_SSL_VERIFYHOST，存在中间人风险。
+        //
+        // 10.4.2：超时由 120 秒收紧到 10 秒，并额外设置 3 秒连接超时。
+        // 原值下单个慢请求即可占住 PHP-FPM worker 两分钟，并发几个就能让站点 502。
+        $connect_timeout = function ($handle) {
+            if (defined("CURLOPT_CONNECTTIMEOUT") && function_exists("curl_setopt")) {
+                curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, self::CONNECT_TIMEOUT);
+            }
+        };
+        add_action("http_api_curl", $connect_timeout);
+
         $response = wp_remote_post("https://smms.app/api/v2/upload", array(
-            "timeout"     => 120,
+            "timeout"     => self::UPLOAD_TIMEOUT,
             "redirection" => 0,
             "sslverify"   => true,
             "headers"     => $headers,
             "body"        => $body,
         ));
+
+        remove_action("http_api_curl", $connect_timeout);
 
         if (is_wp_error($response)) {
             Ajax::editormd_return_json("", "unknown_error", $response->get_error_message());
@@ -268,54 +343,92 @@ class ImagePaste {
      * 安全修复：原实现直接写入 uploads 且完全信任客户端声明的 MIME，
      * 这里改为「先落临时目录 → 以文件内容探测真实类型 → 通过白名单后再转换」。
      *
+     * 10.4.2 补充：
+     *   1. 临时文件名改用 wp_tempnam()（原实现用 md5(dataurl) 拼系统临时目录，
+     *      同一输入的并发请求会争抢同一个文件，且可预测）；
+     *   2. 增加解码后二进制上限、像素预算与内存预算，全部在进入 imagecreatefrom*()
+     *      之前拦截 —— 这是原实现真正缺失的一层。
+     *
      * @return string|false 成功返回临时 JPG 文件路径，失败返回 false
      */
     private function editormd_save_to_temp_dir() {
         // strict 模式：非法 base64 直接返回 false，避免解码出半截内容
         $binary = base64_decode($this->content, true);
         if (false === $binary || "" === $binary) {
+            $this->last_error = "file_extension_error";
+            return false;
+        }
+
+        // 安全修复（10.4.2）：base64 文本长度 ≠ 二进制长度，这里卡住实际体积
+        if (strlen($binary) > self::MAX_BINARY_BYTES) {
+            $this->last_error = "file_too_large";
             return false;
         }
 
         if (! function_exists("getimagesize")) {
+            $this->last_error = "unknown_error";
             return false;
         }
 
-        $tempFile = $this->tempDir . $this->name . ".tmp";
+        // 安全修复（10.4.2）：wp_tempnam() 生成随机且独占的临时文件名。
+        // 该函数位于 wp-admin/includes/file.php；admin-ajax 一般已加载，
+        // 这里显式兜底一次，避免在非常规入口下不可用。
+        if (! function_exists("wp_tempnam")) {
+            require_once ABSPATH . "wp-admin/includes/file.php";
+        }
+
+        $tempFile = wp_tempnam($this->name . ".tmp");
+        if (! $tempFile) {
+            $this->last_error = "unknown_error";
+            return false;
+        }
+
         if (false === @file_put_contents($tempFile, $binary)) {
+            wp_delete_file($tempFile);
+            $this->last_error = "unknown_error";
             return false;
         }
 
-        $mime = $this->detect_image_mime($tempFile);
-        if (false === $mime) {
+        // 一次性取出图片信息：真实 MIME + 尺寸，供白名单与预算判断共用
+        $info = $this->image_info($tempFile);
+        if (false === $info) {
             wp_delete_file($tempFile);
+            $this->last_error = "file_extension_error";
+            return false;
+        }
+
+        $mime = $info["mime"];
+
+        // 安全修复（10.4.2）：像素/内存预算，必须在解码之前判定
+        if (! $this->image_dimensions_within_budget((int) $info[0], (int) $info[1])) {
+            wp_delete_file($tempFile);
+            $this->last_error = "image_too_large";
             return false;
         }
 
         // 源文件本身就是 JPEG 时无需转换，直接沿用
         if ("image/jpeg" === $mime) {
-            $newFilename = preg_replace("/\.tmp$/", ".jpg", $tempFile);
+            $newFilename = $tempFile . ".jpg";
             if (false === @rename($tempFile, $newFilename)) {
                 wp_delete_file($tempFile);
+                $this->last_error = "unknown_error";
                 return false;
             }
 
             return $newFilename;
         }
 
-        $newFilename = $this->editormd_png2jpg($tempFile, true, $mime);
-
-        return $newFilename;
+        return $this->editormd_png2jpg($tempFile, true, $mime);
     }
 
     /**
-     * 以文件内容探测真实图片类型
+     * 读取图片信息并做 MIME 白名单校验
      *
      * @param string $file
      *
-     * @return string|false MIME 或 false
+     * @return array|false getimagesize() 的结果（至少含 mime / 宽 / 高）
      */
-    private function detect_image_mime($file) {
+    private function image_info($file) {
         $info = @getimagesize($file);
         if (false === $info || empty($info["mime"])) {
             return false;
@@ -325,7 +438,75 @@ class ImagePaste {
             return false;
         }
 
-        return $info["mime"];
+        return $info;
+    }
+
+    /**
+     * 像素与内存预算判断
+     *
+     * 两条独立限制：
+     *   1. 单边不超过 MAX_SIDE、总像素不超过 MAX_PIXELS；
+     *   2. 解码所需内存（真彩色位图 + 背景画布，约 8 字节/像素）不得超过
+     *      当前 PHP 内存上限的 80%（内存上限为 -1 表示无限制时跳过该判断）。
+     *
+     * @param int $width
+     * @param int $height
+     *
+     * @return bool 是否允许继续解码
+     */
+    private function image_dimensions_within_budget($width, $height) {
+        if ($width <= 0 || $height <= 0) {
+            return false;
+        }
+
+        if ($width > self::MAX_SIDE || $height > self::MAX_SIDE) {
+            return false;
+        }
+
+        if (($width * $height) > self::MAX_PIXELS) {
+            return false;
+        }
+
+        $limit = function_exists("wp_convert_hr_to_bytes")
+            ? (int) wp_convert_hr_to_bytes(ini_get("memory_limit"))
+            : 0;
+
+        if ($limit > 0) {
+            $needed = $width * $height * 4 * 2 + self::MEMORY_HEADROOM_BYTES;
+            $free   = $limit - memory_get_usage(true);
+
+            if ($free <= 0 || $needed > ($free * 0.8)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 单用户速率限制
+     *
+     * 使用 transient 计数（窗口内累计），避免引入额外存储；
+     * 对象缓存环境下 transient 也是内存态，开销可忽略。
+     *
+     * @return bool true = 超出限制
+     */
+    private function editormd_rate_limit_exceeded() {
+        $user_id = get_current_user_id();
+        if (! $user_id) {
+            return false;
+        }
+
+        $key   = "wp_editormd_rl_" . $user_id;
+        $count = (int) get_transient($key);
+
+        if ($count >= self::RATE_LIMIT_MAX) {
+            return true;
+        }
+
+        set_transient($key, $count + 1, self::RATE_LIMIT_WINDOW);
+
+        return false;
     }
 
     /**
@@ -342,8 +523,11 @@ class ImagePaste {
      * @return string|false 成功返回新文件路径，失败返回 false
      */
     private function editormd_png2jpg($filePath, $deleteOldFile = true, $mime = "image/png") {
-        $quality     = 50;
-        $newFilename = preg_replace("/\.(png|tmp)$/i", ".jpg", $filePath);
+        $quality = 50;
+
+        // 10.4.2：临时文件名由 wp_tempnam() 生成（带随机后缀），
+        // 这里直接追加 .jpg 即可保证唯一，不再依赖对扩展名的正则替换。
+        $newFilename = $filePath . ".jpg";
 
         $image = $this->image_create_from($filePath, $mime);
         if (false === $image) {

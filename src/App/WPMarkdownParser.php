@@ -425,9 +425,20 @@ class WPMarkdownParser extends MarkdownExtra {
         switch ($classname) {
             //Mermaid
             case "mermaid":
-                $codeblock = addslashes($codeblock);
-                $codeblock = preg_replace("/\n/", "\\n", $codeblock);
-                $codeblock = '<div class="mermaid mermaid-diagram no-emojify"><script type="text/javascript">document.write(' . $this->getCodeBlockScript($codeblock) . ');</script></div>';
+                // 安全/兼容性修复（10.4.2）：
+                // 原实现输出 <div class="mermaid"><script>document.write(...)</script></div>，
+                // 存在两个问题：
+                //   1. 网站内容过滤器（实测为 wptexturize）会把脚本里的直引号改写成
+                //      &#8220; 之类的排版实体，导致内联脚本直接语法错误，图表在正文里
+                //      根本渲染不出来（10.4.1 及以前一直如此）；
+                //   2. 把用户可控的图表源码拼进脚本上下文，是审查报告 P1-01 明确指出的风险面。
+                // 现改为数据驱动：图表源码放进 data-mermaid 属性（预处理阶段已 base64 编码），
+                // 由前端脚本（assets/Mermaid/mermaid-compat.js）还原成文本后再交给 Mermaid 渲染。
+                //
+                // 说明：此处 $codeblock 是 MARKDOWN_HASH… 占位符，解析结束后才会被替换成
+                // base64 文本；base64 字符集放进属性是安全的，esc_attr 不会破坏占位符。
+                $codeblock = '<div class="mermaid mermaid-diagram no-emojify" data-mermaid="'
+                    . esc_attr($codeblock) . '"></div>';
                 break;
             //思维导图
             case "mind":

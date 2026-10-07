@@ -87,6 +87,12 @@ jobs:
           print("插件头元数据校验通过（Version=%s）" % expect)
           PY
 
+      # 安全不变量：防止「已修好的问题被改回去」。
+      # 覆盖依赖安全基线（Mermaid / KaTeX / axios / Vue）与若干关键防护点，
+      # 语法校验和打包校验都发现不了这类回归。
+      - name: 安全不变量检查
+        run: python3 .github/scripts/check_security_invariants.py .
+
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
@@ -107,8 +113,19 @@ jobs:
           composer --version
           python3 --version
 
+      # 元数据漂移与依赖安全：composer.json 声明的 PHP 版本必须与插件头一致，
+      # 且锁定的依赖不得带已知安全公告。
+      - name: 校验 composer 声明与依赖安全
+        run: |
+          composer validate --no-check-publish --no-interaction
+          composer audit --no-dev --no-interaction
+
       - name: 修正 composer.lock 的下载源
         run: |
+          # 无论 lock 里的 dist 指向国内镜像（mirrors.cloud.tencent.com）
+          # 还是 api.github.com 的 zipball，统一改从 codeload.github.com 拉取：
+          # 前者在境外 runner 上会超时（curl error 28），后者易受未认证限流影响。
+          # 仓库中的 composer.lock 保持原样，这里只改 runner 上的副本。
           python3 - <<'PY'
           import json
 
@@ -125,10 +142,14 @@ jobs:
           for pkg in lock.get("packages", []):
               repo = REPOS.get(pkg["name"])
               dist = pkg.get("dist") or {}
-              url = dist.get("url", "")
-              if not repo or "mirrors.cloud.tencent.com" not in url:
+              if not repo or not dist.get("reference"):
                   continue
-              dist["url"] = "https://codeload.github.com/%s/zip/%s" % (repo, dist.get("reference"))
+
+              target = "https://codeload.github.com/%s/zip/%s" % (repo, dist["reference"])
+              if dist.get("url") == target:
+                  continue
+
+              dist["url"] = target
               dist["type"] = "zip"
               dist["shasum"] = ""
               pkg["dist"] = dist
@@ -261,6 +282,10 @@ jobs:
             * 修复块级公式被二次解析导致重复渲染（10.4.0）
             * 修复 xmlrpc 请求下 `IXR_Message` 类未找到（10.4.0，采纳上游 PR #546）
             * 新增可选的图片尺寸语法 `![alt](img.jpg =600x400)`（10.4.0）
+            * 修复发布包缺少插件头字段导致后台不显示版本 / 作者 / 所需环境（10.4.1）
+            * **Mermaid 8.4.8 → 10.9.8、KaTeX 0.11.1 → 0.19.0**，并强制 Mermaid `securityLevel=strict`（10.4.2）
+            * 图片粘贴新增像素 / 内存预算与速率限制，上游超时 120s → 10s（10.4.2）
+            * sm.ms 令牌移出浏览器、代理改为固定操作白名单；后台 AJAX 授权收紧（10.4.2）
             * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
 
             完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异)

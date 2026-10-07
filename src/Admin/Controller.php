@@ -112,6 +112,11 @@ class Controller {
         //JavaScript - Config
         wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
 
+        //JavaScript - Mermaid 10 兼容垫片
+        // 编辑器会在运行时动态加载 mermaid.min.js（见 editormd.mermaidURL），
+        // 而 10.x 已移除它调用的 mermaid.init()，故先行加载垫片拦截赋值。
+        wp_enqueue_script("Mermaid-Compat", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
         switch ($lang) {

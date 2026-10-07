@@ -108,6 +108,9 @@ class FrontEditor {
         //JavaScript - Config
         wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front", "Editormd-Nonce_Front"), $this->version, true);
 
+        //JavaScript - Mermaid 10 兼容垫片（见 assets/Mermaid/mermaid-compat.js 的说明）
+        wp_enqueue_script("Mermaid-Compat_Front", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
         switch ($lang) {

@@ -11,12 +11,16 @@
  * Referer 与 Web 服务器访问日志。现改为由服务端注入 window.__EDITORMD_BOOTSTRAP__，
  * URL 上只保留用于 CSRF 校验的 nonce。
  *
+ * 10.4.2：
+ *   1. 令牌不再下发给浏览器（改由服务端代理注入），引导数据里只保留接口地址；
+ *   2. 函数改用插件前缀命名，避免与其它代码的全局 display_page() 冲突。
+ *
  * @param string $text_domain
  * @param string $config
  *
  * @return string
  */
-function display_page($text_domain, $config) {
+function wp_editormd_render_sm_ms_management_page($text_domain, $config) {
     $template = __DIR__ . "/html/index.html";
 
     if (! file_exists($template)) {
@@ -44,7 +48,11 @@ function display_page($text_domain, $config) {
     }
 
     $bootstrap = array(
-        "token"       => (string) $config::get_option("imagepaste_sm_token", "editor_basics"),
+        // 安全加固（10.4.2）：不再把 sm.ms 令牌下发给浏览器。
+        // 令牌只在服务端使用，由下面的代理按操作类型自行注入 Authorization 头。
+        // 浏览器一旦拿到令牌，其暴露面就不再受 WordPress 会话生命周期约束
+        // （第三方后台脚本、浏览器扩展、其它后台 XSS 都可能读到它）。
+        "serverSideToken" => true,
         "endpointUrl" => admin_url(
             "admin-ajax.php?action=wp_editormd_pages&page=sm-ms-management&entry=sm_ms_proxy&_wpnonce="
             . wp_create_nonce("wp_editormd_pages")
@@ -68,9 +76,9 @@ function display_page($text_domain, $config) {
  * wp_editormd_entry_sm_ms_proxy()
  * 由于sm.ms只允许后端请求，不允许前端请求，因此需要此代理
  * 允许sm-ms-management前端在授权情况下post到此接口，并携带如下参数：
- * - url: 代理地址
- * - method: 代理方法(post, get)
- * - header: 请求头(数组，不是字典)
+ * - url: 目标接口（必须是允许的操作之一）
+ * - method: 请求方法(post, get)
+ * - header: 兼容字段，**已被服务端忽略**
  * - body: 请求体(字典)
  *
  * 安全加固（10.3.0）：
@@ -83,24 +91,15 @@ function display_page($text_domain, $config) {
  *     3. 开启 TLS 证书校验（改用 wp_remote_request）；
  *     4. 增加超时与请求体大小上限；
  *     5. 修复 $user_agent 未定义变量的问题。
- *   已核对前端（src/Pages/page/sm-ms-management）只会访问
- *   smms.app/api/v2/{profile,upload_history,delete/*} 且只发送 Authorization 头，
- *   因此上述收紧不影响原有功能。
+ *
+ * 安全加固（10.4.2）：
+ *   6. 令牌不再来自浏览器：Authorization 由服务端按配置注入，客户端传什么都被忽略；
+ *   7. 路径白名单收紧为**固定操作集合**（profile / upload_history / delete/{hash}），
+ *      方法也由服务端按操作决定，不再是「任意 path + 任意 method」的通用代理。
  */
 function wp_editormd_entry_sm_ms_proxy() {
     // 权限兜底校验（入口 renderer() 已校验一次）
     if (! current_user_can("manage_options")) {
-        wp_die("Forbidden", "Forbidden", array("response" => 403));
-    }
-
-    // 安全修复：拒绝跨站发起的请求（同源请求会携带本机 Referer/Origin）
-    $home          = wp_parse_url(home_url());
-    $requestOrigin = isset($_SERVER["HTTP_ORIGIN"])
-        ? wp_parse_url(esc_url_raw(wp_unslash($_SERVER["HTTP_ORIGIN"])))
-        : array();
-
-    if (! empty($home["host"]) && ! empty($requestOrigin["host"])
-        && strtolower($requestOrigin["host"]) !== strtolower($home["host"])) {
         wp_die("Forbidden", "Forbidden", array("response" => 403));
     }
 
@@ -117,33 +116,28 @@ function wp_editormd_entry_sm_ms_proxy() {
 
     $url    = isset($postData["url"]) ? (string) $postData["url"] : "";
     $method = isset($postData["method"]) ? strtolower((string) $postData["method"]) : "get";
-    $header = (isset($postData["header"]) && is_array($postData["header"])) ? $postData["header"] : array();
     $body   = (isset($postData["body"]) && is_array($postData["body"])) ? $postData["body"] : array();
 
-    // 安全修复 1：上游地址白名单
-    if (! wp_editormd_sm_ms_url_allowed($url)) {
+    // 安全修复 6：客户端自带的 Authorization 一律忽略（连同其它请求头）
+    // 安全修复 7：只允许固定操作，方法与地址都由服务端决定
+    $operation = wp_editormd_sm_ms_resolve_operation($url, $method);
+    if (false === $operation) {
         wp_die("Forbidden upstream", "Forbidden upstream", array("response" => 403));
     }
 
-    // 安全修复 2：仅透传 Authorization 头
+    // 安全修复 6：令牌只在服务端使用
+    $token = "";
+    if (class_exists("\EditormdUtils\Config")) {
+        $token = (string) \EditormdUtils\Config::get_option("imagepaste_sm_token", "editor_basics");
+    }
+
     $forwardHeaders = array();
-    foreach ($header as $item) {
-        if (! is_string($item)) {
-            continue;
-        }
-
-        $position = strpos($item, ":");
-        if (false === $position) {
-            continue;
-        }
-
-        if (0 === stripos(trim(substr($item, 0, $position)), "authorization")) {
-            $forwardHeaders[] = "Authorization: " . trim(substr($item, $position + 1));
-        }
+    if ("" !== $token) {
+        $forwardHeaders[] = "Authorization: " . $token;
     }
 
     $args = array(
-        "method"      => ("post" === $method) ? "POST" : "GET",
+        "method"      => $operation["method"],
         "timeout"     => 30,
         "redirection" => 0,
         "sslverify"   => true,
@@ -151,13 +145,13 @@ function wp_editormd_entry_sm_ms_proxy() {
         "user-agent"  => "WP-Editor.md/" . WP_EDITORMD_VER,
     );
 
-    if ("post" === $method && ! empty($body)) {
+    if ("POST" === $operation["method"] && ! empty($body)) {
         $args["body"] = $body;
     }
 
     // 安全修复 3：改用 WordPress 官方 HTTP API（自带证书校验与超时控制），
     // 替代原先关闭了证书校验的裸 curl
-    $response = wp_remote_request($url, $args);
+    $response = wp_remote_request($operation["url"], $args);
 
     header("Content-Type: application/json");
 
@@ -173,16 +167,19 @@ function wp_editormd_entry_sm_ms_proxy() {
 }
 
 /**
- * sm.ms 上游地址白名单校验
+ * 解析并校验 sm.ms 操作
  *
- * 只允许 https://smms.app/api/v2/ 下的接口，
- * 阻断 file://、gopher://、内网地址、云元数据地址与 URL 混淆写法。
+ * 只放行前端界面实际用到的三个操作，方法由服务端固定：
+ *   POST /api/v2/profile
+ *   GET  /api/v2/upload_history[?page=N]
+ *   GET  /api/v2/delete/{hash}
  *
- * @param string $url
+ * @param string $url    客户端请求的目标地址
+ * @param string $method 客户端请求的方法（仅用于记录，实际方法由本函数决定）
  *
- * @return bool
+ * @return array|false array("url" => 规范化地址, "method" => GET|POST)
  */
-function wp_editormd_sm_ms_url_allowed($url) {
+function wp_editormd_sm_ms_resolve_operation($url, $method) {
     if (! is_string($url) || "" === $url) {
         return false;
     }
@@ -193,26 +190,41 @@ function wp_editormd_sm_ms_url_allowed($url) {
     }
 
     $parts = wp_parse_url($url);
-    if (empty($parts["scheme"]) || empty($parts["host"])) {
+    if (empty($parts["scheme"]) || empty($parts["host"]) || empty($parts["path"])) {
         return false;
     }
 
-    if (strtolower($parts["scheme"]) !== "https") {
+    if ("https" !== strtolower($parts["scheme"]) || "smms.app" !== strtolower($parts["host"])) {
         return false;
     }
 
-    if (strtolower($parts["host"]) !== "smms.app") {
-        return false;
-    }
-
-    if (empty($parts["path"]) || 0 !== strpos($parts["path"], "/api/v2/")) {
-        return false;
-    }
+    $path = $parts["path"];
 
     // 阻断路径穿越写法
-    if (false !== strpos($parts["path"], "..")) {
+    if (false !== strpos($path, "..")) {
         return false;
     }
 
-    return true;
+    if ("/api/v2/profile" === $path) {
+        return array("url" => "https://smms.app/api/v2/profile", "method" => "POST");
+    }
+
+    if ("/api/v2/upload_history" === $path) {
+        $query = "";
+        if (! empty($parts["query"])) {
+            // 只保留数字型 page 参数，其余一律丢弃
+            if (preg_match("/(?:^|&)page=(\d{1,6})(?:&|$)/", $parts["query"], $m)) {
+                $query = "?page=" . $m[1];
+            }
+        }
+
+        return array("url" => "https://smms.app/api/v2/upload_history" . $query, "method" => "GET");
+    }
+
+    if (preg_match("#^/api/v2/delete/([A-Za-z0-9]{1,64})$#", $path, $m)) {
+        return array("url" => "https://smms.app/api/v2/delete/" . $m[1], "method" => "GET");
+    }
+
+    return false;
 }
+

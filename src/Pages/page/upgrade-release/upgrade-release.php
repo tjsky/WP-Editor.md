@@ -10,7 +10,10 @@
 //      PHP 8 下会触发 Undefined array key 警告。
 //   4. $title 直接插入 <title> 标签、资源地址未转义，补 esc_html()/esc_url()。
 //   5. 移除指向 jsdelivr CDN 的横幅图片请求（消除后台向第三方 CDN 发起的额外请求）。
-function display_page($text_domain, $config) {
+//
+// 10.4.2：函数改用插件前缀命名 —— 原先两个页面文件都定义了全局 display_page()，
+//         任何第三方代码定义同名函数都会导致 require 时 "Cannot redeclare" 致命错误。
+function wp_editormd_render_upgrade_release_page($text_domain, $config) {
     $targetVersion = isset($_GET["version"]) ? sanitize_text_field(wp_unslash($_GET["version"])) : "";
     $language      = isset($_COOKIE["wp-editormd-lang"])
         ? sanitize_text_field(wp_unslash($_COOKIE["wp-editormd-lang"]))

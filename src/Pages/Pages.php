@@ -36,6 +36,13 @@ class Pages {
      */
     private $entries;
 
+    /**
+     * 页面渲染函数白名单：page slug => 函数名
+     *
+     * @var array
+     */
+    private $renderers;
+
     private $text_domain;
 
     function __construct($text_domain) {
@@ -53,9 +60,23 @@ class Pages {
             "upgrade-release"    => array(),
         );
 
-        // 注册wp_ajax接口，同时允许登录和非登录用户访问，权限由本类控制
+        /**
+         * 页面渲染函数白名单：page slug => 函数名
+         *
+         * 安全/健壮性修复（10.4.2）：原先两个页面文件都定义了全局函数 display_page()，
+         * 属于典型的全局命名污染 —— 只要主题、其它插件或 SDK 也定义了同名函数，
+         * require 页面文件时就会 "Cannot redeclare display_page()" 直接 500。
+         * 现改为插件前缀命名，并在调用前用 function_exists() 校验。
+         */
+        $this->renderers = array(
+            "sm-ms-management"   => "wp_editormd_render_sm_ms_management_page",
+            "upgrade-release"    => "wp_editormd_render_upgrade_release_page",
+        );
+
+        // 注册 wp_ajax 接口。
+        // 安全修复（10.4.2）：本类的两个页面都是管理员页面，原先额外注册了
+        // wp_ajax_nopriv_* 允许未登录用户进入该入口，属于多余且危险的暴露面，已移除。
         add_action("wp_ajax_wp_editormd_pages", array($this, "renderer"));
-        add_action("wp_ajax_nopriv_wp_editormd_pages", array($this, "renderer"));
     }
 
     public function renderer() {
@@ -89,17 +110,25 @@ class Pages {
 
             echo call_user_func($this->entries[$page][$entry]);
         } else {
-            echo display_page($this->text_domain, Config::class);
+            // 安全修复：渲染函数同样走白名单，避免依赖全局函数名
+            if (! isset($this->renderers[$page]) || ! function_exists($this->renderers[$page])) {
+                $this->noAccess();
+            }
+
+            echo call_user_func($this->renderers[$page], $this->text_domain, Config::class);
         }
 
         wp_die();
     }
 
     /**
-     * 请求来源校验
+     * 请求来源校验（CSRF）
      *
-     * 首选 nonce 校验；由于设置页中的 sm-ms-management 是已编译的前端应用，
-     * 其内部请求不一定回传 nonce，故以「同源校验」作为兜底（可有效阻断跨站伪造请求）。
+     * 安全修复（10.4.2）：原实现以「Host 相同即视为同源」作为 nonce 校验失败的兜底。
+     * 该判断既不等价于同源（未比较 scheme 与 port，https://example.com 与
+     * https://example.com:8443、http://example.com 都会被判为同源），
+     * 又把 Origin/Referer 当成了 nonce 的替代品 —— 而这两个头在非浏览器客户端
+     * 可以任意伪造。现改为只接受有效的 nonce，与 WordPress 标准做法一致。
      *
      * @param string $page
      *
@@ -107,40 +136,11 @@ class Pages {
      */
     private function verifyRequest($page) {
         $nonce = isset($_REQUEST["_wpnonce"]) ? sanitize_text_field(wp_unslash($_REQUEST["_wpnonce"])) : "";
-        if ("" !== $nonce && wp_verify_nonce($nonce, "wp_editormd_pages")) {
-            return true;
-        }
-
-        return $this->isSameOriginRequest();
-    }
-
-    /**
-     * 判断请求是否来自本站
-     *
-     * @return bool
-     */
-    private function isSameOriginRequest() {
-        $home = wp_parse_url(home_url());
-        if (empty($home["host"])) {
+        if ("" === $nonce) {
             return false;
         }
 
-        foreach (array("HTTP_ORIGIN", "HTTP_REFERER") as $key) {
-            if (empty($_SERVER[$key])) {
-                continue;
-            }
-
-            $source = wp_parse_url(esc_url_raw(wp_unslash($_SERVER[$key])));
-            if (empty($source["host"])) {
-                continue;
-            }
-
-            if (strtolower($source["host"]) === strtolower($home["host"])) {
-                return true;
-            }
-        }
-
-        return false;
+        return (bool) wp_verify_nonce($nonce, "wp_editormd_pages");
     }
 
     /**

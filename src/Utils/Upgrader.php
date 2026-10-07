@@ -61,6 +61,9 @@ class Upgrader {
             case "10.4.0":
                 $this->upgrade_10_4_0_to_10_4_1();
                 // no break
+            case "10.4.1":
+                $this->upgrade_10_4_1_to_10_4_2();
+                // no break
             default:
                 break;
         }
@@ -72,6 +75,17 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.1 → 10.4.2
+     *
+     * 本版只做安全与依赖升级（Mermaid / KaTeX / 前端依赖、图片资源预算、
+     * AJAX 授权收紧、令牌移出浏览器等），没有数据结构变更，
+     * 同样只需把 editor_version 推进到新版本号 —— 理由见上一段。
+     */
+    private function upgrade_10_4_1_to_10_4_2() {
+        $this->update_to_version("10.4.2");
     }
 
     /**

@@ -199,23 +199,26 @@ export default class App extends Vue implements AppInterface {
   mounted() {
     this.$i18n.locale = Utils.getCookie("wp-editormd-lang") ? Utils.getCookie("wp-editormd-lang") : Utils.getBrowserLang();
 
+    let canRequest = false;
+
     if (process.env.VUE_APP_MOCK === "mock") {
       this.authorize.authorize_token = "00000000000000000000000000000000";
       this.endpoint_url = "test_endpoint";
+      canRequest = true;
     } else {
-      // 安全加固：优先读取服务端注入的引导数据（window.__EDITORMD_BOOTSTRAP__），
-      // 避免 sm.ms 令牌与代理地址出现在 iframe URL 中而泄漏到
-      // 浏览器历史、Referer 与 Web 服务器访问日志。
-      // URL 参数仅作为向后兼容的兜底保留。
       const bootstrap = (window as any).__EDITORMD_BOOTSTRAP__ || {};
       this.authorize.authorize_token = bootstrap.token || (Utils.getGet("token") as string) || "";
       this.endpoint_url = bootstrap.endpointUrl || (Utils.getGet("endpoint_url") as string) || "";
+
+      // 安全加固（10.4.2）：令牌已改为只在服务端使用并由代理注入 Authorization 头，
+      // 浏览器侧不再持有令牌，因此只要拿到接口地址即可发起请求。
+      canRequest = bootstrap.serverSideToken === true || this.authorize.authorize_token !== "";
     }
 
     // 避免在热更新时出现数据重复问题
     this.$store.commit("clearImages");
 
-    if (this.authorize.authorize_token !== "" && this.endpoint_url !== "") {
+    if (canRequest && this.endpoint_url !== "") {
       Promise.all([this.getUserInfo(), this.getImageList()]).then((result) => {
         this.authorize.authorized = result[0] && result[1];
       }).catch((error) => {

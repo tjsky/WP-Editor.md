@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.1
+ * Version:           10.4.2
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,17 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.4.2 —— 按代码审查报告做安全加固
+ *   - Mermaid 8.4.8 → 10.9.8（8.x 有 CVE-2021-43861，8.x/9.x 分支均无修复版本），
+ *     并强制 securityLevel=strict；因 10.x 移除了 Editor.md 预览器调用的 mermaid.init()，
+ *     另加 mermaid-compat.js 垫片；
+ *   - KaTeX 0.11.1 → 0.19.0，渲染显式 trust:false；
+ *   - 图片粘贴补解码体积上限、像素与内存预算（都在 GD 解码前拦截）、上游超时 120s → 10s、
+ *     按用户限流，临时文件改用 wp_tempnam()；
+ *   - sm.ms 令牌不再下发浏览器，代理改为固定操作白名单；
+ *   - 后台 AJAX 去掉「按 Host 判同源」兜底并移除 nopriv 入口；日志 URI 脱敏；
+ *   - 前台不再默认移除区块样式（改显式 opt-in）；页面渲染函数加插件前缀。
  *
  * 10.4.1 —— 修复发布的包在后台不显示插件信息
  *   - 上一版（10.3.0 / 10.4.0）的 GitHub 包中，插件头里的 Version / Author /
@@ -43,7 +54,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.1' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.2' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
@@ -122,24 +133,44 @@ function run_editormd() {
         /**
          * 版本更新后需要执行 Activator 中的 Upgrader。
          *
-         * 性能修复：原实现只要用户已登录，就在每次请求都重跑一遍
+         * 性能修复（10.3.0）：原实现只要用户已登录，就在每次请求都重跑一遍
          * Activator::activate()（内含十余次 get_option 与 new Upgrader()），
          * 而 Upgrader 中还带有 wp_redirect()，开销与副作用都很大。
          * 现在改为仅在版本号发生变化时才执行。
+         *
+         * 可用性修复（10.4.2）：上面那条判断原先额外要求「当前用户已登录」，
+         * 于是升级后若长期只有匿名访客访问、没有管理员登录，迁移就迟迟不执行，
+         * editor_version 一直停在旧值。现改为与登录态无关：
+         *   - 版本一致直接返回，正常请求只多一次 get_option（已缓存）；
+         *   - 加一把 transient 锁，避免多个并发请求同时执行激活/迁移；
+         *   - 迁移异常写入 error_log，避免静默失败。
          */
         add_action( 'init', function () {
-            if ( ! is_user_logged_in() ) {
+            $installed = get_option( 'editor_version' );
+
+            if (
+                is_array( $installed )
+                && isset( $installed['wp_editormd_ver'] )
+                && $installed['wp_editormd_ver'] === WP_EDITORMD_VER
+            ) {
                 return;
             }
 
-            $installed = get_option( 'editor_version' );
-            if (
-                ! is_array( $installed )
-                || ! isset( $installed['wp_editormd_ver'] )
-                || $installed['wp_editormd_ver'] !== WP_EDITORMD_VER
-            ) {
-                Activator::activate();
+            if ( get_transient( 'wp_editormd_migrating' ) ) {
+                return;
             }
+
+            set_transient( 'wp_editormd_migrating', 1, MINUTE_IN_SECONDS );
+
+            try {
+                Activator::activate();
+            } catch ( \Throwable $e ) {
+                error_log( 'WP Editor.md: 升级/迁移失败 - ' . $e->getMessage() );
+                delete_transient( 'wp_editormd_migrating' );
+                return;
+            }
+
+            delete_transient( 'wp_editormd_migrating' );
         } );
 
         new Main();

@@ -1,5 +1,75 @@
 # WP Editor.md
 
+### Version 10.4.2
+
+> 本版按代码审查报告的 P1 / P2 清单做**小而集中的安全加固**：升级两个存在公开漏洞的
+> 捆绑库、给图片接口补上真正缺失的资源预算、把 sm.ms 令牌移出浏览器、收紧后台 AJAX 授权。
+> **无数据结构变更，升级无需迁移。**
+
+#### 1. 安全修复
+
+* **Mermaid 8.4.8 → 10.9.8**（`assets/Mermaid/`）。8.x 存在 CVE-2021-43861
+  （恶意图表通过 `%%{init: ...}%%` 指令把 `securityLevel` 降级后执行注入内容），
+  8.x 与 9.x 分支内均无修复版本。渲染侧同时把 `securityLevel` 强制为 `strict`、
+  `startOnLoad` 强制为 `false`（在合并用户配置**之后**覆盖，站点配置与图表指令都无法降级）。
+  10.x 移除了打包的 Editor.md 预览器仍在调用的 `mermaid.init()`，
+  故新增 `assets/Mermaid/mermaid-compat.js` 兼容垫片
+* **顺带修复：Mermaid 图表此前在正文里根本渲染不出来**。原实现把图表源码拼成
+  `<div class="mermaid"><script>document.write(window.atob("…"))</script></div>`，
+  站点的内容过滤器会改写脚本里的引号，内联脚本必然语法错误。现改为数据驱动：
+  服务端输出 `<div class="mermaid" data-mermaid="<base64>">`，由前端脚本还原文本后渲染；
+  前端脚本同时兼容旧格式（能从旧的 `<script>` 中还原源码），因此**升级前的历史文章无需重新保存**
+* **KaTeX 0.11.1 → 0.19.0**（`assets/KaTeX/`）。0.11.x 落在 CVE-2024-28245
+  （`\includegraphics` 文件名未转义）、CVE-2025-23207（`\htmlData` 未校验属性名）等公告范围内；
+  渲染调用显式传入 `trust: false` 与 `maxExpand`
+* **图片粘贴的资源耗尽路径**（`src/App/ImagePaste.php`）。原实现只限制请求体积，
+  一张几 MB 的高压缩 PNG 可展开成数百 MB 像素缓冲区，解码还要再造一张同尺寸画布；
+  sm.ms 上游超时 120 秒。现补充：解码后二进制上限、单边上限、总像素预算、
+  解码内存预算（对比 `memory_limit` 余量），全部在进入 `imagecreatefrom*()` **之前**拦截；
+  上游超时 10 秒（连接 3 秒）；新增按用户的速率限制
+* **sm.ms 令牌不再下发浏览器**（`src/Pages/page/sm-ms-management/`）。
+  引导数据只保留接口地址，`Authorization` 由服务端按配置注入，客户端传入的任何请求头一律忽略；
+  代理由「任意 `service/api/v2/*` + 任意 method」收紧为**固定操作白名单**
+  （`profile` / `upload_history` / `delete/<hash>`，方法与地址由服务端决定）
+* **后台 AJAX 授权收紧**（`src/Pages/Pages.php`）。删掉「nonce 失败后按 Host 判同源」的兜底
+  （该判断不比较 scheme 与 port，且 Origin/Referer 可被非浏览器客户端伪造），
+  并移除管理员页面的 `wp_ajax_nopriv_*` 入口
+* **临时文件唯一化**（`src/App/ImagePaste.php`）。`md5(dataurl)` 拼系统临时目录的方案
+  文件名可预测、同输入并发会互相覆盖，改用 `wp_tempnam()`
+* **日志脱敏**（`src/Utils/Logger.php`）。请求 URI 中的查询参数一律记为 `[REDACTED]`，
+  避免 nonce 被写进 `error_log`
+* **前端依赖升级**：axios 0.19.2 → 1.20.0（0.19.x / 1.x 早期版本存在多项原型链污染与请求劫持公告）。
+  Vue 仍为 2.6.11 —— 2.x 全系落在 GHSA-5j4c-8p2g-v4jx 范围内，官方修复只存在于 3.0，
+  属于 Vue 3 迁移范畴，本版不做
+
+#### 2. 兼容性
+
+* 前台不再默认移除 `wp-block-library` / `wp-block-library-theme` / `wc-blocks-style`，
+  改为显式 opt-in：`add_filter("editormd_dequeue_block_styles", "__return_true");`
+  （原判断是「当前文章不含区块就全站移除」，但短代码、主题模板、小工具同样可能依赖这些样式）
+* 页面渲染函数由全局 `display_page()` 改为 `wp_editormd_render_*_page()`，
+  避免与主题 / 其它插件的同名函数冲突导致 `Cannot redeclare`
+
+#### 3. 可靠性
+
+* 升级/迁移不再要求「当前用户已登录」（原先升级后若长期只有匿名访客访问，迁移会一直不执行），
+  并增加 transient 并发锁与失败日志
+* CI 新增**安全不变量检查**（`check_security_invariants.py`：依赖安全基线 + 关键防护点 +
+  不得复现的高危写法）、`composer validate` 与 `composer audit`
+
+#### 4. 升级
+
+* 升级器新增 `10.4.1 → 10.4.2` 迁移，仅推进版本号，无数据变更
+
+#### 5. 本版未处理
+
+* 代码审查报告中的「推荐整体重构方案」（安全入口统一、图片处理服务化、
+  Mermaid/KaTeX 数据驱动渲染、sm.ms 改服务端 Client）留待后续版本；
+  P2-05（`editor_addres` 第三方资源根地址）本版暂不修改
+* PHPUnit / WordPress 集成测试 / 浏览器级 XSS 回归仍未进入 CI（当前以安全不变量检查兜底）
+
+------
+
 ### Version 10.4.1
 
 > 本版修正 10.3.0 / 10.4.0 发布包的一处元数据缺陷，**无代码逻辑与数据结构变更，升级无需迁移**。
@@ -104,6 +174,90 @@
 
 * `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+
+------
+
+### Version 10.4.2
+
+> This release follows a code review report and applies **focused security hardening**:
+> upgrading two bundled libraries with public advisories, adding the missing resource
+> budgets to the image endpoint, moving the sm.ms token out of the browser, and tightening
+> admin AJAX authorization. **No data-structure changes, so upgrading requires no migration.**
+
+#### 1. Security Fixes
+
+* **Mermaid 8.4.8 → 10.9.8** (`assets/Mermaid/`). The 8.x line is affected by
+  CVE-2021-43861 (a malicious diagram can downgrade `securityLevel` through a
+  `%%{init: ...}%%` directive and then execute injected content), and neither 8.x nor 9.x
+  has a released fix. `securityLevel` is now forced to `strict` and `startOnLoad` to `false`
+  **after** merging user config, so neither the site configuration nor diagram directives can
+  weaken it. Since 10.x removed `mermaid.init()`, which the bundled Editor.md previewer still
+  calls, a small compatibility shim was added (`assets/Mermaid/mermaid-compat.js`)
+* **Incidental fix: Mermaid diagrams never actually rendered in post content.** The old markup
+  wrapped the source in `<div class="mermaid"><script>document.write(window.atob("…"))</script></div>`,
+  and content filters rewrite the quotes inside that script, so the inline script was always a
+  syntax error. Rendering is now data-driven: the server emits
+  `<div class="mermaid" data-mermaid="<base64>">` and the front-end script restores the text
+  before rendering. That script also understands the legacy format (it can recover the source
+  from the old `<script>`), so **existing posts do not need to be re-saved**
+* **KaTeX 0.11.1 → 0.19.0** (`assets/KaTeX/`). The 0.11.x line is covered by
+  CVE-2024-28245 (`\includegraphics` filename not escaped) and CVE-2025-23207
+  (`\htmlData` attribute names not validated), among others. Rendering now passes
+  `trust: false` and `maxExpand` explicitly
+* **Resource exhaustion in the image paste endpoint** (`src/App/ImagePaste.php`).
+  The old code only limited request size: a few-MB compressed PNG can expand into hundreds of
+  MB of pixel buffers, and converting requires a second canvas of the same size. The sm.ms
+  upstream timeout was 120 seconds. Added: decoded binary limit, per-side limit, total pixel
+  budget and a decode memory budget checked against `memory_limit` — all of them **before**
+  any `imagecreatefrom*()` call; upstream timeout 10s (3s connect); per-user rate limiting
+* **The sm.ms token is no longer sent to the browser**
+  (`src/Pages/page/sm-ms-management/`). The bootstrap payload only carries the endpoint URL now;
+  `Authorization` is injected server-side and any client-supplied headers are ignored. The proxy
+  was narrowed from "any `service/api/v2/*` with any method" to a **fixed operation allowlist**
+  (`profile` / `upload_history` / `delete/<hash>`, with method and URL decided by the server)
+* **Admin AJAX authorization** (`src/Pages/Pages.php`). Removed the "treat a matching Host as
+  same-origin when the nonce fails" fallback (it does not compare scheme or port, and
+  Origin/Referer can be forged by non-browser clients), and removed the
+  `wp_ajax_nopriv_*` entry for admin pages
+* **Unique temporary files** (`src/App/ImagePaste.php`). The old `md5(dataurl)` filename was
+  predictable and concurrent requests with the same input overwrote each other; now uses
+  `wp_tempnam()`
+* **Log redaction** (`src/Utils/Logger.php`). Query parameters in the request URI are logged as
+  `[REDACTED]`, so nonces no longer end up in `error_log`
+* **Front-end dependency upgraded**: axios 0.19.2 → 1.20.0 (the 0.19.x line and early 1.x
+  releases carry multiple prototype-pollution and request-hijacking advisories).
+  Vue stays at 2.6.11 — the whole 2.x line is inside GHSA-5j4c-8p2g-v4jx and the official fix
+  only exists in 3.0, which is a Vue 3 migration and out of scope here
+
+#### 2. Compatibility
+
+* The front end no longer removes `wp-block-library` / `wp-block-library-theme` /
+  `wc-blocks-style` by default; it is now explicit opt-in:
+  `add_filter("editormd_dequeue_block_styles", "__return_true");`
+  (the old rule removed them site-wide whenever the current post had no blocks, but shortcodes,
+  theme templates and widgets may still depend on them)
+* Page render functions were renamed from the global `display_page()` to
+  `wp_editormd_render_*_page()` to avoid `Cannot redeclare` conflicts with themes and plugins
+
+#### 3. Reliability
+
+* Upgrade/migration no longer requires a logged-in user (previously, if only anonymous visitors
+  hit the site after an update, the migration would never run); a transient lock and failure
+  logging were added
+* CI gained a **security invariants check** (dependency security baseline, key guards, and
+  forbidden regressions), plus `composer validate` and `composer audit`
+
+#### 4. Upgrade
+
+* The upgrader gains a `10.4.1 → 10.4.2` migration; it only advances the version number
+
+#### 5. Not addressed in this release
+
+* The report's "overall refactoring plan" (unified security entry point, image pipeline as a
+  service, data-driven Mermaid/KaTeX rendering, server-side sm.ms client) is deferred
+* P2-05 (`editor_addres` arbitrary third-party asset root) is left unchanged
+* PHPUnit / WordPress integration tests / browser-level XSS regression are still not part of CI
+  (the security invariants check covers the specific regressions for now)
 
 ------
 

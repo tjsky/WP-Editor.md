@@ -3,7 +3,7 @@
 	"description" : "或许这是一个WordPress中最好，最完美的Markdown编辑器",
 	"type" : "wordpress-plugin",
 	"keywords" : [ "wordpress" ],
-	"license" : "GPL-3.0+",
+	"license" : "GPL-3.0-or-later",
 	"authors" : [
 		{
 			"name" : "LuRenJiasWorld",
@@ -22,10 +22,10 @@
 		}
 	},
 	"require" : {
-		"php" : ">=5.6.0",
+		"php" : ">=7.4",
 		"michelf/php-markdown": "^1.9",
 		"league/html-to-markdown": "^4.9.1",
-		"lurenjiasworld/wp-settings-api-class": "dev-master"
+		"lurenjiasworld/wp-settings-api-class": "dev-master#db58640c497734a011a105c924c285277cb34f90"
 	},
 	"homepage": "https://github.com/LuRenJiasWorld/WP-Editor.md/"
 }

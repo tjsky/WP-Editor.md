@@ -181,7 +181,10 @@ class Logger {
         }
 
         if (isset($_SERVER["REQUEST_URI"])) {
-            $context["uri"] = sanitize_text_field(wp_unslash($_SERVER["REQUEST_URI"]));
+            // 安全修复（10.4.2）：本插件的后台 AJAX 会把 nonce 放在 URL 查询串里，
+            // 直接落盘会把 nonce（以及潜在令牌）写进 error_log，而日志的读取范围
+            // 未必与后台权限一致。这里统一脱敏敏感参数。
+            $context["uri"] = self::sanitize_uri(sanitize_text_field(wp_unslash($_SERVER["REQUEST_URI"])));
         }
 
         if (isset($_SERVER["HTTP_USER_AGENT"])) {
@@ -189,6 +192,48 @@ class Logger {
         }
 
         return $context;
+    }
+
+    /**
+     * 对 REQUEST_URI 做敏感参数脱敏
+     *
+     * 安全修复（10.4.2）：
+     *   WordPress 的 nonce 走 URL 查询串（_wpnonce / _ajax_nonce），本插件的
+     *   图片粘贴与后台页面 AJAX 都会带上它；sm.ms 令牌也可能出现在查询串里。
+     *   日志默认只保留路径与「参数名」，值一律替换为 [REDACTED]，
+     *   既不影响排障（路径与参数名已足够定位），也不会把凭据写进 error_log。
+     *
+     * @param string $uri
+     *
+     * @return string
+     */
+    private static function sanitize_uri($uri) {
+        if (! is_string($uri) || "" === $uri) {
+            return "";
+        }
+
+        $parts = explode("?", $uri, 2);
+        $path  = $parts[0];
+
+        if (! isset($parts[1]) || "" === $parts[1]) {
+            return $path;
+        }
+
+        $kept = array();
+        foreach (explode("&", $parts[1]) as $pair) {
+            if ("" === $pair) {
+                continue;
+            }
+
+            $name = explode("=", $pair, 2)[0];
+            if ("" === $name) {
+                continue;
+            }
+
+            $kept[] = $name . "=[REDACTED]";
+        }
+
+        return empty($kept) ? $path : $path . "?" . implode("&", $kept);
     }
 }
 

@@ -261,6 +261,10 @@ class KaTeX {
         wp_enqueue_script("jquery");
 
         wp_enqueue_style("Katex", Config::get_option("editor_addres","editor_style") . "/assets/KaTeX/katex.min.css", array(), WP_EDITORMD_VER, "all");
+        // 安全修复（10.4.2）：KaTeX 由 0.11.1 升级到 0.19.0。
+        // 0.11.x 落在 CVE-2024-28245（\includegraphics 文件名未转义）、
+        // CVE-2025-23207（\htmlData 未校验属性名）等公告范围内。
+        // 渲染侧同时显式传入 trust:false（默认值，但不再依赖库的默认行为）与 maxExpand。
         wp_enqueue_script("Katex", Config::get_option("editor_addres","editor_style") . "/assets/KaTeX/katex.min.js", array(), WP_EDITORMD_VER, true);
 
     }
@@ -273,25 +277,25 @@ class KaTeX {
                     $(".katex.math.inline").each(function () {
                         var parent = $(this).parent()[0];
                         if (parent.localName !== "code") {
-                            var texTxt = $(this).text();
-                            var el = $(this).get(0);
-                            try {
-                                katex.render(texTxt, el);
-                            } catch (err) {
-                                $(this).text(err);
-                            }
-                        } else {
-                            $(this).parent().text($(this).parent().text());
-                        }
-                    });
-                    $(".katex.math.multi-line").each(function () {
                         var texTxt = $(this).text();
                         var el = $(this).get(0);
                         try {
-                            katex.render(texTxt, el, {displayMode: true})
+                            katex.render(texTxt, el, { trust: false, maxExpand: 1000 });
                         } catch (err) {
-                            $(this).text(err)
+                            $(this).text(err);
                         }
+                    } else {
+                        $(this).parent().text($(this).parent().text());
+                    }
+                });
+                $(".katex.math.multi-line").each(function () {
+                    var texTxt = $(this).text();
+                    var el = $(this).get(0);
+                    try {
+                        katex.render(texTxt, el, { displayMode: true, trust: false, maxExpand: 1000 })
+                    } catch (err) {
+                        $(this).text(err)
+                    }
                     });
                 })
             })(jQuery);
