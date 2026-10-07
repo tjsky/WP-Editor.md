@@ -1,7 +1,7 @@
 <?php
 // sm.ms图片管理页面
 
-function display_page($text_domain, $config) {
+function wp_editormd_render_sm_ms_management_page($text_domain, $config) {
     $template = __DIR__ . "/html/index.html";
 
     if (! file_exists($template)) {
@@ -25,7 +25,7 @@ function display_page($text_domain, $config) {
     }
 
     $bootstrap = array(
-        "token"       => (string) $config::get_option("imagepaste_sm_token", "editor_basics"),
+        "serverSideToken" => true,
         "endpointUrl" => admin_url(
             "admin-ajax.php?action=wp_editormd_pages&page=sm-ms-management&entry=sm_ms_proxy&_wpnonce="
             . wp_create_nonce("wp_editormd_pages")
@@ -59,16 +59,6 @@ function wp_editormd_entry_sm_ms_proxy() {
         wp_die("Forbidden", "Forbidden", array("response" => 403));
     }
 
-    $home          = wp_parse_url(home_url());
-    $requestOrigin = isset($_SERVER["HTTP_ORIGIN"])
-        ? wp_parse_url(esc_url_raw(wp_unslash($_SERVER["HTTP_ORIGIN"])))
-        : array();
-
-    if (! empty($home["host"]) && ! empty($requestOrigin["host"])
-        && strtolower($requestOrigin["host"]) !== strtolower($home["host"])) {
-        wp_die("Forbidden", "Forbidden", array("response" => 403));
-    }
-
     $raw = file_get_contents("php://input", false, null, 0, 1024 * 1024);
     if (false === $raw || "" === $raw) {
         wp_die("Bad Request", "Bad Request", array("response" => 400));
@@ -81,31 +71,25 @@ function wp_editormd_entry_sm_ms_proxy() {
 
     $url    = isset($postData["url"]) ? (string) $postData["url"] : "";
     $method = isset($postData["method"]) ? strtolower((string) $postData["method"]) : "get";
-    $header = (isset($postData["header"]) && is_array($postData["header"])) ? $postData["header"] : array();
     $body   = (isset($postData["body"]) && is_array($postData["body"])) ? $postData["body"] : array();
 
-    if (! wp_editormd_sm_ms_url_allowed($url)) {
+    $operation = wp_editormd_sm_ms_resolve_operation($url, $method);
+    if (false === $operation) {
         wp_die("Forbidden upstream", "Forbidden upstream", array("response" => 403));
     }
 
+    $token = "";
+    if (class_exists("\EditormdUtils\Config")) {
+        $token = (string) \EditormdUtils\Config::get_option("imagepaste_sm_token", "editor_basics");
+    }
+
     $forwardHeaders = array();
-    foreach ($header as $item) {
-        if (! is_string($item)) {
-            continue;
-        }
-
-        $position = strpos($item, ":");
-        if (false === $position) {
-            continue;
-        }
-
-        if (0 === stripos(trim(substr($item, 0, $position)), "authorization")) {
-            $forwardHeaders[] = "Authorization: " . trim(substr($item, $position + 1));
-        }
+    if ("" !== $token) {
+        $forwardHeaders[] = "Authorization: " . $token;
     }
 
     $args = array(
-        "method"      => ("post" === $method) ? "POST" : "GET",
+        "method"      => $operation["method"],
         "timeout"     => 30,
         "redirection" => 0,
         "sslverify"   => true,
@@ -113,11 +97,11 @@ function wp_editormd_entry_sm_ms_proxy() {
         "user-agent"  => "WP-Editor.md/" . WP_EDITORMD_VER,
     );
 
-    if ("post" === $method && ! empty($body)) {
+    if ("POST" === $operation["method"] && ! empty($body)) {
         $args["body"] = $body;
     }
 
-    $response = wp_remote_request($url, $args);
+    $response = wp_remote_request($operation["url"], $args);
 
     header("Content-Type: application/json");
 
@@ -132,7 +116,7 @@ function wp_editormd_entry_sm_ms_proxy() {
     return wp_remote_retrieve_body($response);
 }
 
-function wp_editormd_sm_ms_url_allowed($url) {
+function wp_editormd_sm_ms_resolve_operation($url, $method) {
     if (! is_string($url) || "" === $url) {
         return false;
     }
@@ -142,25 +126,39 @@ function wp_editormd_sm_ms_url_allowed($url) {
     }
 
     $parts = wp_parse_url($url);
-    if (empty($parts["scheme"]) || empty($parts["host"])) {
+    if (empty($parts["scheme"]) || empty($parts["host"]) || empty($parts["path"])) {
         return false;
     }
 
-    if (strtolower($parts["scheme"]) !== "https") {
+    if ("https" !== strtolower($parts["scheme"]) || "smms.app" !== strtolower($parts["host"])) {
         return false;
     }
 
-    if (strtolower($parts["host"]) !== "smms.app") {
+    $path = $parts["path"];
+
+    if (false !== strpos($path, "..")) {
         return false;
     }
 
-    if (empty($parts["path"]) || 0 !== strpos($parts["path"], "/api/v2/")) {
-        return false;
+    if ("/api/v2/profile" === $path) {
+        return array("url" => "https://smms.app/api/v2/profile", "method" => "POST");
     }
 
-    if (false !== strpos($parts["path"], "..")) {
-        return false;
+    if ("/api/v2/upload_history" === $path) {
+        $query = "";
+        if (! empty($parts["query"])) {
+            if (preg_match("/(?:^|&)page=(\d{1,6})(?:&|$)/", $parts["query"], $m)) {
+                $query = "?page=" . $m[1];
+            }
+        }
+
+        return array("url" => "https://smms.app/api/v2/upload_history" . $query, "method" => "GET");
     }
 
-    return true;
+    if (preg_match("#^/api/v2/delete/([A-Za-z0-9]{1,64})$#", $path, $m)) {
+        return array("url" => "https://smms.app/api/v2/delete/" . $m[1], "method" => "GET");
+    }
+
+    return false;
 }
+

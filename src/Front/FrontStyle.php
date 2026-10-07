@@ -62,15 +62,15 @@ class FrontStyle {
      * Ref issue: https://github.com/LuRenJiasWorld/WP-Editor.md/issues/560
      */
     public function dequeue_bloat_scripts() {
+        if (! apply_filters("editormd_dequeue_block_styles", false)) {
+            return;
+        }
+
         if (function_exists("wp_is_block_theme") && wp_is_block_theme()) {
             return;
         }
 
         if (is_singular() && function_exists("has_blocks") && has_blocks()) {
-            return;
-        }
-
-        if (! apply_filters("editormd_dequeue_block_styles", true)) {
             return;
         }
 

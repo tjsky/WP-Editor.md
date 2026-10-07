@@ -3,6 +3,7 @@ const path = require("path");
 module.exports = {
   outputDir: "html",
   productionSourceMap: false,
+  lintOnSave: false,
   publicPath: "/__EDITORMD_ASSET_BASE__/src/Pages/page/sm-ms-management/html/",
   configureWebpack:{
     optimization: {
@@ -16,9 +17,9 @@ module.exports = {
       maxEntrypointSize: process.env.NODE_ENV === "development" ? 1024 * 4096 : 1024 * 2048,
     },
     resolve: {
-      extensions: ['.ts', '.js', '.vue', '.json'],
+      extensions: [".ts", ".js", ".vue", ".json"],
       alias: {
-        'src': path.resolve(__dirname, 'src'),
+        "src": path.resolve(__dirname, "src"),
       },
     }
   },

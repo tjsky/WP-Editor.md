@@ -14,7 +14,10 @@ class Mermaid {
     }
 
     public function mermaid_enqueue_scripts() {
-        wp_enqueue_script("Mermaid",  Config::get_option("editor_addres","editor_style") . "/assets/Mermaid/mermaid.min.js", array(), WP_EDITORMD_VER, true);
+        $base = Config::get_option("editor_addres", "editor_style");
+
+        wp_enqueue_script("Mermaid-Compat", $base . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+        wp_enqueue_script("Mermaid", $base . "/assets/Mermaid/mermaid.min.js", array("Mermaid-Compat"), WP_EDITORMD_VER, true);
     }
 
     public function mermaid_wp_footer_script() {
@@ -24,12 +27,49 @@ class Mermaid {
         if (! is_array($decoded)) {
             $decoded = array();
         }
+
         ?>
         <script type="text/javascript">
             (function ($) {
                 $(document).ready(function () {
+                    if (typeof mermaid === "undefined") {
+                        return;
+                    }
+
+                    if (typeof window.wpEditormdMermaidPrepare === "function") {
+                        window.wpEditormdMermaidPrepare(document);
+                    }
+
                     $(".mermaid script").remove();
-                    mermaid.initialize(<?php echo wp_json_encode($decoded) ?>, ".mermaid");
+
+                    var userConfig = <?php echo wp_json_encode($decoded) ?>;
+                    if (!userConfig || typeof userConfig !== "object") {
+                        userConfig = {};
+                    }
+
+                    var config = $.extend({}, userConfig, {
+                        startOnLoad: false,
+                        securityLevel: "strict"
+                    });
+
+                    mermaid.initialize(config);
+
+                    var nodes = document.querySelectorAll(".mermaid");
+                    if (!nodes.length) {
+                        return;
+                    }
+
+                    try {
+                        if (typeof mermaid.run === "function") {
+                            var result = mermaid.run({ nodes: nodes, suppressErrors: true });
+                            if (result && typeof result.catch === "function") {
+                                result.catch(function () { /* 渲染失败不影响页面其余部分 */ });
+                            }
+                        } else if (typeof mermaid.init === "function") {
+                            mermaid.init(undefined, nodes);
+                        }
+                    } catch (err) {
+                    }
                 })
             })(jQuery)
         </script>

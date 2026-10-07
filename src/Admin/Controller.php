@@ -104,6 +104,8 @@ class Controller {
         //JavaScript - Config
         wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
 
+        wp_enqueue_script("Mermaid-Compat", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");
         switch ($lang) {

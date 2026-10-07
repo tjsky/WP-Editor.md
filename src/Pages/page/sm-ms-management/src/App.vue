@@ -199,19 +199,24 @@ export default class App extends Vue implements AppInterface {
   mounted() {
     this.$i18n.locale = Utils.getCookie("wp-editormd-lang") ? Utils.getCookie("wp-editormd-lang") : Utils.getBrowserLang();
 
+    let canRequest = false;
+
     if (process.env.VUE_APP_MOCK === "mock") {
       this.authorize.authorize_token = "00000000000000000000000000000000";
       this.endpoint_url = "test_endpoint";
+      canRequest = true;
     } else {
       const bootstrap = (window as any).__EDITORMD_BOOTSTRAP__ || {};
       this.authorize.authorize_token = bootstrap.token || (Utils.getGet("token") as string) || "";
       this.endpoint_url = bootstrap.endpointUrl || (Utils.getGet("endpoint_url") as string) || "";
+
+      canRequest = bootstrap.serverSideToken === true || this.authorize.authorize_token !== "";
     }
 
     // 避免在热更新时出现数据重复问题
     this.$store.commit("clearImages");
 
-    if (this.authorize.authorize_token !== "" && this.endpoint_url !== "") {
+    if (canRequest && this.endpoint_url !== "") {
       Promise.all([this.getUserInfo(), this.getImageList()]).then((result) => {
         this.authorize.authorized = result[0] && result[1];
       }).catch((error) => {

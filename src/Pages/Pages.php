@@ -15,6 +15,8 @@ class Pages {
 
     private $entries;
 
+    private $renderers;
+
     private $text_domain;
 
     function __construct($text_domain) {
@@ -32,9 +34,12 @@ class Pages {
             "upgrade-release"    => array(),
         );
 
-        // 注册wp_ajax接口，同时允许登录和非登录用户访问，权限由本类控制
+        $this->renderers = array(
+            "sm-ms-management"   => "wp_editormd_render_sm_ms_management_page",
+            "upgrade-release"    => "wp_editormd_render_upgrade_release_page",
+        );
+
         add_action("wp_ajax_wp_editormd_pages", array($this, "renderer"));
-        add_action("wp_ajax_nopriv_wp_editormd_pages", array($this, "renderer"));
     }
 
     public function renderer() {
@@ -62,7 +67,11 @@ class Pages {
 
             echo call_user_func($this->entries[$page][$entry]);
         } else {
-            echo display_page($this->text_domain, Config::class);
+            if (! isset($this->renderers[$page]) || ! function_exists($this->renderers[$page])) {
+                $this->noAccess();
+            }
+
+            echo call_user_func($this->renderers[$page], $this->text_domain, Config::class);
         }
 
         wp_die();
@@ -70,35 +79,11 @@ class Pages {
 
     private function verifyRequest($page) {
         $nonce = isset($_REQUEST["_wpnonce"]) ? sanitize_text_field(wp_unslash($_REQUEST["_wpnonce"])) : "";
-        if ("" !== $nonce && wp_verify_nonce($nonce, "wp_editormd_pages")) {
-            return true;
-        }
-
-        return $this->isSameOriginRequest();
-    }
-
-    private function isSameOriginRequest() {
-        $home = wp_parse_url(home_url());
-        if (empty($home["host"])) {
+        if ("" === $nonce) {
             return false;
         }
 
-        foreach (array("HTTP_ORIGIN", "HTTP_REFERER") as $key) {
-            if (empty($_SERVER[$key])) {
-                continue;
-            }
-
-            $source = wp_parse_url(esc_url_raw(wp_unslash($_SERVER[$key])));
-            if (empty($source["host"])) {
-                continue;
-            }
-
-            if (strtolower($source["host"]) === strtolower($home["host"])) {
-                return true;
-            }
-        }
-
-        return false;
+        return (bool) wp_verify_nonce($nonce, "wp_editormd_pages");
     }
 
     private function isAuthorized($pagePriv) {

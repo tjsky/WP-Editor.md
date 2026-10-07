@@ -51,8 +51,10 @@ The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) 
 下面只列要点，逐项明细见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
 
 * **安全修复**（本次维护的主要原因）—— 修复 KaTeX 公式渲染的**存储型 XSS**（同类问题即已公开的
-  **CVE-2025-31035**），以及图片粘贴接口的任意文件写入、图床代理的 SSRF、后台管理页的授权缺陷、
-  选项保存未净化、设置页盲 SSRF、携带特定 Cookie 即白屏等一批漏洞；默认不再从第三方 CDN 加载资源
+  **CVE-2025-31035**），以及图片粘贴接口的任意文件写入与资源耗尽、图床代理的 SSRF、
+  后台管理页的授权缺陷、选项保存未净化、设置页盲 SSRF、携带特定 Cookie 即白屏等一批漏洞；
+  升级了存在公开漏洞的捆绑库（**Mermaid → 10.9.8、KaTeX → 0.19.0**）、把图床令牌移出浏览器、
+  默认不再从第三方 CDN 加载资源
 * **兼容性** —— 适配 **WordPress 7.1** 与 **PHP 7.4 ~ 8.4**，含「插件加载期调用用户上下文函数
   导致前台后台同时白屏」这类致命问题
 * **构建链** —— 替换已无法使用的 `node-sass`、`uglify` 插件，项目恢复可构建；新增 GitHub Actions 自动打包
@@ -101,7 +103,7 @@ cd -
 for po in languages/*.po; do msgfmt -o "${po%.po}.mo" "$po"; done
 
 # 5. 打包成可安装 zip
-python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.1.zip 10.4.1
+python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.2.zip 10.4.2
 ```
 
 环境要求：Node.js ≥ 18（推荐 22）、PHP ≥ 7.4、Composer、gettext（`msgfmt`）、Python 3。

@@ -135,7 +135,7 @@ class Logger {
         }
 
         if (isset($_SERVER["REQUEST_URI"])) {
-            $context["uri"] = sanitize_text_field(wp_unslash($_SERVER["REQUEST_URI"]));
+            $context["uri"] = self::sanitize_uri(sanitize_text_field(wp_unslash($_SERVER["REQUEST_URI"])));
         }
 
         if (isset($_SERVER["HTTP_USER_AGENT"])) {
@@ -143,6 +143,37 @@ class Logger {
         }
 
         return $context;
+    }
+
+    /**
+     */
+    private static function sanitize_uri($uri) {
+        if (! is_string($uri) || "" === $uri) {
+            return "";
+        }
+
+        $parts = explode("?", $uri, 2);
+        $path  = $parts[0];
+
+        if (! isset($parts[1]) || "" === $parts[1]) {
+            return $path;
+        }
+
+        $kept = array();
+        foreach (explode("&", $parts[1]) as $pair) {
+            if ("" === $pair) {
+                continue;
+            }
+
+            $name = explode("=", $pair, 2)[0];
+            if ("" === $name) {
+                continue;
+            }
+
+            $kept[] = $name . "=[REDACTED]";
+        }
+
+        return empty($kept) ? $path : $path . "?" . implode("&", $kept);
     }
 }
 

@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.1
+Stable tag: 10.4.2
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,25 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.2 =
+* 安全修复：Mermaid 由 8.4.8 升级到 10.9.8（8.x / 9.x 各自存在无修复版本的 XSS / CSS 注入问题），
+  并把 securityLevel 强制钉为 strict，站点配置与图表指令都无法降低安全等级
+* 缺陷修复：Mermaid 图表此前在正文里无法渲染（内联脚本被内容过滤器改写引号），
+  现改为数据驱动渲染并兼容旧格式，历史文章无需重新保存
+* 安全修复：KaTeX 由 0.11.1 升级到 0.19.0，渲染时显式 trust:false
+* 安全修复：图片粘贴新增解码后体积上限、像素预算与内存预算，全部在进入 GD 解码前拦截；
+  sm.ms 上游超时由 120 秒收紧到 10 秒（连接超时 3 秒）；新增按用户的速率限制
+* 安全修复：sm.ms 令牌不再下发到浏览器，改由服务端代理注入；代理改为固定操作白名单
+  （仅 profile / upload_history / delete），方法与目标地址均由服务端决定
+* 安全修复：后台 AJAX 不再以 Origin/Referer 主机名作为 nonce 失败的兜底授权，并移除未登录入口
+* 安全修复：临时文件改用 wp_tempnam() 生成唯一名称（原先可预测且并发会互相覆盖）
+* 安全修复：日志中的请求 URI 对查询参数做脱敏，不再把 nonce 写进 error_log
+* 安全修复：前端依赖 axios 由 0.19.2 升级到 1.20.0（Vue 2.x 全系无可用修复，留待 Vue 3 迁移）
+* 兼容性：不再默认移除前台的区块样式（wp-block-library 等），改为显式 opt-in
+* 兼容性：页面渲染函数改用插件前缀命名，避免与其它代码的全局 display_page() 冲突
+* 改进：插件升级/迁移不再依赖「有管理员登录」；增加并发锁与失败日志
+* 构建：CI 新增安全不变量检查（依赖安全基线 + 关键防护点）、composer 校验与 composer audit
 
 = 10.4.1 =
 * 缺陷修复：插件头缺少 Version / Author / Requires at least / Requires PHP / Tested up to

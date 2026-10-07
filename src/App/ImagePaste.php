@@ -25,6 +25,20 @@ use EditormdUtils\Ajax;
 class ImagePaste {
     const MAX_PAYLOAD_BYTES = 8388608;
 
+    const MAX_BINARY_BYTES = 6291456;
+
+    const MAX_PIXELS = 10000000;
+
+    const MAX_SIDE = 8192;
+
+    const MEMORY_HEADROOM_BYTES = 16777216;
+
+    const UPLOAD_TIMEOUT  = 10;
+    const CONNECT_TIMEOUT = 3;
+
+    const RATE_LIMIT_MAX    = 30;
+    const RATE_LIMIT_WINDOW = 60;
+
     private static $allowed_mimes = array(
         "image/png",
         "image/jpeg",
@@ -47,6 +61,8 @@ class ImagePaste {
     private $content;               // 文件二进制数据（base64 原文）
 
     private $result = array();
+
+    private $last_error = "";
 
     public function __construct() {
         add_action("wp_ajax_wp_editormd_imagepaste", array($this, "editormd_imagepaste_action_callback"));
@@ -116,7 +132,10 @@ class ImagePaste {
 
         check_ajax_referer("wp_editormd_imagepaste", "_wpnonce");
 
-        // 2. 选择上传目的地
+        if ($this->editormd_rate_limit_exceeded()) {
+            Ajax::editormd_return_json("", "rate_limited", "");
+        }
+
         try {
             switch (Config::get_option("imagepaste_sm", "editor_basics")) {
                 case "on":
@@ -135,7 +154,7 @@ class ImagePaste {
     private function editormd_imagepaste_save() {
         $tempFile = $this->editormd_save_to_temp_dir();
         if (false === $tempFile) {
-            Ajax::editormd_return_json("", "file_extension_error");
+            Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
         }
 
         $this->extension = "jpg";
@@ -166,7 +185,7 @@ class ImagePaste {
     private function editormd_imagepaste_smms() {
         $tempFile = $this->editormd_save_to_temp_dir();
         if (false === $tempFile) {
-            Ajax::editormd_return_json("", "file_extension_error");
+            Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
         }
 
         // 获取用户配置中的图床校验码
@@ -186,13 +205,22 @@ class ImagePaste {
         list($body, $contentType) = $multipart;
         $headers["Content-Type"]  = $contentType;
 
+        $connect_timeout = function ($handle) {
+            if (defined("CURLOPT_CONNECTTIMEOUT") && function_exists("curl_setopt")) {
+                curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, self::CONNECT_TIMEOUT);
+            }
+        };
+        add_action("http_api_curl", $connect_timeout);
+
         $response = wp_remote_post("https://smms.app/api/v2/upload", array(
-            "timeout"     => 120,
+            "timeout"     => self::UPLOAD_TIMEOUT,
             "redirection" => 0,
             "sslverify"   => true,
             "headers"     => $headers,
             "body"        => $body,
         ));
+
+        remove_action("http_api_curl", $connect_timeout);
 
         if (is_wp_error($response)) {
             Ajax::editormd_return_json("", "unknown_error", $response->get_error_message());
@@ -232,40 +260,66 @@ class ImagePaste {
     private function editormd_save_to_temp_dir() {
         $binary = base64_decode($this->content, true);
         if (false === $binary || "" === $binary) {
+            $this->last_error = "file_extension_error";
+            return false;
+        }
+
+        if (strlen($binary) > self::MAX_BINARY_BYTES) {
+            $this->last_error = "file_too_large";
             return false;
         }
 
         if (! function_exists("getimagesize")) {
+            $this->last_error = "unknown_error";
             return false;
         }
 
-        $tempFile = $this->tempDir . $this->name . ".tmp";
+        if (! function_exists("wp_tempnam")) {
+            require_once ABSPATH . "wp-admin/includes/file.php";
+        }
+
+        $tempFile = wp_tempnam($this->name . ".tmp");
+        if (! $tempFile) {
+            $this->last_error = "unknown_error";
+            return false;
+        }
+
         if (false === @file_put_contents($tempFile, $binary)) {
+            wp_delete_file($tempFile);
+            $this->last_error = "unknown_error";
             return false;
         }
 
-        $mime = $this->detect_image_mime($tempFile);
-        if (false === $mime) {
+        $info = $this->image_info($tempFile);
+        if (false === $info) {
             wp_delete_file($tempFile);
+            $this->last_error = "file_extension_error";
+            return false;
+        }
+
+        $mime = $info["mime"];
+
+        if (! $this->image_dimensions_within_budget((int) $info[0], (int) $info[1])) {
+            wp_delete_file($tempFile);
+            $this->last_error = "image_too_large";
             return false;
         }
 
         if ("image/jpeg" === $mime) {
-            $newFilename = preg_replace("/\.tmp$/", ".jpg", $tempFile);
+            $newFilename = $tempFile . ".jpg";
             if (false === @rename($tempFile, $newFilename)) {
                 wp_delete_file($tempFile);
+                $this->last_error = "unknown_error";
                 return false;
             }
 
             return $newFilename;
         }
 
-        $newFilename = $this->editormd_png2jpg($tempFile, true, $mime);
-
-        return $newFilename;
+        return $this->editormd_png2jpg($tempFile, true, $mime);
     }
 
-    private function detect_image_mime($file) {
+    private function image_info($file) {
         $info = @getimagesize($file);
         if (false === $info || empty($info["mime"])) {
             return false;
@@ -275,12 +329,60 @@ class ImagePaste {
             return false;
         }
 
-        return $info["mime"];
+        return $info;
+    }
+
+    private function image_dimensions_within_budget($width, $height) {
+        if ($width <= 0 || $height <= 0) {
+            return false;
+        }
+
+        if ($width > self::MAX_SIDE || $height > self::MAX_SIDE) {
+            return false;
+        }
+
+        if (($width * $height) > self::MAX_PIXELS) {
+            return false;
+        }
+
+        $limit = function_exists("wp_convert_hr_to_bytes")
+            ? (int) wp_convert_hr_to_bytes(ini_get("memory_limit"))
+            : 0;
+
+        if ($limit > 0) {
+            $needed = $width * $height * 4 * 2 + self::MEMORY_HEADROOM_BYTES;
+            $free   = $limit - memory_get_usage(true);
+
+            if ($free <= 0 || $needed > ($free * 0.8)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function editormd_rate_limit_exceeded() {
+        $user_id = get_current_user_id();
+        if (! $user_id) {
+            return false;
+        }
+
+        $key   = "wp_editormd_rl_" . $user_id;
+        $count = (int) get_transient($key);
+
+        if ($count >= self::RATE_LIMIT_MAX) {
+            return true;
+        }
+
+        set_transient($key, $count + 1, self::RATE_LIMIT_WINDOW);
+
+        return false;
     }
 
     private function editormd_png2jpg($filePath, $deleteOldFile = true, $mime = "image/png") {
-        $quality     = 50;
-        $newFilename = preg_replace("/\.(png|tmp)$/i", ".jpg", $filePath);
+        $quality = 50;
+
+        $newFilename = $filePath . ".jpg";
 
         $image = $this->image_create_from($filePath, $mime);
         if (false === $image) {

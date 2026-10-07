@@ -1,7 +1,7 @@
 <?php
 // 版本发行注记页面
 // 包含页面重渲染功能
-function display_page($text_domain, $config) {
+function wp_editormd_render_upgrade_release_page($text_domain, $config) {
     $targetVersion = isset($_GET["version"]) ? sanitize_text_field(wp_unslash($_GET["version"])) : "";
     $language      = isset($_COOKIE["wp-editormd-lang"])
         ? sanitize_text_field(wp_unslash($_COOKIE["wp-editormd-lang"]))
