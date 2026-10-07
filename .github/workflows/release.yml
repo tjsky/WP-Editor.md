@@ -113,12 +113,14 @@ jobs:
           composer --version
           python3 --version
 
-      # 元数据漂移与依赖安全：composer.json 声明的 PHP 版本必须与插件头一致，
+      # 元数据漂移与依赖安全：composer.json 声明的 PHP 版本应统一，
       # 且锁定的依赖不得带已知安全公告。
+      # 注意：audit 必须带 --locked —— 这一步在 composer install 之前执行，
+      # 没有 vendor/ 时 audit 会以「没有已安装包」为由失败。
       - name: 校验 composer 声明与依赖安全
         run: |
           composer validate --no-check-publish --no-interaction
-          composer audit --no-dev --no-interaction
+          composer audit --locked --no-dev --no-interaction
 
       - name: 修正 composer.lock 的下载源
         run: |
