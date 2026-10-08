@@ -61,8 +61,10 @@ The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) 
 * **顺带修复** —— 思维导图设置项丢失、Mermaid 默认值串到 KaTeX 等历史遗留缺陷
 * **公式解析重写**（10.4.0）—— 修复代码块里的 `$` 被当公式、块级公式重复渲染、正文误配对的 `$` 被渲染
 * **新增（可选）**（10.4.0）—— 图片尺寸语法 `![说明](图片地址 =600)`，不写尺寸时渲染结果与原来完全一致
+* **编辑器预览与发布结果对齐**（10.4.5）—— 预览此前不认识上面那套图片尺寸语法（原样显示为 Markdown 源码），
+  还会把价格、函数签名、行内代码里的 `$` 当成公式渲染；现预览侧补齐同等能力，两侧渲染结果逐项一致
 
-有意**未做**的事：为避免影响面扩大，编辑器前端行为、数据存储结构、既有选项的命名与取值均保持不变。
+有意**未做**的事：为避免影响面扩大，不做编辑器功能重构、不改数据存储结构、不改既有选项的命名与取值。
 
 ---
 
@@ -103,7 +105,7 @@ cd -
 for po in languages/*.po; do msgfmt -o "${po%.po}.mo" "$po"; done
 
 # 5. 打包成可安装 zip
-python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.4.zip 10.4.4
+python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.5.zip 10.4.5
 ```
 
 环境要求：Node.js ≥ 18（推荐 22）、PHP ≥ 7.4、Composer、gettext（`msgfmt`）、Python 3。

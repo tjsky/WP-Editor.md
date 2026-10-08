@@ -105,6 +105,16 @@ def main():
         ("src/Admin/Controller.php", "PrismJSAuto::enqueue_assets", "wp-admin 必须复用插件的 Prism（不得依赖第二套）"),
         ("src/Front/FrontEditor.php", "PrismJSAuto::enqueue_assets", "前台编辑器必须显式提供 Prism"),
         ("src/App/PrismJSAuto.php", "static function enqueue_assets", "Prism 资源入队必须是可复用的静态方法"),
+        # 10.4.5：编辑器预览必须认识插件自定义的图片尺寸/属性语法。
+        # 这套语法只实现在服务端解析器里，预览侧若不补齐，就会「预览显示裸 Markdown、
+        # 发布后却正常」—— 预览失去参考价值（用户实际报障）。
+        ("assets/Config/editormd.js", "wp-editormd-img", "预览侧必须补齐图片尺寸语法（fragment 载体）"),
+        ("assets/Config/editormd.js", "installRendererHook", "预览侧必须覆写 renderer.image 输出尺寸"),
+        ("assets/Config/editormd.js", "Object.setPrototypeOf", "包装 editormd.$marked 后必须透出 marked 的静态成员"),
+        # 10.4.5：预览侧的公式误渲染防护必须与服务端同规则
+        ("assets/Config/editormd.js", "guardPseudoTex", "预览侧必须压掉行内公式的误渲染"),
+        ("assets/Config/editormd.js", "looksLikeFormula", "预览侧的公式判定函数必须存在"),
+        ("src/App/KaTeX.php", "katex_looks_like_formula", "服务端的公式判定函数必须存在（与预览侧同规则）"),
     ]
     for path, needle, label in must_have:
         failures += not check(needle in read(path), label, "%s 中未找到 %s" % (path, needle))
@@ -146,6 +156,11 @@ def main():
         # （带标题的链接直接失配）
         ("src/App/WPMarkdownParser.php", "htmlspecialchars($text, ENT_COMPAT)",
          "Markdown 源码不得再用 ENT_COMPAT 整段转义"),
+        # 10.4.5：预览侧不得再直接把 $ 交给 Editor.md 的公式正则 ——
+        # Editor.md 只做正则配对、不判断「像不像公式」，会把价格、函数签名、
+        # 行内代码一并渲染成公式（与服务端行为不一致）
+        ("assets/Config/editormd.js", "baseParagraph.call(this, text)",
+         "段落渲染必须先经 guardPseudoTex 再交给 Editor.md"),
     ]
     for path, needle, label in must_not:
         failures += not check(needle not in read(path), label, "%s 中仍存在 %s" % (path, needle))

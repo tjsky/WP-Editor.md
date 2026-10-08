@@ -1,5 +1,30 @@
 # WP Editor.md
 
+### Version 10.4.5
+
+> 本版修的是「编辑器预览与保存结果不一致」—— 同一段内容预览里是乱码、发布后却正常。
+> **无数据结构变更，升级无需迁移。**
+
+* **缺陷修复：预览不认识插件的图片尺寸语法。** `![alt](img =600)` / `=300x200` / `=x400`
+  以及 `{#id .class}` 只实现在服务端解析器（保存那一刻才生效），而编辑器预览用的是
+  Editor.md 自带的 marked，完全不认识这套写法，会把它当成「不是图片」原样吐出裸 Markdown。
+  现由 `assets/Config/editormd.js` 在解析前把尺寸与属性搬进 URL 的 fragment、并覆写
+  `renderer.image` 还原成带 `width` / `height` / `style` / `id` / `class` 的 `<img>`，
+  输出规则与服务端逐条对齐（含属性块里显式 `width=` / `height=` 的优先级）
+* **缺陷修复：预览会把普通文本当成公式。** Editor.md 的段落渲染只做 `$…$` 正则配对、
+  不判断内容像不像公式，于是「价格从 $100 涨到 $200」「function update( $a, $b )」
+  以及行内代码里的 `$` 都会被渲染成公式 —— 而服务端是有防护的，这又是一处预览与发布不一致。
+  现把服务端的判定规则（定界符必须紧贴内容、内容须含字母/数字/反斜杠）与「跳过 code/pre」
+  一并搬到预览侧，实测同一篇文章两侧的公式数量、正文 `$` 数量完全一致
+* **测试脚本修正**：`e2e-create-post.php` 把未 slash 的内容直接交给 `wp_insert_post()`，
+  而它内部会先做 `wp_unslash()` —— 于是脚本里的 `\frac` 被存成 `frac`、`\alpha` 变成 `alpha`，
+  测试文章本身就是坏的（真实场景走 `$_POST`，PHP 已自动 slash，不受影响）。现改为 `wp_slash()`
+  并在脚本里加了反斜杠保留自检
+* **回归补充**：新增 `tools/vm/regression-preview-parity.py` —— 对同一篇文章分别抓编辑器预览与
+  前台渲染的 DOM，逐项比对图片尺寸/属性、公式数量、正文 `$` 数量、代码块数量。
+  此前的回归只覆盖「保存后的 HTML」与「前台渲染」，**完全没覆盖编辑器预览**，本版补上
+
+
 ### Version 10.4.4
 
 > 本版修的是评论侧的 Markdown 链路，以及页面上同时加载两套 Prism 的历史问题。
@@ -260,6 +285,38 @@
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
 
 ------
+
+### Version 10.4.5
+
+> This release fixes the mismatch between the editor preview and the saved result —
+> the same content that looked like garbage in the preview rendered correctly once published.
+> **No data-structure changes, so upgrading requires no migration.**
+
+* **Fixed: the preview did not understand the plugin's image-size syntax.** `![alt](img =600)`,
+  `=300x200`, `=x400` and `{#id .class}` exist only in the server-side parser (applied at save
+  time), while the editor preview uses Editor.md's bundled marked, which does not recognise the
+  syntax at all and emits the raw Markdown verbatim. `assets/Config/editormd.js` now moves the
+  size and attribute block into a URL fragment before parsing and overrides `renderer.image` to
+  rebuild an `<img>` carrying `width` / `height` / `style` / `id` / `class`, matching the
+  server-side output rule for rule (including the precedence of an explicit `width=` / `height=`
+  inside the attribute block)
+* **Fixed: the preview rendered ordinary text as formulas.** Editor.md's paragraph renderer only
+  pairs `$…$` with a regex and never asks whether the content looks like a formula, so
+  "prices from $100 to $200", "function update( $a, $b )" and even `$` inside inline code were
+  all rendered as maths — while the server side guards against exactly that. Another preview vs
+  published mismatch. The server-side rules (delimiters must hug the content; the content must
+  contain a letter, digit or backslash) and the "skip code/pre" behaviour are now mirrored in the
+  preview; the formula count and the number of literal `$` now match on both sides
+* **Test-harness fix**: `e2e-create-post.php` handed unslashed content straight to
+  `wp_insert_post()`, which runs `wp_unslash()` internally — so `\frac` was stored as `frac` and
+  `\alpha` as `alpha`, meaning the test post itself was broken (real submissions arrive via
+  `$_POST`, which PHP already slashes, so they are unaffected). The script now uses `wp_slash()`
+  and self-checks that backslashes survive
+* **New regression**: `tools/vm/regression-preview-parity.py` scrapes both the editor preview and
+  the published page for the same post and compares image sizes/attributes, formula count, the
+  number of literal `$` and code-block count. Previous regressions only covered the saved HTML and
+  the front-end rendering and **never touched the editor preview** at all
+
 
 ### Version 10.4.4
 
@@ -566,6 +623,31 @@
 * Mermaid's default config was mistakenly written with KaTeX's defaults
 
 ------
+
+### Version 10.4.5
+
+> 本版修正「編輯器預覽與儲存結果不一致」—— 同一段內容預覽裡是亂碼、發佈後卻正常。
+> **無資料結構變更，升級無需遷移。**
+
+* **缺陷修正：預覽不認識外掛的圖片尺寸語法。** `![alt](img =600)` / `=300x200` / `=x400`
+  以及 `{#id .class}` 只實作在伺服端解析器（儲存那一刻才生效），而編輯器預覽用的是
+  Editor.md 內附的 marked，完全看不懂這套寫法，會把它當成「不是圖片」原樣吐出裸 Markdown。
+  現由 `assets/Config/editormd.js` 在解析前把尺寸與屬性搬進 URL 的 fragment、並覆寫
+  `renderer.image` 還原成帶 `width` / `height` / `style` / `id` / `class` 的 `<img>`，
+  輸出規則與伺服端逐條對齊（含屬性區塊裡明確 `width=` / `height=` 的優先順序）
+* **缺陷修正：預覽會把普通文字當成公式。** Editor.md 的段落渲染只做 `$…$` 正則配對、
+  不判斷內容像不像公式，於是「價格從 $100 漲到 $200」「function update( $a, $b )」
+  以及行內程式碼裡的 `$` 都會被渲染成公式 —— 而伺服端是有防護的，這又是一處預覽與發佈不一致。
+  現把伺服端的判定規則（定界符必須緊貼內容、內容須含字母/數字/反斜線）與「跳過 code/pre」
+  一併搬到預覽側；實測同一篇文章兩側的公式數量、正文 `$` 數量完全一致
+* **測試腳本修正**：`e2e-create-post.php` 把未 slash 的內容直接交給 `wp_insert_post()`，
+  而它內部會先做 `wp_unslash()` —— 於是腳本裡的 `\frac` 被存成 `frac`、`\alpha` 變成 `alpha`，
+  測試文章本身就是壞的（真實情境走 `$_POST`，PHP 已自動 slash，不受影響）。現改為 `wp_slash()`
+  並在腳本裡加了反斜線保留自檢
+* **回歸補充**：新增 `tools/vm/regression-preview-parity.py` —— 對同一篇文章分別抓編輯器預覽與
+  前台渲染的 DOM，逐項比對圖片尺寸/屬性、公式數量、正文 `$` 數量、程式碼區塊數量。
+  先前的回歸只涵蓋「儲存後的 HTML」與「前台渲染」，**完全沒有涵蓋編輯器預覽**，本版補上
+
 
 ### Version 10.4.4
 
