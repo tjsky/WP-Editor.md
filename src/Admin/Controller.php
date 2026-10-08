@@ -2,6 +2,7 @@
 
 namespace EditormdAdmin;
 
+use EditormdApp\PrismJSAuto;
 use EditormdApp\WPComMarkdown;
 use EditormdUtils\Config;
 
@@ -47,6 +48,7 @@ class Controller {
         add_filter("pre_option_" . WPComMarkdown::POST_OPTION, "__return_true");
 
         add_action("admin_init", array($this, "editormd_markdown_posting_always_on"), 11);
+        add_action("admin_init", array($this, "editormd_markdown_commenting_managed"), 11);
 
         add_filter("wp_editor_settings", array($this, "parse_editor_settings"));
 
@@ -111,6 +113,15 @@ class Controller {
 
         //JavaScript - Config
         wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
+
+        //JavaScript/CSS - Prism（编辑器预览的语法高亮）
+        //
+        // 统一 Prism（10.4.4）：编辑器预览会调用 Prism.highlightAll()，
+        // 此前后台能跑起来是因为 Editor.md 会动态加载它自带的 lib/prism.min.js
+        // （一整套 280 KB / 132 语言的 Prism，见该文件里的说明）。现在这个文件
+        // 只是占位符，后台改为复用插件自己这一套 —— 主题、行号、复制按钮、
+        // 语言标签与按需语言包都跟着插件设置走，前后台表现一致。
+        PrismJSAuto::enqueue_assets();
 
         //JavaScript - Mermaid 10 兼容垫片
         // 编辑器会在运行时动态加载 mermaid.min.js（见 editormd.mermaidURL），
@@ -179,6 +190,34 @@ class Controller {
         global $wp_settings_fields;
         if (isset($wp_settings_fields["writing"]["default"][WPComMarkdown::POST_OPTION])) {
             unset($wp_settings_fields["writing"]["default"][WPComMarkdown::POST_OPTION]);
+        }
+    }
+
+    /**
+     * 评论 Markdown 已由本插件接管时，隐藏「设置 → 讨论」里遗留的那个开关
+     *
+     * 缺陷修复（10.4.4）：该开关是 WordPress.com Markdown 模块的遗留项，
+     * 插件一开启评论编辑器（support_front / support_reply）就会强制启用评论的
+     * Markdown 转换（见 WPComMarkdown::is_commenting_enabled()），
+     * 此时再摆一个勾选框只会误导 —— 取消勾选也不会有任何效果。
+     *
+     * 只有当插件自己没接管评论编辑器时才保留该开关，站点自己开的设置不受影响。
+     */
+    public function editormd_markdown_commenting_managed() {
+        if (!class_exists("WPComMarkdown")) {
+            return;
+        }
+
+        $managed = Config::get_option("support_front", "editor_basics") === "on"
+            || Config::get_option("support_reply", "editor_basics") === "on";
+
+        if (! $managed) {
+            return;
+        }
+
+        global $wp_settings_fields;
+        if (isset($wp_settings_fields["discussion"]["default"][WPComMarkdown::COMMENT_OPTION])) {
+            unset($wp_settings_fields["discussion"]["default"][WPComMarkdown::COMMENT_OPTION]);
         }
     }
 }

@@ -2,6 +2,8 @@
 
 namespace EditormdApp;
 
+use EditormdUtils\Config;
+
 class WPComMarkdown {
 
     const POST_OPTION = "editormd_wpcom_publish_posts_with_markdown";
@@ -327,10 +329,34 @@ class WPComMarkdown {
     /**
      * Is Markdown conversion for comments enabled?
      *
+     * 缺陷修复（10.4.4）：
+     * 评论的 Markdown 转换开关沿用自 WordPress.com 的 Markdown 模块，落在
+     * 「设置 → 讨论 → Markdown」，默认关闭、入口很深，且与插件自己的
+     * 「支持前端评论 / 支持后台回复」没有任何联动。结果是：插件把评论输入框
+     * 换成了 Markdown 编辑器，预览里一切正常（前端渲染），可内容一提交就被
+     * 原样存进数据库 —— 前台看到的是 `**粗体**` 这样的源码。
+     *
+     * 现在改为：只要插件自己开了评论编辑器（support_front / support_reply），
+     * 就一并启用评论的 Markdown 转换；需要单站点关掉时用过滤器：
+     *
+     *     add_filter("editormd_comment_markdown_enabled", "__return_false");
+     *
      * @return boolean
      */
     public function is_commenting_enabled() {
-        return (bool) get_option(self::COMMENT_OPTION, "");
+        $enabled = (bool) get_option(self::COMMENT_OPTION, "");
+
+        if (! $enabled) {
+            $enabled = Config::get_option("support_front", "editor_basics") === "on"
+                || Config::get_option("support_reply", "editor_basics") === "on";
+        }
+
+        /**
+         * Filter whether Markdown conversion is enabled for comments.
+         *
+         * @param bool $enabled
+         */
+        return (bool) apply_filters("editormd_comment_markdown_enabled", $enabled);
     }
 
     /**

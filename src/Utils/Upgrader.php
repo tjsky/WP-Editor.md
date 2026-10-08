@@ -67,6 +67,9 @@ class Upgrader {
             case "10.4.2":
                 $this->upgrade_10_4_2_to_10_4_3();
                 // no break
+            case "10.4.3":
+                $this->upgrade_10_4_3_to_10_4_4();
+                // no break
             default:
                 break;
         }
@@ -78,6 +81,17 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.3 → 10.4.4
+     *
+     * 本版修的是评论侧的 Markdown 链路（转换开关默认关闭导致评论原样入库、
+     * html_decode 关闭时引用与链接标题被转义破坏）以及 Prism 的双份加载。
+     * 同样没有数据结构变更，只需把 editor_version 推进到新版本号。
+     */
+    private function upgrade_10_4_3_to_10_4_4() {
+        $this->update_to_version("10.4.4");
     }
 
     /**

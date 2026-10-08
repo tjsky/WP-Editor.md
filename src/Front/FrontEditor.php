@@ -2,6 +2,7 @@
 
 namespace EditormdFront;
 
+use EditormdApp\PrismJSAuto;
 use EditormdUtils\Config;
 
 class FrontEditor {
@@ -110,6 +111,14 @@ class FrontEditor {
 
         //JavaScript - Mermaid 10 兼容垫片（见 assets/Mermaid/mermaid-compat.js 的说明）
         wp_enqueue_script("Mermaid-Compat_Front", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+
+        //JavaScript/CSS - Prism
+        //
+        // 统一 Prism（10.4.4）：编辑器预览会调用 Prism.highlightAll()。
+        // 「自动高亮」选项关闭时前台本来一份 Prism 都没有，此前靠 Editor.md 动态加载它
+        // 自带的 lib/prism.min.js 兜底 —— 那个文件现在只是占位，所以这里显式补齐。
+        // 若「自动高亮」已开启，PrismJSAuto 会先一步入队，本调用因幂等直接返回。
+        PrismJSAuto::enqueue_assets();
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");

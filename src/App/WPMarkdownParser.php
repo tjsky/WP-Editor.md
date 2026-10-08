@@ -106,8 +106,25 @@ class WPMarkdownParser extends MarkdownExtra {
 
             // 兼容性修复：原实现未显式传 flags，而 PHP 8.1 起 htmlspecialchars() 的默认值
             // 已由 ENT_COMPAT 变为 ENT_QUOTES|ENT_SUBSTITUTE|ENT_HTML401——单引号会被转义成
-            // &#039;，会改变存量内容的渲染结果。这里显式传 ENT_COMPAT 以冻结既有行为。
-            $text = htmlspecialchars($text, ENT_COMPAT);
+            // &#039;，会改变存量内容的渲染结果。这里显式传 flags 以冻结既有行为。
+            //
+            // 缺陷修复（10.4.4）：这里原本用的是 ENT_COMPAT，会把 `&`、`<`、`>`、`"`
+            // 全部转义。本分支的意图只是「HTML 标签按纯文本展示」，而真正能让标签成形的
+            // 只有 `<`，把 `>` 和 `"` 一起转义反而会改坏 Markdown 自身的语法：
+            //   - 行首 `> ` 被写成 `&gt; `，引用块（blockquote）永远渲染不出来
+            //   - `[文字](http://x "标题")` 的标题引号被写成 `&quot;`，
+            //     链接语法直接失配，输出一堆裸括号
+            // 因此改为 ENT_NOQUOTES（只转义 `&`、`<`、`>`，不动 `"`），
+            // 随后把行首被转义的引用标记还原成 `>`。
+            // 安全性不受影响：`<` 依然被转义，任何标签都无法成形。
+            $text = htmlspecialchars($text, ENT_NOQUOTES);
+
+            // 还原行首的引用标记（支持 `>>` 这类嵌套写法），仅限行首，
+            // 正文中间的 `>` 保持 `&gt;`（渲染结果与之前完全一致）。
+            $text = preg_replace_callback("/^(?:&gt;)+/m", function ($matches) {
+                return str_repeat(">", substr_count($matches[0], "&gt;"));
+            }, $text);
+
             $text = $this->codeblock_hash($text);
         }
 

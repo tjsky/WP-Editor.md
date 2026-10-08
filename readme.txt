@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.3
+Stable tag: 10.4.4
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,17 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.4 =
+* 缺陷修复：访客评论里的 Markdown 此前原样入库（前台看到的还是 `**粗体**` 这类源码）。
+  评论的转换开关沿用自「设置 → 讨论 → Markdown」，默认关闭且与插件设置无联动；
+  现改为插件开着评论编辑器就自动启用转换，并隐藏那个会误导人的遗留勾选框
+* 缺陷修复：html_decode 关闭（默认）时「引用」与「带标题的链接」必然失效 ——
+  源码被整段转义，行首 `>` 变成 `&gt;`、`"` 变成 `&quot;`；现只转义 `&` 与 `<` 并还原引用标记
+* 缺陷修复：页面上同时加载两套 Prism（Editor.md 自带 286 KB / 132 语言的 1.15.0 构建
+  与插件的 1.19），互相覆盖 window.Prism 导致插件的复制按钮、语言标签、按需语言包静默失效。
+  现 Editor.md 那份改为占位、wp-admin 也复用插件这一套；实测同类页面 Prism 脚本由 302.5 KB 降到 24.2 KB
+* 其它：Prism 资源的缓存指纹由写死的 1.15.0 改为真实的 1.19.0
 
 = 10.4.3 =
 * 缺陷修复：修复控制台 Uncaught ReferenceError: Prism is not defined —— 设置代码高亮语言包

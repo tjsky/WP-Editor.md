@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.3
+ * Version:           10.4.4
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,23 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.4.4 —— 修复评论侧的 Markdown 链路与 Prism 双份加载
+ *   - 访客评论里的 Markdown 不再原样入库。评论的转换开关沿用自 WordPress.com
+ *     的 Markdown 模块（设置 → 讨论 → Markdown），默认关闭且与插件自己
+ *     「支持前端评论 / 支持后台回复」毫无联动：编辑器里预览得好好的内容，
+ *     提交后被原样存进数据库。现改为只要插件开着评论编辑器就自动启用转换，
+ *     并隐藏那个会误导人的遗留勾选框（可用 editormd_comment_markdown_enabled 关闭）；
+ *   - 修复 html_decode 关闭时「引用」与「带标题的链接」必然失效：解析器原先用
+ *     htmlspecialchars(ENT_COMPAT) 把源码整段转义，行首 `>` 变成 `&gt;`（引用块
+ *     渲染不出来）、`"` 变成 `&quot;`（`[文字](url "标题")` 直接失配）。现只转义
+ *     `&` 与 `<`（已足以阻止任何标签成形），并还原行首的引用标记；
+ *   - Prism 只保留一套。编辑器预览此前会再加载 Editor.md 自带的 lib/prism.min.js
+ *     （286 KB、132 种语言、且是另一个版本 1.15.0），与插件的 Prism 1.19 互相覆盖
+ *     window.Prism —— 后加载的那份把插件侧的 toolbar / autoloader 顶掉，代码块
+ *     没有复制按钮也没有语言标签，页面还白白多下载 286 KB。
+ *     现该文件改为占位，wp-admin 也复用插件这一套，前后台表现一致；
+ *   - Prism 资源的版本指纹由写死的 1.15.0 改为真实的 1.19.0。
  *
  * 10.4.3 —— 修复前端缺陷
  *   - 控制台报 Prism is not defined：设置代码高亮 autoloader 语言包路径的内联脚本
@@ -67,7 +84,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.3' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.4' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
