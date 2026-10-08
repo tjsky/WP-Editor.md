@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.2
+ * Version:           10.4.3
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,19 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.4.3 —— 修复前端缺陷
+ *   - 控制台报 Prism is not defined：设置代码高亮 autoloader 语言包路径的内联脚本
+ *     原先挂在 wp_print_footer_scripts 默认优先级（10）上输出，而页脚脚本在优先级 20
+ *     才打印，脚本先于 Prism 执行；同时该脚本没跑成会让 languages_path 为空，
+ *     autoloader 退回默认相对路径去请求 /components/prism-*.min.js（404）。
+ *     现改为 wp_add_inline_script 挂在插件脚本句柄之后，并把纯文本语言预声明为空语法；
+ *   - 编辑器工具栏按钮被主题的 Bootstrap 全局 .tooltip（position:absolute;opacity:0）
+ *     命中而透明堆叠 —— 插件按钮的类名就叫 tooltip，现由插件按自己的语义钉回定位与透明度；
+ *   - 后台回复框右半边空白：编辑器宽度原先被 !important 钉死在 50%，而预览面板默认隐藏，
+ *     现改为跟随预览显隐（关闭时占满整行）；
+ *   - 前台控制台每秒一次的 wp is not defined：字数统计写成了 `wp && wp.utils`，
+ *     而前台没有 wp 全局变量，改为 typeof 判断。
  *
  * 10.4.2 —— 按代码审查报告做安全加固
  *   - Mermaid 8.4.8 → 10.9.8（8.x 有 CVE-2021-43861，8.x/9.x 分支均无修复版本），
@@ -54,7 +67,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.2' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.3' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

@@ -1,5 +1,47 @@
 # WP Editor.md
 
+### Version 10.4.3
+
+> 本版集中修前端：Prism 代码高亮的加载顺序与语言包路径、编辑器工具栏与 Bootstrap 的
+> 类名冲突、后台回复框的宽度，以及一处每秒刷屏的控制台报错。
+> **无数据结构变更，升级无需迁移。**
+
+#### 1. Prism 代码高亮
+
+* 修复控制台 `Uncaught ReferenceError: Prism is not defined`。设置 autoloader 语言包路径的
+  内联脚本原先挂在 `wp_print_footer_scripts` 的默认优先级上直接输出，而 WordPress 打印页脚
+  脚本用的是优先级 20 —— 脚本跑在 Prism 前面。现改为挂在本插件自己的脚本句柄之后，
+  由 WordPress 保证执行顺序。
+* 修复 `https://站点/components/prism-*.min.js` 这类 404。上面那条脚本没执行成功时
+  `languages_path` 是空的，autoloader 会退回默认的相对路径。路径设置正常后不再出现。
+* `plaintext` / `plain` / `text` / `txt` 这四个纯文本语言：Prism 既不随内核预置、也没有
+  对应的组件文件，现在预先声明为空语法，省掉一次必然 404 的请求。
+* Prism 内核改为显式声明所有 Prism 插件的依赖，不再依赖入队顺序。
+
+#### 2. 编辑器工具栏
+
+* 修复「主题引入 Bootstrap 之后工具栏只剩零星几个图标」。工具栏按钮的类名是 `tooltip`
+  （配合 `.tooltiptext` 实现悬停提示），与 Bootstrap 3 的全局 `.tooltip`
+  （`position: absolute; z-index: 1070; opacity: 0`）撞名，所有按钮被置为透明、绝对定位并
+  堆叠到一起。现在由插件按自己的语义把定位与透明度钉回来，使用 Bootstrap 的主题不再受影响。
+  前台评论框、自定义目标元素编辑器与后台编辑器均适用。
+
+#### 3. 后台回复框（edit-comments.php）
+
+* 修复回复框右半边永远是一片空白。编辑器宽度原先被 `!important` 钉死在 50%，而回复框的
+  预览面板默认是隐藏的。现改为跟着预览的显隐走 —— 关闭时占满整行，打开时各占一半。
+
+#### 4. 其它
+
+* 修复控制台每秒一次的 `wp is not defined`。字数统计的判断写成了 `wp && wp.utils`，
+  而前台并没有 `wp` 这个全局变量，读取未声明的标识符会抛 ReferenceError。改为 `typeof` 判断。
+
+#### 升级
+
+* 升级器新增 `10.4.2 → 10.4.3` 迁移，仅推进版本号，无数据变更。
+
+------
+
 ### Version 10.4.2
 
 > 本版按代码审查报告的 P1 / P2 清单做**小而集中的安全加固**：升级两个存在公开漏洞的
@@ -174,6 +216,56 @@
 
 * `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+
+------
+
+### Version 10.4.3
+
+> This release is a front-end fix-up: the loading order and language-pack path of Prism,
+> a class-name collision between the editor toolbar and Bootstrap, the width of the admin
+> reply box, and a console error that fired once per second.
+> **No data-structure changes, so upgrading requires no migration.**
+
+#### 1. Prism syntax highlighting
+
+* Fixed `Uncaught ReferenceError: Prism is not defined`. The inline script that sets the
+  autoloader's language path used to be printed on the default priority of
+  `wp_print_footer_scripts`, while WordPress prints footer scripts at priority 20 — so it ran
+  before Prism existed. It is now attached after this plugin's own script handle, and
+  WordPress guarantees the order.
+* Fixed the `https://example.com/components/prism-*.min.js` 404s. When the script above failed,
+  `languages_path` was never set and the autoloader fell back to its default relative path.
+* The four plain-text languages (`plaintext` / `plain` / `text` / `txt`) ship neither inside
+  Prism core nor as component files; they are now pre-declared as empty grammars, which removes
+  a request that could only ever 404.
+* Prism core is now declared as a dependency of every Prism plugin instead of relying on
+  enqueue order.
+
+#### 2. Editor toolbar
+
+* Fixed "after a theme loads Bootstrap the toolbar only shows a couple of icons". The toolbar
+  buttons carry the class `tooltip` (paired with `.tooltiptext` for hover hints), which collides
+  with Bootstrap 3's global `.tooltip` (`position: absolute; z-index: 1070; opacity: 0`) —
+  every button became transparent, absolutely positioned and stacked on top of each other.
+  The plugin now pins the positioning and opacity back to its own semantics, so Bootstrap-based
+  themes are no longer affected. This covers the front-end comment box, the custom-target editor
+  and the admin editor alike.
+
+#### 3. Admin reply box (edit-comments.php)
+
+* Fixed the permanently blank right half of the reply box. The editor width was pinned to 50%
+  with `!important` while the preview pane of the reply box is hidden by default. It now follows
+  the preview's visibility: full width when closed, half each when open.
+
+#### 4. Other
+
+* Fixed the once-per-second `wp is not defined` console error. The word-count guard was written
+  as `wp && wp.utils`, but there is no `wp` global on the front end, and reading an undeclared
+  identifier throws. It now uses a `typeof` guard.
+
+#### Upgrade
+
+* The upgrader gains a `10.4.2 → 10.4.3` migration; it only advances the version number, no data changes.
 
 ------
 
@@ -378,6 +470,77 @@
 
 * `editor_mindmap` option was overwritten by the `editor_style` array, breaking the mind map feature
 * Mermaid's default config was mistakenly written with KaTeX's defaults
+
+------
+
+### Version 10.4.3
+
+> 本版集中修正前端問題：Prism 程式碼高亮的載入順序與語言包路徑、編輯器工具列與 Bootstrap 的
+> 類名衝突、後台回覆框的寬度，以及一處每秒刷屏的主控台錯誤。
+> **無資料結構變更，升級無需遷移。**
+
+#### 1. Prism 程式碼高亮
+
+* 修正主控台 `Uncaught ReferenceError: Prism is not defined`。設定 autoloader 語言包路徑的
+  內聯腳本原本掛在 `wp_print_footer_scripts` 的預設優先級上直接輸出，而 WordPress 列印頁尾
+  腳本用的是優先級 20 —— 腳本跑在 Prism 之前。現改為掛在外掛自己的腳本控制代碼之後，
+  由 WordPress 保證執行順序。
+* 修正 `https://站點/components/prism-*.min.js` 這類 404。上一條腳本沒執行成功時
+  `languages_path` 是空的，autoloader 會退回預設的相對路徑。路徑設定正常後不再出現。
+* `plaintext` / `plain` / `text` / `txt` 這四個純文字語言：Prism 既不隨核心預置、也沒有對應的
+  元件檔案，現在預先宣告為空語法，省掉一次必然 404 的請求。
+* Prism 核心改為顯式宣告所有 Prism 外掛的依賴，不再依賴入隊順序。
+
+#### 2. 編輯器工具列
+
+* 修正「主題引入 Bootstrap 之後工具列只剩零星幾個圖示」。工具列按鈕的類名是 `tooltip`
+  （配合 `.tooltiptext` 實現懸停提示），與 Bootstrap 3 的全域 `.tooltip`
+  （`position: absolute; z-index: 1070; opacity: 0`）撞名，所有按鈕被設為透明、絕對定位並
+  堆疊在一起。現在由外掛按自己的語意把定位與透明度釘回來，使用 Bootstrap 的主題不再受影響。
+  前台評論框、自訂目標元素編輯器與後台編輯器皆適用。
+
+#### 3. 後台回覆框（edit-comments.php）
+
+* 修正回覆框右半邊永遠是一片空白。編輯器寬度原本被 `!important` 釘死在 50%，而回覆框的
+  預覽面板預設是隱藏的。現改為跟著預覽的顯隱走 —— 關閉時佔滿整行，開啟時各佔一半。
+
+#### 4. 其他
+
+* 修正主控台每秒一次的 `wp is not defined`。字數統計的判斷寫成了 `wp && wp.utils`，
+  而前台並沒有 `wp` 這個全域變數，讀取未宣告的識別字會拋出 ReferenceError。改為 `typeof` 判斷。
+
+#### 升級
+
+* 升級器新增 `10.4.2 → 10.4.3` 遷移，僅推進版本號，無資料變更。
+
+------
+
+### Version 10.4.2
+
+> 本版依程式碼審查報告的 P1 / P2 清單做**小而集中的安全加固**：升級兩個有公開漏洞的綑綁
+> 函式庫、為圖片介面補上真正缺失的資源預算、把 sm.ms 權杖移出瀏覽器、收緊後台 AJAX 授權。
+> **無資料結構變更，升級無需遷移。**
+
+#### 1. 安全修正
+
+* **Mermaid 8.4.8 → 10.9.8**：8.x / 9.x 分支皆無可用修正；`securityLevel` 強制釘為 strict，
+  且在使用者設定合併**之後**覆蓋，站點設定與圖表指令都無法降低安全等級
+* **KaTeX 0.11.1 → 0.19.0**，渲染時顯式 `trust: false`
+* 圖片貼上新增解碼後體積、像素與記憶體預算，全部在進入 GD 解碼前攔截；sm.ms 上游逾時
+  120 秒 → 10 秒（連線 3 秒）；新增依使用者的速率限制
+* sm.ms 權杖不再下發到瀏覽器，改由伺服端代理注入；代理改為固定操作白名單
+* 後台 AJAX 不再以 Origin/Referer 主機名作為 nonce 失敗的兜底授權，並移除未登入入口
+* 暫存檔改用 `wp_tempnam()`；日誌中的請求 URI 對查詢參數脫敏
+* 前端依賴 axios 0.19.2 → 1.20.0（Vue 2.x 全系無可用修正，留待 Vue 3 遷移）
+
+#### 2. 缺陷修正
+
+* Mermaid 圖表先前在正文裡無法渲染（內聯腳本被內容篩選器改寫引號），改為資料驅動渲染，
+  並相容舊格式，歷史文章無需重新儲存
+
+#### 升級
+
+* 升級器新增 `10.4.1 → 10.4.2` 遷移，僅推進版本號，無資料變更。
 
 ------
 

@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.2
+Stable tag: 10.4.3
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,17 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.3 =
+* 缺陷修复：修复控制台 Uncaught ReferenceError: Prism is not defined —— 设置代码高亮语言包
+  路径的内联脚本原先早于 Prism 执行，现改为挂在插件脚本之后，由 WordPress 保证执行顺序
+* 缺陷修复：修复随之而来的 /components/prism-*.min.js 404；纯文本语言（plaintext / plain /
+  text / txt）预先声明为空语法，不再请求并不存在的组件文件
+* 缺陷修复：修复主题引入 Bootstrap 后编辑器工具栏按钮变透明并堆叠（插件按钮类名 tooltip
+  与 Bootstrap 的全局 .tooltip 撞名），前台评论框与后台编辑器均受影响
+* 缺陷修复：修复后台回复框右半边一片空白（编辑器宽度原先被钉死在 50%，现跟随预览面板显隐，
+  关闭预览时占满整行）
+* 缺陷修复：修复前台控制台每秒一次的 wp is not defined（字数统计判断写了未声明的全局变量）
 
 = 10.4.2 =
 * 安全修复：Mermaid 由 8.4.8 升级到 10.9.8（8.x / 9.x 各自存在无修复版本的 XSS / CSS 注入问题），

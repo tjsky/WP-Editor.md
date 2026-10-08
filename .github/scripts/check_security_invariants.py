@@ -89,6 +89,14 @@ def main():
         ("src/Utils/Logger.php", "REDACTED", "日志 URI 必须脱敏"),
         ("src/Front/FrontStyle.php", 'editormd_dequeue_block_styles", false', "block CSS 移除应为显式 opt-in"),
         ("wp-editormd.php", "wp_editormd_migrating", "迁移必须与登录态解耦并加锁"),
+        # 10.4.3：Prism autoloader 的路径必须在 Prism 之后设置
+        ("src/App/PrismJSAuto.php", "wp_add_inline_script", "Prism autoloader 配置必须挂在内联脚本队列上以保证顺序"),
+        ("src/App/PrismJSAuto.php", "prism_autoloader_init_script", "Prism autoloader 初始化必须走独立方法"),
+        # 10.4.3：工具栏按钮必须挡住 Bootstrap 的 .tooltip
+        ("assets/Editormd/scss/editormd.menu.scss", "&.tooltip", "工具栏按钮必须钉住 Bootstrap 的 .tooltip 撞名"),
+        # 10.4.3：回复框宽度与 wp 未声明变量的防护
+        ("assets/Config/editormd.js", "syncReplyEditorWidth", "回复框编辑器宽度必须跟随预览面板显隐"),
+        ("assets/Config/editormd.js", 'typeof wp !== "undefined" && wp.utils', "读取 wp 前必须做 typeof 判断"),
     ]
     for path, needle, label in must_have:
         failures += not check(needle in read(path), label, "%s 中未找到 %s" % (path, needle))
@@ -106,6 +114,13 @@ def main():
         ("src/App/WPMarkdownParser.php", '<div class="mermaid mermaid-diagram no-emojify"><script',
          "Mermaid 不得再输出 document.write 形式的内联脚本"),
         ("src/Front/FrontStyle.php", 'apply_filters("editormd_dequeue_block_styles", true)', "block CSS 移除不得默认开启"),
+        # 10.4.3：autoloader 配置若再次挂到 wp_print_footer_scripts（默认优先级 10），
+        # 会早于优先级 20 的脚本打印执行 → Prism is not defined + 语言包路径丢失导致 404
+        ("src/App/PrismJSAuto.php", 'add_action("wp_print_footer_scripts"', "Prism autoloader 配置不得再挂 wp_print_footer_scripts"),
+        ("src/App/PrismJSAuto.php", "prism_wp_footer_scripts", "旧的页脚输出方法必须已移除"),
+        # 10.4.3：回复框编辑器宽度不得再被 !important 钉死（会导致右半边永远空白）
+        ("assets/Config/editormd.css", "width: 50%!important;\n  margin-left: 0!important;",
+         "回复框编辑器宽度不得再被 !important 钉死在 50%"),
     ]
     for path, needle, label in must_not:
         failures += not check(needle not in read(path), label, "%s 中仍存在 %s" % (path, needle))

@@ -64,6 +64,9 @@ class Upgrader {
             case "10.4.1":
                 $this->upgrade_10_4_1_to_10_4_2();
                 // no break
+            case "10.4.2":
+                $this->upgrade_10_4_2_to_10_4_3();
+                // no break
             default:
                 break;
         }
@@ -75,6 +78,17 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.2 → 10.4.3
+     *
+     * 本版只修前端缺陷（Prism 语言包路径与执行顺序、工具栏与 Bootstrap 的
+     * .tooltip 类名冲突、后台回复框宽度、字数统计的未声明变量），
+     * 没有数据结构变更，同样只需把 editor_version 推进到新版本号 —— 理由见上一段。
+     */
+    private function upgrade_10_4_2_to_10_4_3() {
+        $this->update_to_version("10.4.3");
     }
 
     /**
