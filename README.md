@@ -103,7 +103,7 @@ cd -
 for po in languages/*.po; do msgfmt -o "${po%.po}.mo" "$po"; done
 
 # 5. 打包成可安装 zip
-python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.2.zip 10.4.2
+python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.3.zip 10.4.3
 ```
 
 环境要求：Node.js ≥ 18（推荐 22）、PHP ≥ 7.4、Composer、gettext（`msgfmt`）、Python 3。

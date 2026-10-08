@@ -71,6 +71,21 @@
                 background: #eee;
             }
 
+            // 工具栏按钮的类名就叫 tooltip（配合下面的 .tooltiptext 实现悬停提示），
+            // 而 Bootstrap 3 定义了同名的全局类：
+            //   .tooltip { position: absolute; z-index: 1070; display: block; opacity: 0 }
+            // 只要主题引入了 Bootstrap 的全局 CSS，所有按钮就会被置为透明、绝对定位并堆叠
+            // 到一起，表现为「工具栏只剩零星几个图标」，编辑器看起来是坏的。
+            // 本插件的 .tooltiptext 已自带样式，.tooltip 只是命名钩子，因此在这里按本插件
+            // 的语义把它钉回来。选择器权重 (0,2,1) 高于 Bootstrap 的 .tooltip (0,1,0)。
+            &.tooltip {
+                position: static;
+                z-index: auto;
+                opacity: 1;
+                filter: none;
+                visibility: visible;
+            }
+
             > .fa {
                 text-align: center;
                 display: block;

@@ -8,10 +8,10 @@ class PrismJSAuto {
 
     public function __construct() {
         add_action("wp_enqueue_scripts", array($this, "prism_styles_scripts"));
+    }
 
-        if (!isset($GLOBALS["pagenow"]) || !in_array($GLOBALS["pagenow"], array("wp-login.php", "wp-register.php"))) {
-            add_action("wp_print_footer_scripts", array($this, "prism_wp_footer_scripts"));
-        }
+    private function prism_languages_path() {
+        return esc_url_raw(Config::get_option("editor_addres", "editor_style") . "/assets/Prism.js/components/");
     }
 
     public function prism_styles_scripts() {
@@ -47,8 +47,6 @@ class PrismJSAuto {
         $prism_styles   = array();
         $prism_scripts  = array();
 
-        $prism_scripts["prism-core-js"] = $prism_base_url . "/components/prism-core.min.js";
-
         if (empty($prism_theme) || $prism_theme == "default") {
             $prism_styles["prism-theme-default"] = $prism_base_url . "/themes/prism.css";
         } else if ($prism_theme == "customize") {
@@ -79,17 +77,26 @@ class PrismJSAuto {
             wp_enqueue_style($name, $prism_style, array(), "1.15.0", "all");
         }
 
+        wp_enqueue_script("prism-core-js", $prism_base_url . "/components/prism-core.min.js", array(), "1.15.0", true);
+
         foreach ($prism_scripts as $name => $prism_script) {
-            wp_enqueue_script($name, $prism_script, array(), "1.15.0", true);
+            wp_enqueue_script($name, $prism_script, array("prism-core-js"), "1.15.0", true);
         }
+
+        wp_add_inline_script("prism-plugin-autoloader", $this->prism_autoloader_init_script(), "after");
     }
 
-    public function prism_wp_footer_scripts() {
-        $languages_path = Config::get_option('editor_addres','editor_style') . '/assets/Prism.js/components/';
-        ?>
-        <script type="text/javascript">
-            Prism.plugins.autoloader.languages_path = <?php echo wp_json_encode( esc_url_raw( $languages_path ) ); ?>;
-        </script>
-        <?php
+    private function prism_autoloader_init_script() {
+        return 'window.Prism=window.Prism||{};'
+            . '(function(P){'
+            . 'P.languages=P.languages||{};'
+            . 'P.plugins=P.plugins||{};'
+            . 'P.languages.plaintext=P.languages.plaintext||{};'
+            . 'P.languages.plain=P.languages.plain||{};'
+            . 'P.languages.text=P.languages.text||{};'
+            . 'P.languages.txt=P.languages.txt||{};'
+            . 'if(P.plugins.autoloader){P.plugins.autoloader.languages_path='
+            . wp_json_encode($this->prism_languages_path()) . ';}'
+            . '})(window.Prism);';
     }
 }

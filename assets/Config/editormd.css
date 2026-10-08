@@ -30,8 +30,14 @@
   width: 100%!important;
 }
 
+/* 后台回复框（edit-comments.php）里编辑器与预览的宽度分配：
+   预览面板的宽度固定为一半（由下面的规则保证）；
+   编辑器宽度则由 Config JS 按预览的显隐同步 —— 预览关闭（回复框的默认状态）
+   时占满整行，打开时让出一半。
+   原先这里用 !important 把编辑器宽度钉死在 50%，而回复框的预览默认是隐藏的，
+   于是右半边永远留着一大片空白（用户反馈的「评论框显示诡异」）。
+   width 上不能再有 !important，否则 JS 通过行内样式设置的宽度会被压回去。 */
 .edit-comments-php .CodeMirror.cm-s-default.CodeMirror-wrap {
-  width: 50%!important;
   margin-left: 0!important;
 }
 

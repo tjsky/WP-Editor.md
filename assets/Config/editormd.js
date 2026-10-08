@@ -127,9 +127,48 @@ require("./editormd.css");
         }
 
         if (textareaID === "wp-replycontent-editor-container") {
+          // 后台回复框：编辑器宽度跟着预览面板的显隐走。
+          // 预览关闭（默认状态）时编辑器占满整行，打开时各占一半 ——
+          // 否则关闭预览时编辑器仍只占左半边，右半边是一大片空白。
+          var syncReplyEditorWidth = function () {
+            var $wrap = $("#wp-replycontent-editor-container");
+            if (!$wrap.length) {
+              return;
+            }
+
+            var $preview = $wrap.find(".editormd-preview");
+            var previewVisible = $preview.is(":visible");
+
+            // 行内样式（非 !important）用于覆盖 Editor.md 内联写入的宽度，
+            // 因此 editormd.css 里不能再给 .CodeMirror 的 width 加 !important
+            $wrap.find(".CodeMirror").css("width", previewVisible ? "50%" : "100%");
+          };
+
+          syncReplyEditorWidth();
+          window.addEventListener("resize", syncReplyEditorWidth);
+
+          // 宽度由 Editor.md 自己在内联样式里改（而且不是点击后立刻生效，
+          // 只靠固定延时对不上时机，它也可能在我们之后再把宽度写回去），
+          // 因此监听容器整棵子树的样式变化，谁改都能立刻校正回来。
+          var replyWrapNode = $("#wp-replycontent-editor-container").get(0);
+          if (replyWrapNode && typeof MutationObserver !== "undefined") {
+            new MutationObserver(syncReplyEditorWidth).observe(replyWrapNode, {
+              attributes: true,
+              attributeFilter: ["style", "class"],
+              subtree: true,
+            });
+          }
+
+          // 保底：工具栏按钮点击后再补几次校正
+          $(document).on("click", "#wp-replycontent-editor-container .editormd-toolbar-container a", function () {
+            setTimeout(syncReplyEditorWidth, 50);
+            setTimeout(syncReplyEditorWidth, 300);
+          });
+
           $(".reply").click(function () {
             setTimeout(function () {
               $(".edit-comments-php .CodeMirror.cm-s-default.CodeMirror-wrap").css("margin-top", $(".editormd-toolbar").height());
+              syncReplyEditorWidth();
             }, 100);
           });
         }
@@ -174,8 +213,11 @@ require("./editormd.css");
     }
     // 实时更新字数
     var updateWordCounter = setInterval(function() {
-      // wp.utils.WordCounter()在前台评论部分不存在，因此需要判断一下，避免出现错误
-      if (wp && wp.utils) {
+      // wp.utils.WordCounter()在前台评论部分不存在，因此需要判断一下，避免出现错误。
+      // 修复（10.4.3）：原来的判断写成 `wp && wp.utils`，而前台根本没有 wp 这个全局变量，
+      // 直接读未声明的标识符会抛 ReferenceError —— 每秒一次、每次一报，
+      // 控制台里就会刷出大量「wp is not defined」。必须先做 typeof 判断。
+      if (typeof wp !== "undefined" && wp.utils) {
         var $count = $("#wp-word-count").find(".word-count");
         var html = wpEditormd.getHTML();
 
