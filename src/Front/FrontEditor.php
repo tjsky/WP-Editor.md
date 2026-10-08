@@ -2,6 +2,7 @@
 
 namespace EditormdFront;
 
+use EditormdApp\PrismJSAuto;
 use EditormdUtils\Config;
 
 class FrontEditor {
@@ -91,6 +92,8 @@ class FrontEditor {
         wp_enqueue_script("Config_Front", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd_Front", "Editormd-Nonce_Front"), $this->version, true);
 
         wp_enqueue_script("Mermaid-Compat_Front", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
+
+        PrismJSAuto::enqueue_assets();
 
         //JavaScript - 载入国际化语言资源文件
         $lang = get_bloginfo("language");

@@ -1,5 +1,47 @@
 # WP Editor.md
 
+### Version 10.4.4
+
+> 本版修的是评论侧的 Markdown 链路，以及页面上同时加载两套 Prism 的历史问题。
+> **无数据结构变更，升级无需迁移。**
+
+#### 1. 访客评论的 Markdown 现在真的会被转换
+
+* 此前游客在评论框里写的 Markdown，提交后会**原样存进数据库** —— 前台看到的还是
+  `**粗体**`、`[链接](...)` 这类源码，而编辑器里的预览是前端渲染的，所以看起来一切正常。
+* 根因是评论的 Markdown 转换开关沿用自 WordPress.com 的 Markdown 模块，落在
+  「设置 → 讨论 → Markdown」，默认关闭、入口很深，而且和插件自己的
+  「支持前端评论 / 支持后台回复」没有任何联动。
+* 现在：只要插件开着评论编辑器（任一开关为开），评论的 Markdown 转换就一并启用。
+  同时把那个遗留勾选框从「设置 → 讨论」里隐藏 —— 它此刻只是个会误导人的摆设。
+* 需要单站点关掉，可以用过滤器：
+  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
+* 关闭 `html_decode`（默认值）时才存在的解析缺陷一并修掉：源码此前会被整段
+  `htmlspecialchars(ENT_COMPAT)` 转义，导致
+  - 行首的 `>` 变成 `&gt;`，**引用块永远渲染不出来**；
+  - `[文字](http://x "标题")` 的标题引号变成 `&quot;`，**链接语法直接失配**。
+  现改为只转义 `&` 与 `<`（已足以阻止任何标签成形，安全性不变），`"` 不再动，
+  行首被转义的引用标记再还原回来（支持 `>>` 嵌套）。
+
+#### 2. Prism 只保留一套
+
+* 编辑器预览会额外加载 Editor.md 自带的 `lib/prism.min.js`：一整套 286 KB、
+  132 种语言、版本还是 1.15.0 的独立构建。
+* 它和插件提供的 Prism 1.19（内核 + autoloader + toolbar / 行号 / 语言标签 /
+  复制按钮 + 主题）互相覆盖 `window.Prism`。后加载的那份会把先挂上去的插件顶掉 ——
+  实测 `window.Prism.plugins` 只剩 `lineNumbers`，`toolbar` 与 `autoloader` 都不见了，
+  于是代码块没有复制按钮、没有语言标签，语言包也不再按需加载。
+* 现在 `lib/prism.min.js` 只是一个占位文件（避免 Editor.md 的加载链 404），
+  wp-admin 也改为复用插件同一套 Prism。实测同一个页面：Prism 脚本从 **302.5 KB 降到
+  24.2 KB**，`window.Prism.plugins` 恢复为 `autoloader / toolbar / lineNumbers`。
+* Prism 资源的缓存指纹由写死的 `1.15.0` 改为插件实际随包发布的 `1.19.0`。
+
+#### 升级
+
+* 升级器新增 `10.4.3 → 10.4.4` 迁移，仅推进版本号，无数据变更。
+
+------
+
 ### Version 10.4.3
 
 > 本版集中修前端：Prism 代码高亮的加载顺序与语言包路径、编辑器工具栏与 Bootstrap 的
@@ -216,6 +258,58 @@
 
 * `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
 * Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+
+------
+
+### Version 10.4.4
+
+> This release fixes the Markdown pipeline on the comment side, plus a long-standing issue
+> where two separate copies of Prism were loaded on the same page.
+> **No data-structure changes, so upgrading requires no migration.**
+
+#### 1. Markdown in visitor comments is now actually converted
+
+* Until now, Markdown written by a guest in the comment box was **stored verbatim** —
+  the front end still showed `**bold**`, `[link](...)` and friends. The editor preview is
+  rendered client-side, which is why everything looked fine while typing.
+* The root cause is that the comment-side Markdown switch is inherited from the
+  WordPress.com Markdown module and lives under **Settings → Discussion → Markdown**:
+  off by default, buried, and completely unconnected to the plugin's own
+  "Support Front Comment / Support Reply Comment" options.
+* Now, as soon as the plugin enables a comment editor (either switch on), comment
+  Markdown conversion is enabled alongside it, and the leftover checkbox is hidden from
+  Settings → Discussion — at that point it is only a misleading no-op.
+* To turn it off per site:
+  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
+* A parser defect that only shows up with `html_decode` off (the default) is fixed too:
+  the whole source used to be escaped with `htmlspecialchars(ENT_COMPAT)`, so
+  - a line-leading `>` became `&gt;` and **blockquotes never rendered**;
+  - the title quotes in `[text](http://x "title")` became `&quot;` and the **link failed
+    to parse**.
+  Only `&` and `<` are escaped now (which is already enough to keep any tag from forming,
+  so security is unchanged), `"` is left alone, and line-leading quote markers are
+  restored (nested `>>` included).
+
+#### 2. A single copy of Prism
+
+* The editor preview additionally loaded Editor.md's bundled `lib/prism.min.js`: a
+  self-contained 286 KB build with 132 languages, and version 1.15.0 to boot.
+* It and the plugin's Prism 1.19 (core + autoloader + toolbar / line numbers / language
+  label / copy button + themes) overwrite each other's `window.Prism`. Whichever loads last
+  wipes out the plugins registered on the earlier object — measured: `window.Prism.plugins`
+  was down to `lineNumbers`, with `toolbar` and `autoloader` gone, so code blocks had no
+  copy button, no language label, and languages were no longer loaded on demand.
+* `lib/prism.min.js` is now a placeholder (so Editor.md's loader chain does not 404) and
+  wp-admin reuses the plugin's copy as well. Measured on the same page: Prism scripts went
+  from **302.5 KB down to 24.2 KB**, and `window.Prism.plugins` is back to
+  `autoloader / toolbar / lineNumbers`.
+* The cache-buster for Prism assets changed from the hard-coded `1.15.0` to the `1.19.0`
+  that the plugin actually ships.
+
+#### Upgrade
+
+* The upgrader gains a `10.4.3 → 10.4.4` migration that only bumps the version number;
+  there are no data changes.
 
 ------
 
@@ -470,6 +564,48 @@
 
 * `editor_mindmap` option was overwritten by the `editor_style` array, breaking the mind map feature
 * Mermaid's default config was mistakenly written with KaTeX's defaults
+
+------
+
+### Version 10.4.4
+
+> 本版修正評論側的 Markdown 鏈路，以及頁面上同時載入兩套 Prism 的歷史問題。
+> **無資料結構變更，升級無需遷移。**
+
+#### 1. 訪客評論的 Markdown 現在真的會被轉換
+
+* 此前訪客在評論框裡寫的 Markdown，送出後會**原樣存進資料庫** —— 前台看到的還是
+  `**粗體**`、`[連結](...)` 這類原始碼，而編輯器裡的預覽是前端渲染的，所以看起來一切正常。
+* 根因是評論的 Markdown 轉換開關沿用自 WordPress.com 的 Markdown 模組，位於
+  「設定 → 討論 → Markdown」，預設關閉、入口很深，而且和插件自己的
+  「支援前端評論 / 支援後台回覆」沒有任何連動。
+* 現在：只要插件開著評論編輯器（任一開關為開），評論的 Markdown 轉換就一併啟用。
+  同時把那個遺留勾選框從「設定 → 討論」裡隱藏 —— 它此刻只是個會誤導人的擺設。
+* 需要單站台關掉，可以用過濾器：
+  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
+* 關閉 `html_decode`（預設值）時才存在的解析缺陷一併修掉：原始碼此前會被整段
+  `htmlspecialchars(ENT_COMPAT)` 轉義，導致
+  - 行首的 `>` 變成 `&gt;`，**引用區塊永遠渲染不出來**；
+  - `[文字](http://x "標題")` 的標題引號變成 `&quot;`，**連結語法直接失配**。
+  現改為只轉義 `&` 與 `<`（已足以阻止任何標籤成形，安全性不變），`"` 不再動，
+  行首被轉義的引用標記再還原回來（支援 `>>` 嵌套）。
+
+#### 2. Prism 只保留一套
+
+* 編輯器預覽會額外載入 Editor.md 自帶的 `lib/prism.min.js`：一整套 286 KB、
+  132 種語言、版本還是 1.15.0 的獨立建置。
+* 它和插件提供的 Prism 1.19（內核 + autoloader + toolbar / 行號 / 語言標籤 /
+  複製按鈕 + 主題）互相覆蓋 `window.Prism`。後載入的那份會把先掛上去的插件頂掉 ——
+  實測 `window.Prism.plugins` 只剩 `lineNumbers`，`toolbar` 與 `autoloader` 都不見了，
+  於是程式碼區塊沒有複製按鈕、沒有語言標籤，語言包也不再按需載入。
+* 現在 `lib/prism.min.js` 只是一個佔位檔案（避免 Editor.md 的載入鏈 404），
+  wp-admin 也改為重用插件同一套 Prism。實測同一個頁面：Prism 腳本從 **302.5 KB 降到
+  24.2 KB**，`window.Prism.plugins` 恢復為 `autoloader / toolbar / lineNumbers`。
+* Prism 資源的快取指紋由寫死的 `1.15.0` 改為插件實際隨包發佈的 `1.19.0`。
+
+#### 升級
+
+* 升級器新增 `10.4.3 → 10.4.4` 遷移，僅推進版本號，無資料變更。
 
 ------
 

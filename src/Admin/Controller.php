@@ -2,6 +2,7 @@
 
 namespace EditormdAdmin;
 
+use EditormdApp\PrismJSAuto;
 use EditormdApp\WPComMarkdown;
 use EditormdUtils\Config;
 
@@ -47,6 +48,7 @@ class Controller {
         add_filter("pre_option_" . WPComMarkdown::POST_OPTION, "__return_true");
 
         add_action("admin_init", array($this, "editormd_markdown_posting_always_on"), 11);
+        add_action("admin_init", array($this, "editormd_markdown_commenting_managed"), 11);
 
         add_filter("wp_editor_settings", array($this, "parse_editor_settings"));
 
@@ -103,6 +105,8 @@ class Controller {
 
         //JavaScript - Config
         wp_enqueue_script("Config", $this->front_static_url . "/assets/Config/editormd.min.js", array("Editormd", "Editormd-Nonce"), $this->version, true);
+
+        PrismJSAuto::enqueue_assets();
 
         wp_enqueue_script("Mermaid-Compat", $this->front_static_url . "/assets/Mermaid/mermaid-compat.js", array(), WP_EDITORMD_VER, true);
 
@@ -167,6 +171,24 @@ class Controller {
         global $wp_settings_fields;
         if (isset($wp_settings_fields["writing"]["default"][WPComMarkdown::POST_OPTION])) {
             unset($wp_settings_fields["writing"]["default"][WPComMarkdown::POST_OPTION]);
+        }
+    }
+
+    public function editormd_markdown_commenting_managed() {
+        if (!class_exists("WPComMarkdown")) {
+            return;
+        }
+
+        $managed = Config::get_option("support_front", "editor_basics") === "on"
+            || Config::get_option("support_reply", "editor_basics") === "on";
+
+        if (! $managed) {
+            return;
+        }
+
+        global $wp_settings_fields;
+        if (isset($wp_settings_fields["discussion"]["default"][WPComMarkdown::COMMENT_OPTION])) {
+            unset($wp_settings_fields["discussion"]["default"][WPComMarkdown::COMMENT_OPTION]);
         }
     }
 }

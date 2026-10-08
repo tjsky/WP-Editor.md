@@ -2,6 +2,8 @@
 
 namespace EditormdApp;
 
+use EditormdUtils\Config;
+
 class WPComMarkdown {
 
     const POST_OPTION = "editormd_wpcom_publish_posts_with_markdown";
@@ -319,7 +321,14 @@ class WPComMarkdown {
      * @return boolean
      */
     public function is_commenting_enabled() {
-        return (bool) get_option(self::COMMENT_OPTION, "");
+        $enabled = (bool) get_option(self::COMMENT_OPTION, "");
+
+        if (! $enabled) {
+            $enabled = Config::get_option("support_front", "editor_basics") === "on"
+                || Config::get_option("support_reply", "editor_basics") === "on";
+        }
+
+        return (bool) apply_filters("editormd_comment_markdown_enabled", $enabled);
     }
 
     /**

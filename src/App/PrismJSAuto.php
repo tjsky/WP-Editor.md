@@ -6,15 +6,26 @@ use EditormdUtils\Config;
 
 class PrismJSAuto {
 
+    private static $enqueued = false;
+
     public function __construct() {
         add_action("wp_enqueue_scripts", array($this, "prism_styles_scripts"));
     }
 
-    private function prism_languages_path() {
+    private static function prism_languages_path() {
         return esc_url_raw(Config::get_option("editor_addres", "editor_style") . "/assets/Prism.js/components/");
     }
 
     public function prism_styles_scripts() {
+        self::enqueue_assets();
+    }
+
+    public static function enqueue_assets() {
+        if (self::$enqueued) {
+            return;
+        }
+        self::$enqueued = true;
+
         $prism_base_url = Config::get_option("editor_addres","editor_style") . "/assets/Prism.js";                  // 资源载入地址
         $prism_theme    = Config::get_option("highlight_library_style", "syntax_highlighting");                     // 语法高亮风格
         $line_numbers   = Config::get_option("line_numbers", "syntax_highlighting") == "on" ? true : false;         // 行号显示
@@ -73,20 +84,22 @@ class PrismJSAuto {
             wp_enqueue_script("copy-clipboard", $lib_url, array(), "2.0.1", true);
         }
 
+        $prism_version = "1.19.0";
+
         foreach ($prism_styles as $name => $prism_style) {
-            wp_enqueue_style($name, $prism_style, array(), "1.15.0", "all");
+            wp_enqueue_style($name, $prism_style, array(), $prism_version, "all");
         }
 
-        wp_enqueue_script("prism-core-js", $prism_base_url . "/components/prism-core.min.js", array(), "1.15.0", true);
+        wp_enqueue_script("prism-core-js", $prism_base_url . "/components/prism-core.min.js", array(), $prism_version, true);
 
         foreach ($prism_scripts as $name => $prism_script) {
-            wp_enqueue_script($name, $prism_script, array("prism-core-js"), "1.15.0", true);
+            wp_enqueue_script($name, $prism_script, array("prism-core-js"), $prism_version, true);
         }
 
-        wp_add_inline_script("prism-plugin-autoloader", $this->prism_autoloader_init_script(), "after");
+        wp_add_inline_script("prism-plugin-autoloader", self::prism_autoloader_init_script(), "after");
     }
 
-    private function prism_autoloader_init_script() {
+    private static function prism_autoloader_init_script() {
         return 'window.Prism=window.Prism||{};'
             . '(function(P){'
             . 'P.languages=P.languages||{};'
@@ -96,7 +109,7 @@ class PrismJSAuto {
             . 'P.languages.text=P.languages.text||{};'
             . 'P.languages.txt=P.languages.txt||{};'
             . 'if(P.plugins.autoloader){P.plugins.autoloader.languages_path='
-            . wp_json_encode($this->prism_languages_path()) . ';}'
+            . wp_json_encode(self::prism_languages_path()) . ';}'
             . '})(window.Prism);';
     }
 }

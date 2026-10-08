@@ -97,9 +97,29 @@ def main():
         # 10.4.3：回复框宽度与 wp 未声明变量的防护
         ("assets/Config/editormd.js", "syncReplyEditorWidth", "回复框编辑器宽度必须跟随预览面板显隐"),
         ("assets/Config/editormd.js", 'typeof wp !== "undefined" && wp.utils', "读取 wp 前必须做 typeof 判断"),
+        # 10.4.4：评论侧的 Markdown 转换必须能跟着插件的评论编辑器设置自动启用，
+        # 否则编辑器里写的 Markdown 会被原样存进数据库
+        ("src/App/WPComMarkdown.php", "editormd_comment_markdown_enabled", "评论 Markdown 转换必须可跟随插件设置并保留过滤器"),
+        ("src/App/WPComMarkdown.php", 'Config::get_option("support_front", "editor_basics")', "评论 Markdown 转换必须联动 support_front"),
+        # 10.4.4：Prism 只允许有一套 —— wp-admin 也必须复用插件这一套
+        ("src/Admin/Controller.php", "PrismJSAuto::enqueue_assets", "wp-admin 必须复用插件的 Prism（不得依赖第二套）"),
+        ("src/Front/FrontEditor.php", "PrismJSAuto::enqueue_assets", "前台编辑器必须显式提供 Prism"),
+        ("src/App/PrismJSAuto.php", "static function enqueue_assets", "Prism 资源入队必须是可复用的静态方法"),
     ]
     for path, needle, label in must_have:
         failures += not check(needle in read(path), label, "%s 中未找到 %s" % (path, needle))
+
+    # 10.4.4：Editor.md 自带的第二套 Prism 必须只剩占位文件，
+    # 否则它会覆盖 window.Prism 并顶掉插件侧的 toolbar / autoloader（286 KB 白下载）
+    prism_lib = read("assets/Editormd/lib/prism.min.js")
+    failures += not check(
+        len(prism_lib) < 5000,
+        "assets/Editormd/lib/prism.min.js 必须只是占位（当前 %d 字节）" % len(prism_lib),
+    )
+    failures += not check(
+        "Prism.languages." not in prism_lib and "Prism.plugins" not in prism_lib,
+        "assets/Editormd/lib/prism.min.js 不得再携带第二套 Prism",
+    )
 
     # ---------- 3. 不得复现的写法 ----------
     print("不得复现的写法：")
@@ -121,6 +141,11 @@ def main():
         # 10.4.3：回复框编辑器宽度不得再被 !important 钉死（会导致右半边永远空白）
         ("assets/Config/editormd.css", "width: 50%!important;\n  margin-left: 0!important;",
          "回复框编辑器宽度不得再被 !important 钉死在 50%"),
+        # 10.4.4：解析器不得再用 ENT_COMPAT 整段转义源码 ——
+        # 它会把行首 `>` 变成 `&gt;`（引用块渲染不出来）、把 `"` 变成 `&quot;`
+        # （带标题的链接直接失配）
+        ("src/App/WPMarkdownParser.php", "htmlspecialchars($text, ENT_COMPAT)",
+         "Markdown 源码不得再用 ENT_COMPAT 整段转义"),
     ]
     for path, needle, label in must_not:
         failures += not check(needle not in read(path), label, "%s 中仍存在 %s" % (path, needle))

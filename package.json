@@ -1,6 +1,6 @@
 {
   "name": "wp-editor.md",
-  "version": "10.4.3",
+  "version": "10.4.4",
   "description": "Perhaps this is the best and most perfect Markdown editor in WordPress",
   "scripts": {
     "build-prod": "webpack --config webpack.prod.js",

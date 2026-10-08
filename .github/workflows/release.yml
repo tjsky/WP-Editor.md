@@ -291,6 +291,9 @@ jobs:
             * 修复代码高亮控制台报 `Prism is not defined` 与 `/components/prism-*.min.js` 404（10.4.3）
             * 修复主题引入 Bootstrap 后编辑器工具栏按钮变透明并堆叠（10.4.3）
             * 修复后台回复框右半边空白、前台控制台每秒一次的 `wp is not defined`（10.4.3）
+            * 修复访客评论的 Markdown 原样入库（评论转换开关此前默认关闭且与插件设置无联动）（10.4.4）
+            * 修复 `html_decode` 关闭时引用与带标题的链接必然失效（10.4.4）
+            * 修掉重复加载的两套 Prism，同类页面 Prism 脚本 302.5 KB → 24.2 KB（10.4.4）
             * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
 
             完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异)
