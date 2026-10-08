@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.4
+Stable tag: 10.4.5
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,15 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.4.5 =
+* 缺陷修复：编辑器预览不认识插件的图片尺寸语法（`![alt](img =600)` / `=300x200` / `=x400`
+  以及 `{#id .class}`），预览里显示为裸 Markdown、发布后却正常；现由前端在解析前搬运尺寸与属性，
+  预览与发布结果一致（含 width / height / style / id / class）
+* 缺陷修复：编辑器预览会把普通文本当公式渲染（价格 "$100 涨到 $200"、函数签名、行内代码里的 `$`），
+  服务端本有防护、预览侧却没有；现把同一套判定规则搬到预览侧，两侧公式数量完全一致
+* 其它：新增「编辑器预览 vs 前台渲染」一致性回归脚本；修正端到端测试脚本里 wp_insert_post()
+  需要 slash 数据的问题（否则脚本里的 LaTeX 反斜杠会被吃掉）
 
 = 10.4.4 =
 * 缺陷修复：访客评论里的 Markdown 此前原样入库（前台看到的还是 `**粗体**` 这类源码）。

@@ -67,8 +67,8 @@ class Upgrader {
             case "10.4.2":
                 $this->upgrade_10_4_2_to_10_4_3();
                 // no break
-            case "10.4.3":
-                $this->upgrade_10_4_3_to_10_4_4();
+            case "10.4.4":
+                $this->upgrade_10_4_4_to_10_4_5();
                 // no break
             default:
                 break;
@@ -81,6 +81,18 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.4 → 10.4.5
+     *
+     * 本版修的是「编辑器预览与保存结果不一致」：预览侧不认识插件的图片尺寸 /
+     * 属性语法，也缺少服务端那套公式误渲染防护。全部改动都在前端资源与
+     * 构建产物（assets/Config/editormd.min.js）里，没有数据结构变更，
+     * 只需把 editor_version 推进到新版本号 —— 理由见上一段。
+     */
+    private function upgrade_10_4_4_to_10_4_5() {
+        $this->update_to_version("10.4.5");
     }
 
     /**

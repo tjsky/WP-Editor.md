@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.4
+ * Version:           10.4.5
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,22 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.4.5 —— 修复「编辑器预览与保存结果不一致」
+ *   预览走的是 Editor.md 自带的 marked，服务端走的是插件自己的解析器，
+ *   两边的能力此前并不对等，于是同一段内容「预览里是乱码、发布后却正常」：
+ *   - 预览不认识插件的图片尺寸语法。`![alt](img =600)` / `=300x200` / `=x400`
+ *     与 `{#id .class}` 只实现在服务端解析器（保存那一刻才生效），marked 会把
+ *     整个构造判为「不是图片」并原样吐出裸 Markdown。现由 assets/Config/editormd.js
+ *     在解析前把尺寸与属性搬进 URL 的 fragment，再覆写 renderer.image 还原成
+ *     带 width / height / style / id / class 的 <img>，输出规则与服务端逐条对齐；
+ *   - 预览会把普通文本当成公式。Editor.md 的段落渲染只做 `$…$` 正则配对、不判断
+ *     内容像不像公式，「价格从 $100 涨到 $200」「function update( $a, $b )」乃至
+ *     行内代码里的 `$` 都会被渲染成公式 —— 而服务端对这些是有防护的（定界符必须
+ *     紧贴内容、内容须含字母/数字/反斜杠，并跳过 code/pre）。现把同一套规则搬到
+ *     预览侧，两侧的公式数量与正文 `$` 数量实测完全一致；
+ *   - 回归补充：新增「预览 vs 发布」一致性脚本，此前的回归只覆盖保存后的 HTML 与
+ *     前台渲染，完全没覆盖编辑器预览（这正是本版问题得以漏过测试的原因）。
  *
  * 10.4.4 —— 修复评论侧的 Markdown 链路与 Prism 双份加载
  *   - 访客评论里的 Markdown 不再原样入库。评论的转换开关沿用自 WordPress.com
@@ -84,7 +100,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.4' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.4.5' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
