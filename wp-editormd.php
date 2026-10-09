@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.5.0
+ * Version:           10.5.1
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,12 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.5.1 —— 修复后台「回复评论」编辑器的聚焦与行号显示
+ *   编辑器在页面加载时就已创建，而它所在的「回复行」默认 display:none。在隐藏状态下
+ *   初始化会让 CodeMirror 量到 0 宽的行号栏（行号叠在正文第一个字上），并把「已聚焦」
+ *   标记挂上而真实焦点仍在 body（打开后没有光标、键盘输入无效）。现在回复行变为可见时
+ *   会重新测量并真正取回焦点。仅影响后台回复框，文章编辑器与前台评论不受影响。
  *
  * 10.5.0 —— 新增「访客评论简版编辑器」
  *   评论区属于**不可信输入**，WordPress 只用一张 15 个标签的 KSES 白名单过滤它，
@@ -140,7 +146,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.5.0' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.1' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
