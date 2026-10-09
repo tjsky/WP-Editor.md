@@ -1030,6 +1030,54 @@ require("./editormd.css");
           syncReplyEditorWidth();
           window.addEventListener("resize", syncReplyEditorWidth);
 
+          /**
+           * 后台回复框：补一次「重新测量 + 取回焦点」
+           *
+           * 编辑器是在页面加载时就创建好的，而它所在的「回复行」（`#replyrow`）
+           * 默认是 `display:none`。在隐藏状态下初始化，CodeMirror 会留下两处
+           * **不会自愈**的后遗症：
+           *
+           *   1. 行号栏量到 0 宽，`sizer` 的 `margin-left` 被写成 `0px`。
+           *      容器显示出来之后没有任何东西会重算它 —— 行号于是直接叠在正文
+           *      第一个字上。实测：`gutters` 实际 29px、`margin-left` 仍是 0，
+           *      只有 `refresh()` 会重新测量并写回。
+           *   2. `autoFocus` 的 `focus()` 落在隐藏元素上：CodeMirror 的
+           *      `state.focused` 被置为 true、容器也挂上了 `CodeMirror-focused`，
+           *      但真实焦点仍在 `<body>`。表现就是「没有光标、键盘输入无效」，
+           *      反而要点一下工具栏按钮（把焦点状态打断）才能恢复。
+           *
+           * 两者同源，所以一起修。注意顺序：必须先纠掉「假聚焦」，再 `refresh()`，
+           * 最后才 `focus()` —— 否则 CodeMirror 认为自己已经聚焦，会留下一个
+           * 依然没有光标的输入框。
+           */
+          var prepareReplyEditor = function () {
+            var node = document.getElementById("wp-replycontent-editor-container");
+            var wrapper = node && node.querySelector(".CodeMirror");
+            var instance = wrapper && wrapper.CodeMirror;
+
+            if (!instance || !instance.display) {
+              return;
+            }
+
+            // 容器仍不可见时什么都不做：refresh() 量不出尺寸，
+            // focus() 也只会再留下一次「假聚焦」。
+            if (!node.offsetWidth && !node.offsetHeight) {
+              return;
+            }
+
+            var field = instance.getInputField();
+
+            if (instance.state && instance.state.focused && document.activeElement !== field) {
+              instance.state.focused = false;
+            }
+
+            instance.refresh();
+
+            if (document.activeElement !== field) {
+              instance.focus();
+            }
+          };
+
           // 宽度由 Editor.md 自己在内联样式里改（而且不是点击后立刻生效，
           // 只靠固定延时对不上时机，它也可能在我们之后再把宽度写回去），
           // 因此监听容器整棵子树的样式变化，谁改都能立刻校正回来。
@@ -1042,6 +1090,37 @@ require("./editormd.css");
             });
           }
 
+          // 回复行是容器的**祖先**（不在上面那个观察范围内），要单独监听它
+          // 从 display:none 变为可见的那一刻。用「可见性变化」而不是固定延时，
+          // 是为了不依赖 WP 具体在什么时候显示这一行。
+          var replyRowNode = document.getElementById("replyrow");
+          var replyRowVisible = false;
+          var handleReplyRowVisibility = function () {
+            var visible = !!replyRowNode
+              && !!replyRowNode.offsetWidth && !!replyRowNode.offsetHeight;
+
+            if (visible === replyRowVisible) {
+              return;
+            }
+
+            replyRowVisible = visible;
+
+            if (visible) {
+              prepareReplyEditor();
+              syncReplyEditorWidth();
+            }
+          };
+
+          if (replyRowNode && typeof MutationObserver !== "undefined") {
+            new MutationObserver(handleReplyRowVisibility).observe(replyRowNode, {
+              attributes: true,
+              attributeFilter: ["style", "class"],
+            });
+          }
+
+          // 页面加载时回复行也可能已经是展开的（例如带 #reply-<id> 直接进来）
+          setTimeout(handleReplyRowVisibility, 0);
+
           // 保底：工具栏按钮点击后再补几次校正
           $(document).on("click", "#wp-replycontent-editor-container .editormd-toolbar-container a", function () {
             setTimeout(syncReplyEditorWidth, 50);
@@ -1052,6 +1131,9 @@ require("./editormd.css");
             setTimeout(function () {
               $(".edit-comments-php .CodeMirror.cm-s-default.CodeMirror-wrap").css("margin-top", $(".editormd-toolbar").height());
               syncReplyEditorWidth();
+              // WP 自己会把焦点交给那个被我们隐藏掉的原生 textarea（无效），
+              // 所以打开回复行后要在这里把真实的焦点与尺寸补上。
+              prepareReplyEditor();
             }, 100);
           });
         }
