@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.4.5
+Stable tag: 10.5.0
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,30 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.0 =
+* 新功能：**访客评论「简版编辑器」**（设置 → 基本设置，默认关闭）。开启后评论区只提供
+  粗体、斜体、删除线、引用、行内代码、图片与链接，工具栏精简、默认单栏、字号 16px
+  （防 iOS 聚焦缩放）；链接降级为「文字：`地址`」不可点击，图片去掉外层链接并强制
+  懒加载与 no-referrer；公式、任务列表、代码块、emoji 短代码在预览侧与服务端同时关闭
+* 新功能：编辑器风格可只在后台生效 —— 新增「把以上风格应用到前台编辑器」开关（默认关闭），
+  前台评论编辑器默认改用 Editor.md 自带浅色样式，方便跟随主题（含夜间模式）
+* 新功能：高级设置 → 调试信息新增「评论区允许的 HTML 标签」与「本插件对评论区新增的行为」，
+  可直接查看当前生效的 KSES 白名单，并标注哪些条目属于插件扩展而非 WordPress 原生
+* 变更：**移除第三方图床（sm.ms）上传功能**及其后台管理页。该服务已转向收费模式，本次一并
+  删除上传分流、访问令牌与代理接口、相关设置项与语言包条目；图片粘贴统一保存到本站媒体库，
+  升级时自动清理遗留的图床配置
+* 缺陷修复：修复块主题（Twenty Twenty-Four / Twenty-Five）下评论框下方额外露出一个文本框 ——
+  主题的 `.comment-form textarea { display: block }` 权重高于插件隐藏编辑器中间元素的规则
+* 缺陷修复：修复后台**所有**页面都弹出「检验到插件资源包已过时」。该检查的输出原先挂在
+  `admin_notices` 上，而后台每个页面都会触发 `admin_init`；现改为只在插件设置页显示一行状态，
+  并直接给出资源包版本与插件版本
+* 缺陷修复：补齐升级链里缺失的 `10.4.3` / `10.4.5` 两个分支。停在这两个版本上的站点此前
+  匹配不到任何分支，`editor_version` 永不推进，导致每个请求都重跑一次激活流程
+* 其它：简版模式下图片对话框不再提供「图片链接」字段（写了也点不动）
+* 缺陷修复：修复简版工具栏在窄屏下把页面撑宽 —— 「纯预览」按钮落在工具栏最右侧，
+  它自带的长提示语按 `left:130%` 定位会冲出视口（375px 视口下页面可横向拖动 248px）；
+  现于窄屏把提示语翻到按钮左侧
 
 = 10.4.5 =
 * 缺陷修复：编辑器预览不认识插件的图片尺寸语法（`![alt](img =600)` / `=300x200` / `=x400`

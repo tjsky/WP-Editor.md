@@ -2,6 +2,8 @@
 
 namespace EditormdUtils;
 
+use EditormdApp\SimpleCommentMode;
+
 class Debugger {
 
     private static $sensitive_keywords = array("token", "secret", "password", "passwd", "apikey", "api_key", "key");
@@ -62,6 +64,12 @@ class Debugger {
             $debug_info .= '<tr><th>' . esc_html__($label, $text_domain) . '</th><th>' . $rows . '</th></tr>';
         }
 
+        $debug_info .= '<tr><th>' . esc_html__("Comment HTML Whitelist (KSES)", $text_domain) . '</th><th>'
+            . self::render_comment_kses($text_domain) . '</th></tr>';
+
+        $debug_info .= '<tr><th>' . esc_html__("Comment Behavior Added By This Plugin", $text_domain) . '</th><th>'
+            . self::render_comment_extras($text_domain) . '</th></tr>';
+
         $plugins = array();
         foreach ((array) get_option("active_plugins") as $key => $value) {
             $plugins[] = $key . " => " . $value;
@@ -90,6 +98,68 @@ class Debugger {
         }
 
         return $rows;
+    }
+
+    private static function render_comment_kses($text_domain) {
+        $allowed = wp_kses_allowed_html("pre_comment_content");
+
+        if (! is_array($allowed) || empty($allowed)) {
+            return esc_html__("(unavailable on this site)", $text_domain);
+        }
+
+        $plugin_tags = SimpleCommentMode::added_tags();
+        $native_tpl  = __("[WordPress native]", $text_domain);
+        $plugin_tpl  = __("[added by this plugin]", $text_domain);
+
+        ksort($allowed);
+
+        $rows = "";
+
+        foreach ($allowed as $tag => $attributes) {
+            $attribute_names = array_keys((array) $attributes);
+            sort($attribute_names);
+
+            $rows .= esc_html($tag) . " => "
+                . esc_html(empty($attribute_names)
+                    ? __("(no attribute)", $text_domain)
+                    : implode(", ", $attribute_names))
+                . " " . esc_html(isset($plugin_tags[$tag]) ? $plugin_tpl : $native_tpl)
+                . " <br>";
+        }
+
+        return $rows;
+    }
+
+    private static function render_comment_extras($text_domain) {
+        $on    = __("enabled", $text_domain);
+        $off   = __("disabled", $text_domain);
+        $state = SimpleCommentMode::enabled() ? $on : $off;
+
+        $rows = array(
+            sprintf(
+                __('Images: WordPress does not allow <img> inside comments natively; this plugin adds it to the whitelist above. Current state: %s', $text_domain),
+                $state
+            ),
+            sprintf(
+                __('Links: external links inside comments are degraded to read-only text and no <a> tag is produced. Current state: %s', $text_domain),
+                $state
+            ),
+            sprintf(
+                __('Degraded link output template: %s', $text_domain),
+                SimpleCommentMode::link_template()
+            ),
+            sprintf(
+                __('Comment body wrapper (%1$s) scopes image width and turns off emoji shortcodes inside comments. Current state: %2$s', $text_domain),
+                SimpleCommentMode::BODY_CLASS . " / " . SimpleCommentMode::NO_EMOJIFY_CLASS,
+                $state
+            ),
+            sprintf(
+                __('Formulas / task lists / code blocks / emoji inside comments are turned off. Current state: %s', $text_domain),
+                $state
+            ),
+        );
+
+        return implode("<br>", array_map("esc_html", $rows));
     }
 
     private static function mask_sensitive($key, $value) {

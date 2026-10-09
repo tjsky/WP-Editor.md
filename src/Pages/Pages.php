@@ -23,19 +23,14 @@ class Pages {
         $this->text_domain = $text_domain;
 
         $this->pages = array(
-            "sm-ms-management"   =>    self::ADMIN_PRIV,
             "upgrade-release"    =>    self::ADMIN_PRIV,
         );
 
         $this->entries = array(
-            "sm-ms-management"   => array(
-                "sm_ms_proxy" => "wp_editormd_entry_sm_ms_proxy",
-            ),
             "upgrade-release"    => array(),
         );
 
         $this->renderers = array(
-            "sm-ms-management"   => "wp_editormd_render_sm_ms_management_page",
             "upgrade-release"    => "wp_editormd_render_upgrade_release_page",
         );
 

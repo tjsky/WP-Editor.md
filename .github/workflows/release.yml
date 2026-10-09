@@ -1,8 +1,8 @@
 name: Release
 
 # 为什么用 GitHub Actions 而不是提交本地构建产物：
-#   本仓库的 .gitignore 忽略了 vendor/、所有 *.min.js / *.min.css、languages/*.mo
-#   与 Vue 子项目的 html/ 产物。这些是「运行期必需但不宜入库」的东西 ——
+#   本仓库的 .gitignore 忽略了 vendor/、所有 *.min.js / *.min.css、languages/*.mo。
+#   这些是「运行期必需但不宜入库」的东西 ——
 #   直接安装 GitHub 源码包会因缺少 vendor/autoload.php 而致命报错。
 #   因此由 CI 从源码干净构建，产出的 zip 才可安装，且过程可复现、可追溯。
 
@@ -88,7 +88,7 @@ jobs:
           PY
 
       # 安全不变量：防止「已修好的问题被改回去」。
-      # 覆盖依赖安全基线（Mermaid / KaTeX / axios / Vue）与若干关键防护点，
+      # 覆盖依赖安全基线（Mermaid / KaTeX）与若干关键防护点，
       # 语法校验和打包校验都发现不了这类回归。
       - name: 安全不变量检查
         run: python3 .github/scripts/check_security_invariants.py .
@@ -173,12 +173,6 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build-prod
 
-      - name: 构建 sm.ms 图片管理页（Vue 子项目）
-        working-directory: src/Pages/page/sm-ms-management
-        run: |
-          npm ci --no-audit --no-fund
-          npm run build
-
       - name: 编译语言包（.po → .mo）
         run: |
           sudo apt-get update -qq
@@ -233,7 +227,6 @@ jobs:
               "wp-editormd/assets/Editormd/editormd.min.js",
               "wp-editormd/assets/Config/editormd-nonce.js",
               "wp-editormd/languages/editormd-zh_CN.mo",
-              "wp-editormd/src/Pages/page/sm-ms-management/html/index.html",
           ]
           bad = [r for r in required if r not in names]
           print("zip 条目数:", len(names))
@@ -241,8 +234,19 @@ jobs:
               print(("  OK   " if r in names else "  MISS ") + r)
           if bad:
               raise SystemExit("产物校验失败，缺少：%s" % bad)
+
+          leftover = [n for n in names if "sm-ms-management" in n]
+          if leftover:
+              raise SystemExit("产物校验失败，仍含已下线的 sm-ms 管理页：%s" % leftover)
           print("产物校验通过")
           PY
+      - name: 生成 Release 正文
+        run: |
+          python3 .github/scripts/release_body.py \
+            "${{ steps.ver.outputs.version }}" \
+            "${{ runner.temp }}/release-body.md"
+          echo "---- 正文预览（前 40 行）----"
+          head -40 "${{ runner.temp }}/release-body.md"
 
       - name: 发布 GitHub Release
         uses: softprops/action-gh-release@v2
@@ -252,54 +256,4 @@ jobs:
           tag_name: v${{ steps.ver.outputs.version }}
           draft: false
           generate_release_notes: true
-          body: |
-            > **这是修改版（Modified Version），非上游原版。**
-            > 上游 [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md)
-            > 最后版本为 10.2.1，长期未更新，并已于 2025-04-09 被 WordPress.org 以安全问题下架
-            > （对应 **CVE-2025-31035**，Stored XSS，影响 `<= 10.2.1`）。本 Release 为在其基础上
-            > 完成安全加固与新版兼容性适配的维护版本。
-
-            ## 安装
-
-            下载下方 `wp-editormd-${{ steps.ver.outputs.version }}.zip`，在 WordPress 后台
-            「插件 → 安装插件 → 上传插件」中上传并启用即可。
-
-            该 zip 已包含 `vendor/` 与全部前端编译产物，**可直接安装**。
-            请勿使用 GitHub 自动生成的 Source code 压缩包 —— 它缺少这些运行期必需文件。
-
-            ## 本版变更
-
-            本版本的逐项变更见
-            [CHANGELOG 的 ${{ steps.ver.outputs.version }} 条目](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)；
-            下方的自动生成说明列出了本次提交。
-
-            ## 维护分支累计改动
-
-            * 修复 KaTeX 公式渲染链路的**存储型 XSS**（与 CVE-2025-31035 同类）
-            * 修复图片粘贴接口缺失权限与 CSRF 校验、任意文件写入
-            * 修复 sm.ms 图床代理的 SSRF / 开放代理
-            * 修复后台管理页渲染器的授权缺陷、设置项净化失效
-            * 修复设置页选项互相覆盖导致思维导图失效的数据损坏缺陷
-            * 修复代码块 / 行内代码中的 `$` 被误当公式渲染（10.4.0）
-            * 修复块级公式被二次解析导致重复渲染（10.4.0）
-            * 修复 xmlrpc 请求下 `IXR_Message` 类未找到（10.4.0，采纳上游 PR #546）
-            * 新增可选的图片尺寸语法 `![alt](img.jpg =600x400)`（10.4.0）
-            * 修复发布包缺少插件头字段导致后台不显示版本 / 作者 / 所需环境（10.4.1）
-            * **Mermaid 8.4.8 → 10.9.8、KaTeX 0.11.1 → 0.19.0**，并强制 Mermaid `securityLevel=strict`（10.4.2）
-            * 图片粘贴新增像素 / 内存预算与速率限制，上游超时 120s → 10s（10.4.2）
-            * sm.ms 令牌移出浏览器、代理改为固定操作白名单；后台 AJAX 授权收紧（10.4.2）
-            * 修复代码高亮控制台报 `Prism is not defined` 与 `/components/prism-*.min.js` 404（10.4.3）
-            * 修复主题引入 Bootstrap 后编辑器工具栏按钮变透明并堆叠（10.4.3）
-            * 修复后台回复框右半边空白、前台控制台每秒一次的 `wp is not defined`（10.4.3）
-            * 修复访客评论的 Markdown 原样入库（评论转换开关此前默认关闭且与插件设置无联动）（10.4.4）
-            * 修复 `html_decode` 关闭时引用与带标题的链接必然失效（10.4.4）
-            * 修掉重复加载的两套 Prism，同类页面 Prism 脚本 302.5 KB → 24.2 KB（10.4.4）
-            * 修复编辑器预览不认识图片尺寸语法、并会把普通文本当公式渲染（预览与发布结果不一致）（10.4.5）
-            * 适配 WordPress 7.1 与 PHP 8.4，构建链可在现代 Node 下运行
-
-            完整差异与逐项说明见仓库 [README](https://github.com/tjsky/WP-Editor.md#与上游的差异)
-            与 [CHANGELOG](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
-
-            ## 授权
-
-            本项目沿用上游的 **GNU GPL v3 or later**。
+          body_path: ${{ runner.temp }}/release-body.md

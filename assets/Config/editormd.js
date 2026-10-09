@@ -161,13 +161,14 @@ require("./editormd.css");
     return /[A-Za-z0-9\\]/.test(content);
   }
 
-  function guardPseudoTex(html) {
+  function guardPseudoTex(html, forcePlain) {
     if (typeof html !== "string" || html.indexOf("$") === -1) {
       return { text: html, count: 0 };
     }
 
     // 整段就是块级公式时原样放行，交由 Editor.md 的 isTeXLine 分支处理
-    if (/^\s*\$\$[\s\S]*\$\$\s*$/.test(stripTags(html))) {
+    // （简版强制全部压平时不适用，见下）
+    if (!forcePlain && /^\s*\$\$[\s\S]*\$\$\s*$/.test(stripTags(html))) {
       return { text: html, count: 0 };
     }
 
@@ -223,7 +224,7 @@ require("./editormd.css");
     for (var p = 0; p + 1 < candidates.length; p += 2) {
       var open = candidates[p];
       var close = candidates[p + 1];
-      if (looksLikeFormula(html.slice(open + 1, close))) {
+      if (!forcePlain && looksLikeFormula(html.slice(open + 1, close))) {
         continue;
       }
       chars[open] = TEX_PLACEHOLDER;
@@ -399,6 +400,75 @@ require("./editormd.css");
     return out + " />";
   }
 
+  /* ---------------------------------------- 简版评论：链接 / 代码块双侧对齐 */
+  /*
+   * 访客评论「简版模式」在服务端会做两处降级（见 src/App/SimpleCommentMode.php
+   * 与 WPComMarkdown::transform()）：
+   *   1. 外链不再生成 <a>，改为只读文本「文字：<code>url</code>」；
+   *   2. 代码块不再生成 <pre>（评论的 KSES 白名单会剥掉它），只留下 <code>。
+   * 预览走的是另一套引擎（Editor.md 自带的 marked），所以这里必须把同一套规则
+   * 再实现一次 —— 否则又会出现「预览能点、发布不能点」这类不一致。
+   * 判定顺序与 SimpleCommentMode::degrade_links() 逐条对齐。
+   */
+
+  var SIMPLE_LINK_OPEN = "「";
+  var SIMPLE_LINK_SEP = "：";
+  var SIMPLE_LINK_CLOSE = "」";
+
+  /** 只需要处理最主要的几个实体，用于「锚文本是否就是地址本身」的比较 */
+  function decodeBasicEntities(value) {
+    return String(value === null || value === undefined ? "" : value)
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"")
+      .replace(/&#0?39;/g, "'")
+      .replace(/&amp;/g, "&");
+  }
+
+  /**
+   * 链接降级。返回 null 表示「不属于降级范围，交回原实现」。
+   *
+   * @param {string} href 锚点地址
+   * @param {string} text 锚点内容（已渲染的 HTML）
+   * @returns {string|null}
+   */
+  function degradeLinkHtml(href, text) {
+    var url = href === null || href === undefined ? "" : String(href);
+    var label = text === null || text === undefined ? "" : String(text);
+
+    // 规则 0：页内锚点（脚注 / 目录）原样保留 —— 无钓鱼风险，改动会破坏导航
+    if (url === "" || url.charAt(0) === "#") {
+      return null;
+    }
+
+    // 规则 1：邮件地址解包为纯文本
+    if (/^mailto:/i.test(url)) {
+      return label;
+    }
+
+    // 规则 2：锚内出现图片 → 解包，保证图片永远不可点击
+    if (/<img\b/i.test(label)) {
+      return label;
+    }
+
+    // 规则 3：写作 <url> 的裸地址，锚文本与地址相同，避免重复输出两遍
+    var plain = decodeBasicEntities(stripTags(label)).trim();
+    if (plain !== "" && plain === decodeBasicEntities(url).trim()) {
+      return "<code>" + escAttr(url) + "</code>";
+    }
+
+    // 规则 4：标准降级
+    return (
+      SIMPLE_LINK_OPEN +
+      label +
+      SIMPLE_LINK_SEP +
+      "<code>" +
+      escAttr(url) +
+      "</code>" +
+      SIMPLE_LINK_CLOSE
+    );
+  }
+
   /* ------------------------------------------------------------- 包装安装 */
 
   function wrapMarked(original) {
@@ -482,10 +552,21 @@ require("./editormd.css");
        * 不判断「像不像公式」，会把价格、函数签名、行内代码一并当成公式。
        * 这里先把不该当公式的 $ 换成占位字符，渲染完再换回来。
        */
+      /**
+       * 压掉行内公式的误渲染：Editor.md 的 paragraph() 只做正则配对、
+       * 不判断「像不像公式」，会把价格、函数签名、行内代码一并当成公式。
+       * 这里先把不该当公式的 $ 换成占位字符，渲染完再换回来。
+       *
+       * 简版评论额外把**所有** $ 都压平（forcePlain）：Editor.md 的
+       * markedRenderer.paragraph 会**无条件**把 $…$ 包成
+       * <span class="editormd-inline-tex"> 并吃掉两个定界符 —— 它并不看
+       * `tex` 选项（tex 只决定后面要不要真的调 katex.render）。若不压平，
+       * 简版预览会显示成 `E=mc^2` 而发布后是 `$E=mc^2$`，定界符凭空消失。
+       */
       if (renderer && typeof renderer.paragraph === "function") {
         var baseParagraph = renderer.paragraph;
         renderer.paragraph = function (text) {
-          var guarded = guardPseudoTex(text);
+          var guarded = guardPseudoTex(text, !!window.wpEditormdSimpleComment);
           var html = baseParagraph.call(this, guarded.text);
           if (!guarded.count) {
             return html;
@@ -496,14 +577,266 @@ require("./editormd.css");
         };
       }
 
+      /**
+       * 简版评论：链接降级为只读文本
+       *
+       * 只在访客评论的简版实例上生效（window.wpEditormdSimpleComment），
+       * 文章编辑器与后台回复框不受影响。
+       */
+      if (renderer && typeof renderer.link === "function") {
+        var baseLink = renderer.link;
+        renderer.link = function (href, title, text) {
+          if (window.wpEditormdSimpleComment) {
+            var degraded = degradeLinkHtml(href, text);
+            if (degraded !== null) {
+              return degraded;
+            }
+          }
+          return baseLink.apply(this, arguments);
+        };
+      }
+
+      /**
+       * 简版评论：代码块降级为行内 <code>
+       *
+       * 服务端产出的 <pre><code>…</code></pre> 会被评论的 KSES 白名单剥掉 <pre>
+       * 与 language-* ，只剩一个多行 <code>；预览侧若继续输出带高亮的 <pre>，
+       * 就会出现「预览是代码块、发布是行内代码」。这里输出与发布结果同构的
+       * <code>，并补上与 wpautop 等价的 <br />，让两侧观感一致。
+       */
+      if (renderer && typeof renderer.code === "function") {
+        var baseCode = renderer.code;
+        renderer.code = function (code, lang, escaped) {
+          if (window.wpEditormdSimpleComment) {
+            var body = escaped ? String(code) : escAttr(code);
+            return "<code>" + body.replace(/\r?\n/g, "<br />") + "</code>";
+          }
+          return baseCode.apply(this, arguments);
+        };
+      }
+
+      /**
+       * 简版评论：把 KSES 会剥掉的「结构类」语法在预览侧一并降级
+       *
+       * 工具栏里本来就没有这些按钮，但访客完全可以手打。服务端的实际结果是：
+       * `<h1-6>` / `<ul>` / `<ol>` / `<li>` / `<table>` / `<hr>` 全被 KSES 剥掉，
+       * **文字内容留下、结构消失**。若预览照常渲染，就会出现「预览是标题/列表/表格、
+       * 发布后变成一坨文字」——这正是本项目反复踩过的预览/发布不一致。
+       * 这里让预览侧输出与之一致的「只有文字」形态。
+       *
+       * 注：单元格之间的空行/换行细节无法逐字节对齐（服务端是「剥标签后留下的
+       * 原始空白 + wpautop」），但**结构消失**这一点两侧一致。
+       */
+      if (renderer && typeof renderer.heading === "function") {
+        var baseHeading = renderer.heading;
+        renderer.heading = function (text, level, raw) {
+          if (window.wpEditormdSimpleComment) {
+            return text + "\n\n";
+          }
+          return baseHeading.apply(this, arguments);
+        };
+      }
+
+      if (renderer && typeof renderer.hr === "function") {
+        var baseHr = renderer.hr;
+        renderer.hr = function () {
+          if (window.wpEditormdSimpleComment) {
+            // <hr> 被剥后什么都不剩
+            return "";
+          }
+          return baseHr.apply(this, arguments);
+        };
+      }
+
+      if (renderer && typeof renderer.list === "function") {
+        var baseList = renderer.list;
+        renderer.list = function (body, ordered, start) {
+          if (window.wpEditormdSimpleComment) {
+            // 去掉 <ul>/<ol> 外壳，只留条目
+            return body;
+          }
+          return baseList.apply(this, arguments);
+        };
+      }
+
+      if (renderer && typeof renderer.listitem === "function") {
+        var baseListItem = renderer.listitem;
+        renderer.listitem = function (text) {
+          if (window.wpEditormdSimpleComment) {
+            // 去掉 <li> 外壳，条目退化成一行文字（条目内的 <strong> 等保留，
+            // 与服务端一致：KSES 只剥结构标签）。
+            // 同时剥掉条目开头的任务列表复选框 —— 它在进入 renderer.listitem
+            // 之前就已由 marked 的 GFM 任务列表解析生成，与本插件的
+            // `taskList` 选项无关，只能在这里清掉。服务端同样不会有复选框
+            // （- [x] 的 <input> 由 TaskList 钩子生成，简版下该钩子已摘除）。
+            return String(text).replace(/^\s*<input\b[^>]*>\s*/i, "") + "\n";
+          }
+          return baseListItem.apply(this, arguments);
+        };
+      }
+
+      if (renderer && typeof renderer.table === "function") {
+        var baseTable = renderer.table;
+        renderer.table = function (header, body) {
+          if (window.wpEditormdSimpleComment) {
+            // 表格结构标签全被剥，单元格退化成一行行文字
+            return (header + body)
+              .replace(/<\/t(?:h|d)>/gi, "\n")
+              .replace(/<\/?(?:table|thead|tbody|tfoot|tr)\b[^>]*>/gi, "")
+              .replace(/\n{2,}/g, "\n")
+              .trim() + "\n\n";
+          }
+          return baseTable.apply(this, arguments);
+        };
+      }
+
       return renderer;
     };
     factory.__wpEditormdWrapped = true;
     editormd.markedRenderer = factory;
   }
 
+  /**
+   * 简版评论：去掉图片对话框里的「图片链接」字段（10.5.0）
+   *
+   * 评论区的图片不会被 <a> 包裹（简版下链接一律降级为纯文本，图片也必须
+   * 不可点击），这个字段填了也不会生效 —— 留着只会让访客以为能点。
+   *
+   * 不改 assets/Editormd/plugins/image-dialog/image-dialog.js 的原因：那是上游
+   * 文件，动它会让后续同步上游变麻烦；这里包一层，只在简版实例上生效。
+   *
+   * 用 DOM 清理而非重写对话框：字段的 HTML 是插件内部拼的字符串，没有
+   * 配置项可关。清理点是 `[data-link]`（插件里就这么一处）：
+   *   - 元素本身保留、只清空并隐藏 —— 「确定」回调仍会读它
+   *     （`this.find("[data-link]").val()`），读不到会得到 undefined，
+   *     进而拼出 `[![alt](url)](undefined)`；
+   *   - 顺带移除紧邻的 <label>图片链接</label> 与它后面的 <br/>。
+   * 第二次打开对话框时插件会把值重置回 "http://"，而本包装在插件之后
+   * 执行，所以每次打开都会重新清空 —— 幂等。
+   */
+  function wrapImageDialog(original) {
+    if (typeof original !== "function" || original.__wpEditormdWrapped) {
+      return original;
+    }
+
+    var wrapped = function () {
+      var result = original.apply(this, arguments);
+
+      if (!window.wpEditormdSimpleComment || !this.editor) {
+        return result;
+      }
+
+      var $link = this.editor.find("[data-link]");
+      if (!$link.length) {
+        return result;
+      }
+
+      $link.val("").hide();
+      $link.prev("label").remove();
+      $link.next("br").remove();
+
+      // 对话框高度是插件写死的 254px（为三行字段备的），少一行会剩一截
+      // 空白。改成按内容自适应并重新居中：库里 dialogPosition() 读的是
+      // dialog.height()，窗口 resize 时会自然用上新高度。
+      // 用 window.jQuery 而不是 $ —— 这个文件顶层的 IIFE 里没有 $ 全局
+      // （eslint no-undef 会拦，构建直接报错）。
+      var $dialog = $link.closest(".editormd-image-dialog");
+      if ($dialog.length) {
+        var $win = window.jQuery(window);
+        $dialog.css("height", "auto");
+        var w = $dialog.outerWidth();
+        var h = $dialog.outerHeight();
+        $dialog.css({
+          top: Math.max(0, ($win.height() - h) / 2) + "px",
+          left: Math.max(0, ($win.width() - w) / 2) + "px",
+        });
+      }
+
+      return result;
+    };
+    wrapped.__wpEditormdWrapped = true;
+
+    return wrapped;
+  }
+
+  /**
+   * image-dialog 是「按需加载」的插件：本文件执行时 `editormd.fn.imageDialog`
+   * 尚未存在（用户第一次点图片按钮时才会 loadPlugin 并赋值）。
+   * 因此必须在 `editormd.fn` 上装 setter 拦截赋值 —— 与 `editormd.$marked`
+   * 同一处理手法，否则补丁会被后到的插件定义整个覆盖掉。
+   */
+  function installImageDialogHook(editormd) {
+    if (!editormd || !editormd.fn) {
+      return;
+    }
+
+    var current = editormd.fn.imageDialog;
+
+    Object.defineProperty(editormd.fn, "imageDialog", {
+      configurable: true,
+      enumerable: true,
+      get: function () {
+        return current;
+      },
+      set: function (fn) {
+        current =
+          fn && fn.__wpEditormdWrapped ? fn : wrapImageDialog(fn);
+      },
+    });
+  }
+
   installMarkedHook();
   installRendererHook();
+  patchPreviewHandler(editormd);
+  installImageDialogHook(editormd);
+
+  /**
+   * 简版评论：修复「纯预览一片空白」
+   *
+   * Editor.md 的 `save()` 是预览内容的唯一写入点，它有两个前置条件：
+   *   1. `timer !== null`；而 `bindChangeEvent()` 每次内容变化都会
+   *      `timer = setTimeout(...)`，并在回调里把它置回 `null` ——
+   *      也就是说**在用户停止输入之后 timer 就是 null**；
+   *   2. `settings.watch || state.preview` 成立。
+   *
+   * 简版评论是单栏（`watch: false`），于是点「纯预览」时：
+   * `previewing()` 先把 `state.preview = true` 再调 `this.save()`，
+   * 但 `timer === null` 让 `save()` 直接 return —— 预览容器保持空白。
+   *
+   * 修法：在内置的 `preview` 处理器之前先 `watch()` 再 `unwatch()`。
+   *   - `watch()` 会把 `timer` 置为 0 并在末尾调用 `save()`，内容因此被真正写入；
+   *   - `unwatch()` 立刻恢复单栏（同一 tick 内完成，不会出现可见的闪烁）。
+   * 之后原本的 `previewing()` 再走一遍，就能拿到带内容的纯预览。
+   *
+   * 为什么不去覆盖 settings.toolbarHandlers.preview：`setToolbarHandler()`
+   * 里内置处理器（`editormd.toolbarHandlers`）优先级更高，settings 里的同名项
+   * 永远不会被调用，只能打在库的处理器表上。
+   */
+  function patchPreviewHandler(editormd) {
+    if (
+      !editormd ||
+      !editormd.toolbarHandlers ||
+      typeof editormd.toolbarHandlers.preview !== "function"
+    ) {
+      return;
+    }
+
+    var original = editormd.toolbarHandlers.preview;
+    if (original.__wpEditormdWrapped) {
+      return;
+    }
+
+    var wrapped = function () {
+      if (window.wpEditormdSimpleComment && typeof this.watch === "function") {
+        this.watch();
+        this.unwatch();
+      }
+      return original.apply(this, arguments);
+    };
+    wrapped.__wpEditormdWrapped = true;
+
+    editormd.toolbarHandlers.preview = wrapped;
+  }
 })(window.editormd);
 
 (function ($, doc, win, editor) {
@@ -545,13 +878,42 @@ require("./editormd.css");
       "watch", "preview", "fullscreen", "info",
     ];
 
+    /**
+     * 访客评论「简版」工具栏（10.5.0）
+     *
+     * 只保留服务端确实能支持的 8 项语法，外加 1 个「纯预览」入口。
+     * 被刻意去掉的按钮及其原因：
+     *   - h1~h6 / list-ul / list-ol / hr / table：评论的 KSES 白名单会把
+     *     <h1-6> <ul> <ol> <li> <hr> <table> 整段剥掉，留着按钮只会误导访客；
+     *   - code-block：<pre> 同样会被剥，内容退化成多行 <code>（本版不支持代码块）；
+     *   - watch / unwatch / fullscreen：手机屏幕上双栏与全屏只会把输入区挤没；
+     *   - clear：误触清空的代价对访客来说不可挽回（内容无法找回）；
+     *   - emoji / datetime / reference-link / html-entities / more / pagebreak：
+     *     简版不提供（emoji 短代码在评论区亦已由 no-emojify 容器关闭）；
+     *   - undo / redo：按「全关」的要求去掉。
+     *
+     * 保留 image 按钮，但它的对话框里不提供「图片链接」字段（填了也不会
+     * 生效：简版下图片一律不包 <a>）。见 wrapImageDialog()。
+     */
+    var guestCommentToolBar = [
+      "bold", "italic", "del", "quote", "|",
+      "code", "link", "image", "|",
+      "preview",
+    ];
+
+    var isSimpleComment = textareaID === "comment" && editor.simpleComment === "on";
+
+    // 供上方 marked 渲染器覆写读取：只有访客评论的简版实例才走链接/代码块降级。
+    // 前台评论页同一时刻只会创建一个编辑器实例，用全局标记足够且最简单。
+    window.wpEditormdSimpleComment = isSimpleComment;
+
     var toolBar;
     switch (textareaID) {
       case "wp-content-editor-container":
         toolBar = fullToolBar;
         break;
       case "comment":
-        toolBar = simpleToolBar;
+        toolBar = isSimpleComment ? guestCommentToolBar : simpleToolBar;
         break;
       case "wp-replycontent-editor-container":
         toolBar = miniToolBar;
@@ -576,28 +938,42 @@ require("./editormd.css");
       id: textareaID,
       path: editor.editormdUrl + "/assets/Editormd/lib/",
       width: "100%", //编辑器宽度
-      height: textareaID === "wp-content-editor-container" ? 640 : 320,  //编辑器高度
-      syncScrolling: editor.livePreview !== "off" && editor.syncScrolling !== "off", //即是否开启同步滚动预览
-      watch: textareaID === "wp-replycontent-editor-container" ? false : editor.livePreview !== "off",
-      htmlDecode: editor.htmlDecode !== "off", //HTML标签解析
+      //正文字号：Editor.md 会把它作为 CodeMirror 选项写进 .CodeMirror 的**内联样式**，
+      //样式表覆盖不了，所以只能在实例选项里改。简版给 16px —— 低于 16px 时
+      //iOS Safari 会在访客聚焦评论框时自动放大整个页面。
+      fontSize: isSimpleComment ? "16px" : "13px",
+      //编辑器高度：简版评论收窄到 200，减少首屏占用
+      height: isSimpleComment ? 200 : (textareaID === "wp-content-editor-container" ? 640 : 320),
+      //同步滚动预览：简版评论为单栏，没有可同步的对象
+      syncScrolling: !isSimpleComment && editor.livePreview !== "off" && editor.syncScrolling !== "off",
+      //实时预览（双栏）：简版评论强制单栏，不跟随站点的 live_preview 全局选项
+      watch: isSimpleComment
+        ? false
+        : (textareaID === "wp-replycontent-editor-container" ? false : editor.livePreview !== "off"),
+      //HTML标签解析：简版评论强制关闭 —— 预览放行原始 HTML、发布却被 KSES
+      //剥掉，会构成新的预览/发布不一致
+      htmlDecode: isSimpleComment ? false : editor.htmlDecode !== "off",
       htmlTagEscapedItem: htmlTagEscapedItem,
       toolbarAutoFixed: false, //工具栏是否自动固定
       toolbar: true,
       autoFocus: textareaID !== "comment", //判断场景是否跳转到编辑器区域
       tocm: false, //同TOC 不过不合适
-      tocContainer: editor.toc === "off" ? false : "", //TOC
+      tocContainer: isSimpleComment ? false : (editor.toc === "off" ? false : ""), //TOC
       tocDropdown: false, //下拉TOC
       theme: editor.theme, //编辑器总体主题
       previewTheme: editor.previewTheme, //编辑器主题
       editorTheme: editor.editorTheme, //编辑器主题
-      emoji: editor.emoji !== "off", //Emoji表情
-      tex: editor.tex === "katex", //LaTeX公式
-      mind: editor.mindMap !== "off", //思维导图
-      mermaid: editor.mermaid !== "off", //Mermaid
+      //以下五项在简版评论中一律关闭：对应的服务端钩子也已同步摘除，
+      //保证「预览不渲染」与「发布不渲染」一致
+      emoji: !isSimpleComment && editor.emoji !== "off", //Emoji表情
+      tex: !isSimpleComment && editor.tex === "katex", //LaTeX公式
+      mind: !isSimpleComment && editor.mindMap !== "off", //思维导图
+      mermaid: !isSimpleComment && editor.mermaid !== "off", //Mermaid
       atLink: false, //Github @Link
-      taskList: editor.taskList !== "off", //task lists
+      taskList: !isSimpleComment && editor.taskList !== "off", //task lists
       imageFormats: ["jpg", "jpeg", "gif", "png", "bmp", "webp"],
-      placeholder: editor.placeholderEditor, //编辑器placeholder
+      //编辑器placeholder：简版评论换成只列可用语法的提示
+      placeholder: (isSimpleComment && editor.commentPlaceholder) ? editor.commentPlaceholder : editor.placeholderEditor,
       prismTheme: editor.prismTheme, //Prism主題风格
       prismLineNumbers: editor.prismLineNumbers !== "off",
       saveHTMLToTextarea: true,
@@ -625,6 +1001,12 @@ require("./editormd.css");
         if (textareaID === "comment") {
           //修改评论表单name
           $("textarea.editormd-markdown-textarea").attr("name", "comment");
+
+          if (isSimpleComment) {
+            // 简版样式作用域：字号、工具栏留白、窄屏最小高度等规则都挂在这个类上，
+            // 避免污染文章编辑器与后台回复框
+            $("#" + textareaID).addClass("editormd-comment-simple");
+          }
         }
 
         if (textareaID === "wp-replycontent-editor-container") {
@@ -731,7 +1113,11 @@ require("./editormd.css");
       }
     }, 1000);
     // 图像粘贴
-    if (editor.imagePaste === "on") {
+    //
+    // 简版评论一律不绑定：该接口要求 current_user_can("upload_files")，且只注册了
+    // wp_ajax_（没有 nopriv 变体），匿名访客粘贴图片必然失败 —— 结果只是在评论框里
+    // 插入一个「上传失败」占位符。图片在简版里通过「图片地址」按钮插入。
+    if (editor.imagePaste === "on" && !isSimpleComment) {
       $("#" + textareaID).on("paste", function (event) {
         event = event.originalEvent;
         var cbd = window.clipboardData || event.clipboardData; //兼容ie||chrome

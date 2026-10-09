@@ -13,6 +13,7 @@ use EditormdApp\Mermaid;
 use EditormdApp\TaskList;
 use EditormdApp\ImagePaste;
 use EditormdApp\MindMap;
+use EditormdApp\SimpleCommentMode;
 use EditormdPages\Pages;
 use EditormdUtils\Guide;
 use EditormdUtils\Internationalization;
@@ -98,6 +99,7 @@ class Main {
         Config::get_option("highlight_mode_auto", "syntax_highlighting") == "on"     ? new PrismJSAuto()       : null;
         Config::get_option("support_front", "editor_basics")             == "on" 
         || Config::get_option("support_other_text", "editor_basics")    !== ""       ? new ControllerFrontEditor()   : null;
+        Config::get_option("support_front", "editor_basics")             == "on"     ? new SimpleCommentMode()       : null;
         Config::get_option("open_in_new_tab", "editor_basics")          !== "off"    ? new ControllerFrontStyle() : null;
     }
 

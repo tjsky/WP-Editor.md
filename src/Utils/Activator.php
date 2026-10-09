@@ -52,8 +52,6 @@ class Activator {
     public static $defaultOptionsBasics = array(
         "task_list"           =>  "on",
         "imagepaste"          =>  "on",
-        "imagepaste_sm"       =>  "off",
-        "imagepaste_sm_token" =>  "",
         "image_link"          =>  "on",
         "open_in_new_tab"     =>  "on",
         "live_preview"        =>  "on",
@@ -61,13 +59,15 @@ class Activator {
         "html_decode"         =>  "on",
         "support_front"       =>  "off",
         "support_reply"       =>  "off",
-        "support_other_text"  =>  ""
+        "support_other_text"  =>  "",
+        "simple_comment_editor" => "off"
     );
 
     public static $defaultOptionsStyle = array(
-        "theme_style"   => "default",
-        "code_style"    => "default",
-        "editor_addres" => ""
+        "theme_style"       => "default",
+        "code_style"        => "default",
+        "front_style_sync"  => "off",
+        "editor_addres"     => ""
     );
 
     public static $defaultOptionsSyntax = array(

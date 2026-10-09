@@ -16,7 +16,10 @@ class KaTeX {
     public function __construct() {
 
         add_filter("the_content", array($this, "katex_markup"), 9);
-        add_filter("comment_text", array($this, "katex_markup"), 9);
+
+        if (! SimpleCommentMode::enabled()) {
+            add_filter("comment_text", array($this, "katex_markup"), 9);
+        }
 
         //前端加载资源
         add_action("wp_enqueue_scripts", array($this, "katex_enqueue_scripts"));

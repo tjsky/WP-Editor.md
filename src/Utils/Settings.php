@@ -30,8 +30,6 @@ class Settings {
         "editor_basics"       => array(
             "task_list"           => "onoff",
             "imagepaste"          => "onoff",
-            "imagepaste_sm"       => "onoff",
-            "imagepaste_sm_token" => "text",
             "image_link"          => "onoff",
             "open_in_new_tab"     => "onoff",
             "live_preview"        => "onoff",
@@ -40,11 +38,13 @@ class Settings {
             "support_front"       => "onoff",
             "support_reply"       => "onoff",
             "support_other_text"  => "text",
+            "simple_comment_editor" => "onoff",
         ),
         "editor_style"        => array(
-            "theme_style"   => "key",
-            "code_style"    => "key",
-            "editor_addres" => "url",
+            "theme_style"       => "key",
+            "code_style"        => "key",
+            "front_style_sync"  => "onoff",
+            "editor_addres"     => "url",
         ),
         "syntax_highlighting" => array(
             "highlight_mode_auto"     => "onoff",
@@ -180,7 +180,6 @@ class Settings {
         //检查编辑器静态资源，如果是默认配置选项提前条件下，不符合最新版资源强制升级
         $style_option = get_option("editor_style");
         if (! is_array($style_option)) {
-        // is_ssl 判断网站是否启用ssl不准确
             $style_option = array();
         }
 
@@ -282,7 +281,9 @@ class Settings {
             return $this->static_file_ver;
         }
 
-        $cached = get_transient("editormd_static_file_ver");
+        $cache_key = "editormd_static_file_ver_" . $this->version;
+
+        $cached = get_transient($cache_key);
         if (false !== $cached && is_string($cached) && "" !== $cached) {
             $this->static_file_ver = $cached;
 
@@ -303,7 +304,7 @@ class Settings {
             $version = (string) $editormd["version"];
         }
 
-        set_transient("editormd_static_file_ver", $version, 12 * HOUR_IN_SECONDS);
+        set_transient($cache_key, $version, 12 * HOUR_IN_SECONDS);
 
         $this->static_file_ver = $version;
 
@@ -311,26 +312,33 @@ class Settings {
     }
 
     public function upgrade_editormd_file() {
-        if ($this->get_static_file_ver() !== WP_EDITORMD_VER) {
-            add_action("admin_notices", function () {
-                $message = __("The resources used by the plugin check are outdated. Please upgrade the latest resources.", "editormd");
-                printf('<div class="error"><p>%1$s</p></div>', esc_html($message));
-            });
+        $package = $this->get_static_file_ver();
 
-            return '<span class="error">' . esc_html__('Status: Please Update!', 'editormd') . '</span> '
-                . '<a href="https://github.com/tjsky/WP-Editor.md/releases/latest" rel="noopener">' . esc_html__('Downaload', 'editormd') . '</a>';
+        if ("0.0.0" === $package) {
+            return '<span class="error">'
+                . esc_html__("Status: Resource package missing or corrupt!", "editormd")
+                . '</span> '
+                . esc_html__("Cannot read assets/version.json — the resource package may not have been uploaded completely.", "editormd");
         }
 
-        return '<span class="updated">' . esc_html__('Status: Latest', 'editormd') . '</span>';
+        if ($package !== WP_EDITORMD_VER) {
+            return '<span class="error">'
+                . esc_html__("Status: Please Update!", "editormd")
+                . '</span> '
+                . sprintf(
+                    esc_html__("Resource package version %1\$s does not match plugin version %2\$s.", "editormd"),
+                    esc_html($package),
+                    esc_html(WP_EDITORMD_VER)
+                )
+                . ' <a href="https://github.com/tjsky/WP-Editor.md/releases/latest" rel="noopener">'
+                . esc_html__("Downaload", "editormd")
+                . '</a>';
+        }
+
+        return '<span class="updated">' . esc_html__("Status: Latest", "editormd") . '</span>';
     }
 
     function get_settings_sections() {
-        if ("0.0.0" === $this->get_static_file_ver()) {
-            add_action("admin_notices", function () {
-                $message = __("The resource package is corrupt, please download again!", "editormd");
-                printf('<div class="error"><p>%1$s</p></div>', esc_html($message));
-            });
-        }
 
         $sections = array(
             array(
@@ -447,26 +455,6 @@ class Settings {
                     'default' => 'off'
                 ),
                 array(
-                    'name'    => 'imagepaste_sm',
-                    'label'   => __('ImagePaste Upload Source', $this->text_domain),
-                    'desc'    => __('Change image paste upload source to https://smms.app', $this->text_domain),
-                    'type'    => 'checkbox',
-                    'default' => 'off'
-                ),
-                array(
-                    'name'    => 'imagepaste_sm_token',
-                    'label'   => __('sm.ms Auth Token', $this->text_domain),
-                    'desc'    => __('Optional, makes your uploaded image binded with your sm.ms account. Get token <a href="https://smms.app/home/apitoken" target="_blank">Here</a>.', $this->text_domain),
-                    'type'    => 'text',
-                    'default' => ''
-                ),
-                array(
-                    'name'    => 'sm_library_management',
-                    'label'   => __('sm.ms Image Management', $this->text_domain),
-                    'desc'    => '<a href="javascript;" id="sm-ms-management">' . __('Go', $this->text_domain) . '</a>',
-                    'type'    => 'html'
-                ),
-                array(
                     'name'    => 'image_link',
                     'label'   => __('Image Hyperlink', $this->text_domain),
                     'desc'    => __('Support upload image hyperlink', $this->text_domain),
@@ -504,8 +492,22 @@ class Settings {
                 array(
                     'name'    => 'support_front',
                     'label'   => __('Support Front Comment', $this->text_domain),
+                    'desc'    => __('Currently confirmed to be fully compatible with the WordPress default themes. If it fails to load, please report it as soon as possible.', $this->text_domain),
                     'type'    => 'checkbox',
                     'default' => 'off'
+                ),
+                array(
+                    'name'    => 'simple_comment_editor',
+                    'label'   => __('Use Simple Editor For Front Comments', $this->text_domain),
+                    'desc'    => __('Offers only bold, italic, strikethrough, blockquote, inline code, images and links in the visitor comment box — links and images are not clickable. The editor starts in single-column mode with a trimmed toolbar.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'off'
+                ),
+                array(
+                    'name'  => 'comment_syntax_notice',
+                    'label' => __('Comment Syntax Limitation', $this->text_domain),
+                    'desc'  => __('Comment syntax is limited by the WordPress KSES whitelist for untrusted content. Whether or not the simple editor is enabled, images, tables, headings, lists and horizontal rules may not display correctly in comments — some are stripped outright. The currently effective whitelist is listed under “Advanced Settings → Debugger”.', $this->text_domain),
+                    'type'  => 'html'
                 ),
                 array(
                     'name'    => 'support_reply',
@@ -613,6 +615,13 @@ class Settings {
                                     </div>
                                  ',
                     'type'    => 'html'
+                ),
+                array(
+                    'name'    => 'front_style_sync',
+                    'label'   => __('Apply The Styles Above To The Front-end Editor', $this->text_domain),
+                    'desc'    => __('Off (default): the front-end comment editor keeps the default light style and follows your theme — write your own CSS if you need e.g. a dark mode. On: the two styles above apply to the front-end editor as well. The admin editor is never affected by this switch.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'off'
                 ),
                 array(
                     'name'    => 'editor_addres',
@@ -805,6 +814,7 @@ class Settings {
             echo '<p style="display: table;"><strong style="display: table-cell;vertical-align: middle;">Alipay(支付宝)：</strong><a rel="nofollow" target="_blank" href="'. $donateImgUrl .'/支付宝.png"><img width="160" height="160" src="'. $donateImgUrl .'/支付宝.png"/></a></p>';
             echo '<p style="display: table;"><strong style="display: table-cell;vertical-align: middle;">WeChat(微信)：</strong><a rel="nofollow" target="_blank" href="'. $donateImgUrl .'/微信赞赏.png"><img width="160" height="160" src="'. $donateImgUrl .'/微信赞赏.png"/></a></p>';
             echo '<p style="display: table;"><strong style="display: table-cell;vertical-align: middle;">PayPal(贝宝)：</strong><a rel="nofollow" target="_blank" href="https://www.paypal.me/lurenjia">https://www.paypal.me/lurenjia</a></p>';
+            echo '<p class="editormd-fork-note">' . __('I am the author of this modified / forked version. Compared with the original author\'s contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href="https://www.tjsky.net" target="_blank" rel="noopener">秋风于渭水</a> when you have time. Thank you!', $this->text_domain) . '</p>';
             echo '</div>';
         }
         

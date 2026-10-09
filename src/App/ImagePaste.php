@@ -5,7 +5,6 @@
 
 namespace EditormdApp;
 
-use EditormdUtils\Config;
 use EditormdUtils\Ajax;
 
 /**
@@ -14,13 +13,7 @@ use EditormdUtils\Ajax;
  * 
  * - error  : 返回的错误信息，可能值如下：
  *  1. file_extension_error: 文件扩展名错误，无论图片本身是什么格式，传递上来都应为image/png，致命错误，不返回图片地址
- *  2. file_too_large: 文件过大，常见于第三方图床，不返回图片地址
- *  3. file_repeated: 文件重复，常见于第三方图床，返回正确的图片地址
- *  4. unknown_error: 未知错误，详见detail
  * 
- * - detail : 其他信息，可能为以下几种格式：
- *  1. 在第三方图床请求正常的情况下，返回第三方图床返回的raw数据
- *  2. 在出现未知错误时，返回错误内容
  */
 class ImagePaste {
     const MAX_PAYLOAD_BYTES = 8388608;
@@ -32,9 +25,6 @@ class ImagePaste {
     const MAX_SIDE = 8192;
 
     const MEMORY_HEADROOM_BYTES = 16777216;
-
-    const UPLOAD_TIMEOUT  = 10;
-    const CONNECT_TIMEOUT = 3;
 
     const RATE_LIMIT_MAX    = 30;
     const RATE_LIMIT_WINDOW = 60;
@@ -51,7 +41,6 @@ class ImagePaste {
      */
     private $uploadUrl;
     private $uploadDir;
-    private $tempDir;
 
     /*
      * 与图片相关的变量
@@ -81,7 +70,6 @@ class ImagePaste {
 
             $this->uploadUrl = $upload["url"];
             $this->uploadDir = $upload["path"];
-            $this->tempDir   = trailingslashit(get_temp_dir());
 
             if (! isset($_REQUEST["dataurl"]) || ! is_string($_REQUEST["dataurl"])) {
                 Ajax::editormd_return_json("", "unknown_error", "Missing or invalid dataurl");
@@ -137,14 +125,7 @@ class ImagePaste {
         }
 
         try {
-            switch (Config::get_option("imagepaste_sm", "editor_basics")) {
-                case "on":
-                    $this->editormd_imagepaste_smms();
-                    break;
-                default:
-                    $this->editormd_imagepaste_save();
-                    break;
-            }
+            $this->editormd_imagepaste_save();
         } catch (\Throwable $e) {
             Ajax::editormd_return_json("", "unknown_error", "Exception occurred when uploading:" . $e->getMessage());
         }
@@ -179,82 +160,6 @@ class ImagePaste {
         }
 
         Ajax::editormd_return_json($uploaded["url"]);
-    }
-
-    // 上传图片到sm.ms
-    private function editormd_imagepaste_smms() {
-        $tempFile = $this->editormd_save_to_temp_dir();
-        if (false === $tempFile) {
-            Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
-        }
-
-        // 获取用户配置中的图床校验码
-        $authToken = Config::get_option("imagepaste_sm_token", "editor_basics");
-        $headers   = array();
-        if ($authToken !== "") {
-            $headers["Authorization"] = $authToken;
-        }
-
-        $multipart = $this->build_multipart_body($tempFile, basename($tempFile), array("format" => "json"));
-        wp_delete_file($tempFile);
-
-        if (false === $multipart) {
-            Ajax::editormd_return_json("", "unknown_error", "Failed to read image payload");
-        }
-
-        list($body, $contentType) = $multipart;
-        $headers["Content-Type"]  = $contentType;
-
-        $connect_timeout = function ($handle) {
-            if (defined("CURLOPT_CONNECTTIMEOUT") && function_exists("curl_setopt")) {
-                curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, self::CONNECT_TIMEOUT);
-            }
-        };
-        add_action("http_api_curl", $connect_timeout);
-
-        $response = wp_remote_post("https://smms.app/api/v2/upload", array(
-            "timeout"     => self::UPLOAD_TIMEOUT,
-            "redirection" => 0,
-            "sslverify"   => true,
-            "headers"     => $headers,
-            "body"        => $body,
-        ));
-
-        remove_action("http_api_curl", $connect_timeout);
-
-        if (is_wp_error($response)) {
-            Ajax::editormd_return_json("", "unknown_error", $response->get_error_message());
-        }
-
-        $reqCode = (int) wp_remote_retrieve_response_code($response);
-        $result  = wp_remote_retrieve_body($response);
-
-        switch ($reqCode) {
-            case 200:
-                $data = json_decode($result, true);
-                if (! is_array($data)) {
-                    Ajax::editormd_return_json("", "unknown_error", "Invalid response from sm.ms");
-                }
-                // 对图片重复的情况进行特殊处理
-                if (isset($data["code"]) && $data["code"] === "image_repeated") {
-                    $imageUrl = isset($data["images"]) ? $data["images"] : "";
-                } else {
-                    $imageUrl = isset($data["data"]["url"]) ? $data["data"]["url"] : "";
-                }
-
-                if ("" === $imageUrl) {
-                    Ajax::editormd_return_json("", "unknown_error", $result);
-                }
-
-                Ajax::editormd_return_json($imageUrl, "", $result);
-                break;
-            case 413:
-                Ajax::editormd_return_json("", "file_too_large", "");
-                break;
-            default:
-                Ajax::editormd_return_json("", "unknown_error", $reqCode . $result);
-                break;
-        }
     }
 
     private function editormd_save_to_temp_dir() {
@@ -442,30 +347,5 @@ class ImagePaste {
         }
 
         return false;
-    }
-
-    private function build_multipart_body($filePath, $fileName, $fields) {
-        $contents = file_get_contents($filePath);
-        if (false === $contents) {
-            return false;
-        }
-
-        $boundary = "----WPEditormdBoundary" . md5(microtime(true) . wp_rand());
-        $eol      = "\r\n";
-        $body     = "";
-
-        foreach ($fields as $key => $value) {
-            $body .= "--" . $boundary . $eol
-                . 'Content-Disposition: form-data; name="' . $key . '"' . $eol . $eol
-                . $value . $eol;
-        }
-
-        $body .= "--" . $boundary . $eol
-            . 'Content-Disposition: form-data; name="smfile"; filename="' . sanitize_file_name($fileName) . '"' . $eol
-            . 'Content-Type: image/jpeg' . $eol . $eol
-            . $contents . $eol
-            . "--" . $boundary . "--" . $eol;
-
-        return array($body, "multipart/form-data; boundary=" . $boundary);
     }
 }

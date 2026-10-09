@@ -68,29 +68,6 @@
 					+ '</div>';
 		}
 
-		$("#sm-ms-management").click(function(event) {
-			event.preventDefault();
-
-			$("#wp-editormd-modal").remove();
-			$(modalTemplate(
-				'<iframe id="sm-ms-management-window" src="<?php echo esc_url( admin_url( "admin-ajax.php" ) ); ?>?action=wp_editormd_pages&page=sm-ms-management&_wpnonce=<?php echo esc_js( wp_create_nonce( "wp_editormd_pages" ) ); ?>"></iframe>'
-			)).appendTo("body").modal({
-				fadeDuration: 200
-			});
-
-			// 点击悬浮窗的关闭按钮后，自动清除窗口相关DOM节点
-			let interval = setInterval(function() {
-				$(".close-modal").click(function() {
-					setTimeout(function() {
-						clearInterval(interval);
-						$("#wp-editormd-modal").remove();
-					}, 200);
-				});
-			}, 200);
-		});
-		///	---------------------
-		/// sm-ms-management
-		///	---------------------
 
 
 		///	---------------------

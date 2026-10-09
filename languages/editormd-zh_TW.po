@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: GlotPress/2.4.0-alpha\n"
-"Language: zh_CN\n"
+"Language: zh_TW\n"
 "Project-Id-Version: Plugins - WP-Editor.md - Development (trunk)\n"
 
 msgid " Options"
@@ -28,9 +28,6 @@ msgstr "我的主頁"
 
 msgid "Browser Information"
 msgstr "瀏覽器信息"
-
-msgid "Change image paste upload source to https://smms.app"
-msgstr "將圖片上傳至https://smms.app，圖片不再在本地存儲！"
 
 msgid "Change the markdown editor style"
 msgstr "變更Markdown編輯器風格"
@@ -119,9 +116,6 @@ msgstr "讓編輯器支持圖像粘貼（部分瀏覽器可能無法支援此功
 
 msgid "Image Uploading..."
 msgstr "圖片上傳中..."
-
-msgid "ImagePaste Upload Source"
-msgstr "更改圖片粘貼(上傳)源"
 
 msgid "Info"
 msgstr "獲取信息（如果遇到問題，請將這裡的信息反饋給作者）"
@@ -287,13 +281,21 @@ msgid "jQuery Version"
 msgstr "jQuery版本號"
 
 msgid "Support Front Comment"
-msgstr "支援頁面評論，可能會失效（歡迎反饋！）"
+msgstr "支援前端評論"
 
 msgid "Support Reply Comment For edit-comments.php"
 msgstr "支援後台評論管理"
 
 msgid "Hey, we've noticed that you're running an outdated version of PHP which is no longer supported. Make sure your site is fast and secure, by upgrading PHP to the latest version."
 msgstr "您正在運行一個過時的、不受支持的PHP版本。請升級到最新版本以獲取完整支援！"
+
+#: src/Utils/Settings.php
+msgid "Apply The Styles Above To The Front-end Editor"
+msgstr "把以上風格套用到前台編輯器"
+
+#: src/Utils/Settings.php
+msgid "Off (default): the front-end comment editor keeps the default light style and follows your theme — write your own CSS if you need e.g. a dark mode. On: the two styles above apply to the front-end editor as well. The admin editor is never affected by this switch."
+msgstr "關閉（預設）：前台留言編輯器使用 Editor.md 內建的淺色樣式、跟隨你的佈景主題 —— 需要夜間模式等效果請自行撰寫 CSS。開啟：以上兩項風格同樣套用到前台編輯器。後台編輯器不受本開關影響。"
 
 msgid "Editor.md Static Resource Addres"
 msgstr "編輯器靜態資源地址"
@@ -304,11 +306,17 @@ msgstr "請確保靜態資源版本為最新！<br/>"
 msgid "Please upload the resource (the unzipped folder name is \"assets\") to your server or cdn. If your resource address is: \"http(s)://example.com/myfile/assets\", you should fill in: \"http(s)://example.com/myfile \". <br/>"
 msgstr "請將資源（目錄名為assets）上傳到你的服務器，如果資源庫地址為：“http(s)://example.com/myfile/assets”，那麼應該鍵入：“http(s)://example.com/myfile”。<br/>"
 
-msgid "The resource package is corrupt, please download again!"
-msgstr "靜態資源包出現損壞！請重新下載！"
+#: src/Utils/Settings.php
+msgid "Status: Resource package missing or corrupt!"
+msgstr "狀態：資源包缺失或損毀！"
 
-msgid "The resources used by the plugin check are outdated. Please upgrade the latest resources."
-msgstr "檢測到插件資源包已過時，請在設定頁面中進行配置！"
+#: src/Utils/Settings.php
+msgid "Cannot read assets/version.json — the resource package may not have been uploaded completely."
+msgstr "讀不到 assets/version.json，資源包可能未完整上傳。"
+
+#: src/Utils/Settings.php
+msgid "Resource package version %1$s does not match plugin version %2$s."
+msgstr "資源包版本 %1$s 與插件版本 %2$s 不一致。"
 
 msgid "Status: Please Update!"
 msgstr "狀態：資源過時，請升級！"
@@ -353,15 +361,6 @@ msgstr "導出調試訊息"
 msgid "Enabled Plugins List"
 msgstr "啟用的外掛列表"
 
-msgid "sm.ms Auth Token"
-msgstr "sm.ms Auth Token"
-
-msgid "Optional, makes your uploaded image binded with your sm.ms account. Get token <a href=\"https://smms.app/home/apitoken\" target=\"_blank\">Here</a>."
-msgstr "可選，便於sm.ms註冊用戶將粘貼上傳的圖片與自己的賬戶綁定，在<a href=\"https://smms.app/home/apitoken\" target=\"_blank\">這裡</a>獲取Token"
-
-msgid "sm.ms Image Management"
-msgstr "sm.ms圖床管理"
-
 msgid "Editor Style Preview"
 msgstr "編輯器樣式預覽"
 
@@ -370,3 +369,83 @@ msgstr "語法高亮樣式預覽"
 
 msgid "Successfully upgraded to version %s !"
 msgstr "成功升級到版本 %s ！"
+
+#: src/Utils/Settings.php
+msgid "Use Simple Editor For Front Comments"
+msgstr "訪客留言使用簡版編輯器"
+
+#: src/Utils/Settings.php
+msgid "Offers only bold, italic, strikethrough, blockquote, inline code, images and links in the visitor comment box — links and images are not clickable. The editor starts in single-column mode with a trimmed toolbar."
+msgstr "訪客留言區只提供粗體、斜體、刪除線、引用、行內程式碼、圖片與連結（連結與圖片不可點擊），編輯器預設單欄、工具列精簡。"
+
+#: src/Utils/Settings.php
+msgid "Comment Syntax Limitation"
+msgstr "留言語法的限制"
+
+#: src/Utils/Settings.php
+msgid "Comment syntax is limited by the WordPress KSES whitelist for untrusted content. Whether or not the simple editor is enabled, images, tables, headings, lists and horizontal rules may not display correctly in comments — some are stripped outright. The currently effective whitelist is listed under “Advanced Settings → Debugger”."
+msgstr "留言區可用的語法受 WordPress 對不可信內容的 KSES 白名單限制。無論是否開啟簡版編輯器，圖片、表格、多級標題、列表、分隔線等在留言區的顯示都可能受限（部分會被直接剝除）。目前實際生效的白名單見「進階設定 → 偵錯資訊」。"
+
+#: src/Front/FrontEditor.php
+msgid "Supports **bold**, *italic*, ~~strikethrough~~, > quote, `code`, images and links (links and images are not clickable)"
+msgstr "支援 **粗體**、*斜體*、~~刪除線~~、> 引用、`程式碼`、圖片與連結（連結與圖片不可點擊）"
+
+#: src/Utils/Debugger.php
+msgid "Comment HTML Whitelist (KSES)"
+msgstr "留言區允許的 HTML 標籤（KSES）"
+
+#: src/Utils/Debugger.php
+msgid "Comment Behavior Added By This Plugin"
+msgstr "本外掛對留言區新增的行為（非 WordPress 原生支援）"
+
+#: src/Utils/Debugger.php
+msgid "(unavailable on this site)"
+msgstr "（本站不可用）"
+
+#: src/Utils/Debugger.php
+msgid "(no attribute)"
+msgstr "（無屬性）"
+
+#: src/Utils/Debugger.php
+msgid "[WordPress native]"
+msgstr "［WordPress 原生］"
+
+#: src/Utils/Debugger.php
+msgid "[added by this plugin]"
+msgstr "［本外掛擴充］"
+
+#: src/Utils/Debugger.php
+msgid "enabled"
+msgstr "已開啟"
+
+#: src/Utils/Debugger.php
+msgid "disabled"
+msgstr "已關閉"
+
+#: src/Utils/Debugger.php
+msgid "Images: WordPress does not allow <img> inside comments natively; this plugin adds it to the whitelist above. Current state: %s"
+msgstr "圖片：WordPress 原生不允許留言內嵌 <img>，是本外掛把它加進了上面的白名單（非原生支援）。目前狀態：%s"
+
+#: src/Utils/Debugger.php
+msgid "Links: external links inside comments are degraded to read-only text and no <a> tag is produced. Current state: %s"
+msgstr "連結：留言內的外部連結會被降級為唯讀文字，不產生 <a> 標籤。目前狀態：%s"
+
+#: src/Utils/Debugger.php
+msgid "Degraded link output template: %s"
+msgstr "連結降級後的輸出範本：%s"
+
+#: src/Utils/Debugger.php
+msgid "Comment body wrapper (%1$s) scopes image width and turns off emoji shortcodes inside comments. Current state: %2$s"
+msgstr "留言正文容器（%1$s）：用於約束圖片寬度，並關閉留言區的 emoji 短代碼。目前狀態：%2$s"
+
+#: src/Utils/Debugger.php
+msgid "Formulas / task lists / code blocks / emoji inside comments are turned off. Current state: %s"
+msgstr "留言區的公式 / 任務清單 / 程式碼區塊 / emoji 已關閉。目前狀態：%s"
+
+#: src/Utils/Settings.php
+msgid "Currently confirmed to be fully compatible with the WordPress default themes. If it fails to load, please report it as soon as possible."
+msgstr "目前已確認與 WordPress 預設主題完全相容，若載入失敗請及時回饋！"
+
+#: src/Utils/Settings.php
+msgid "I am the author of this modified / forked version. Compared with the original author's contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a> when you have time. Thank you!"
+msgstr "我是二次開發修改版的作者：和原作者的貢獻比起來，我只是做了些沒什麼技術含量的小修小改，就不留捐贈資訊了，如果修改版 WP-Editor.md 能得到你的喜愛，有空來看看我的部落格《<a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a>》就好啦，謝謝！"

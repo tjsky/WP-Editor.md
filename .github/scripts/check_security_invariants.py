@@ -57,14 +57,6 @@ def main():
         ok = current is not None and version_tuple(current) >= minimum
         failures += not check(ok, "%s >= %s（当前 %s）" % (name, ".".join(map(str, minimum)), current))
 
-    vue_pkg = json.loads(read("src/Pages/page/sm-ms-management/package.json"))
-    deps = dict(vue_pkg.get("dependencies", {}), **vue_pkg.get("devDependencies", {}))
-    # 说明：Vue 保持在 2.6.11 —— 2.x 全系都落在 GHSA-5j4c-8p2g-v4jx 的范围内，
-    # 官方修复只存在于 3.0，属于 Vue 3 迁移的范畴，不在本版范围。
-    for name, minimum in (("axios", (1, 20, 0)),):
-        raw = re.sub(r"[^\d.]", "", str(deps.get(name, "")))
-        ok = raw and version_tuple(raw) >= minimum
-        failures += not check(ok, "sm-ms 依赖 %s >= %s（当前 %s）" % (name, ".".join(map(str, minimum)), raw or "缺失"))
 
     # 捆绑文件里的真实版本串（防止只改了 version.json 而没换文件）
     katex_js = read("assets/KaTeX/katex.min.js")
@@ -85,7 +77,6 @@ def main():
         ("src/App/ImagePaste.php", "wp_tempnam", "临时文件必须使用唯一文件名"),
         ("src/App/ImagePaste.php", "editormd_rate_limit_exceeded", "图片接口必须有限流"),
         ("src/Pages/Pages.php", 'wp_verify_nonce($nonce, "wp_editormd_pages")', "后台 AJAX 必须校验 nonce"),
-        ("src/Pages/page/sm-ms-management/sm-ms-management.php", "wp_editormd_sm_ms_resolve_operation", "sm.ms 代理必须走固定操作白名单"),
         ("src/Utils/Logger.php", "REDACTED", "日志 URI 必须脱敏"),
         ("src/Front/FrontStyle.php", 'editormd_dequeue_block_styles", false', "block CSS 移除应为显式 opt-in"),
         ("wp-editormd.php", "wp_editormd_migrating", "迁移必须与登录态解耦并加锁"),
@@ -136,8 +127,6 @@ def main():
     must_not = [
         ("src/Pages/Pages.php", "isSameOriginRequest", "不得再以 Origin/Host 作为 nonce 兜底"),
         ("src/Pages/Pages.php", "wp_ajax_nopriv_wp_editormd_pages", "后台页面不得注册 nopriv 入口"),
-        ("src/Pages/page/sm-ms-management/sm-ms-management.php", '"token"', "sm.ms 令牌不得下发给浏览器"),
-        ("src/Pages/page/sm-ms-management/sm-ms-management.php", "function display_page(", "不得再定义全局 display_page()"),
         ("src/Pages/page/upgrade-release/upgrade-release.php", "function display_page(", "不得再定义全局 display_page()"),
         ("src/App/ImagePaste.php", '"timeout"     => 120', "上游请求不得保留 120 秒超时"),
         ("composer.json", '"php" : ">=5.6.0"', "composer PHP 约束必须与插件头一致"),
@@ -161,6 +150,10 @@ def main():
         # 行内代码一并渲染成公式（与服务端行为不一致）
         ("assets/Config/editormd.js", "baseParagraph.call(this, text)",
          "段落渲染必须先经 guardPseudoTex 再交给 Editor.md"),
+        ("src/App/ImagePaste.php", "smms", "第三方图床上传逻辑不得回流"),
+        ("src/Utils/Settings.php", "imagepaste_sm", "图床设置项不得回流"),
+        ("src/Utils/Activator.php", "imagepaste_sm", "图床默认值不得回流"),
+        ("src/Pages/Pages.php", "sm-ms-management", "图床管理页不得回流"),
     ]
     for path, needle, label in must_not:
         failures += not check(needle not in read(path), label, "%s 中仍存在 %s" % (path, needle))

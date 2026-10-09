@@ -52,4 +52,3 @@ if ( is_multisite() ) {
     wp_editormd_uninstall_site_options( $options_name );
 }
 
-//开启自带可视化编辑器

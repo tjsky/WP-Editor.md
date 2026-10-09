@@ -1,23 +1,30 @@
-# WP Editor.md
+# WP Editor.md（维护版）
 
-> ## ⚠️ 这是修改版（Modified Version），不是上游原版
+**给 WordPress 用的 Markdown 编辑器。** 你在后台用 Markdown 写文章，它负责把内容排得漂漂亮亮——公式、流程图、代码高亮、图片、目录，都是现成的。
+
+> **English:** A Markdown editor for WordPress. This repository is a maintained fork of a plugin that is no longer developed — the original was removed from WordPress.org over a security issue. We fix the security problems and keep it working on current WordPress. Full notes are in Chinese below.
+
+> ## ⚠️ 先看这里：这是修改版，不是原版
 >
-> 本仓库是 [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md) 的**维护分支（fork）**。
+> 本仓库是 [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md) 的**维护分支**。
+> 原版早已停更，并且**已于 2025-04-09 被 WordPress 官方应用商店下架**——原因是安全问题
+> （**CVE-2025-31035**，影响 10.2.1 及更早版本），而原版至今没有推出修复版本。
 >
-> | | |
+> 我们做的事很简单：**把安全问题修好，让它能在新版 WordPress 上正常跑起来。**
+> 功能设计和数据格式都没动，**升级不需要迁移数据**。
+>
+> |  |  |
 > | --- | --- |
-> | 上游项目 | [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md) |
-> | 上游最后版本 | **10.2.1**（本分支的起点 commit `d73d725`） |
-> | 上游状态 | 长期停止更新；已于 **2025-04-09 被 WordPress.org 以安全问题下架**（reason: `security-issue`） |
-> | 关联漏洞 | **CVE-2025-31035**（Stored XSS，影响 `<= 10.2.1`），上游**无修复版本** |
-> | 本分支 | [tjsky/WP-Editor.md](https://github.com/tjsky/WP-Editor.md) |
-> | 修改者 | tjsky |
-> | 修改日期 | 起始 **2026-10-02**；后续变更见 [CHANGELOG](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md) |
-> | 修改性质 | **以安全加固与新版兼容性为主；另新增一项小功能（图片尺寸语法），未做功能重构** |
+> | 原版项目 | [LuRenJiasWorld/WP-Editor.md](https://github.com/LuRenJiasWorld/WP-Editor.md)（最后版本 10.2.1） |
+> | 本维护版 | [tjsky/WP-Editor.md](https://github.com/tjsky/WP-Editor.md) |
+> | 维护者 | [tjsky](https://github.com/tjsky) |
+> | 修改起始 | 2026-10-02 |
+> | 最近更新 | 2026-10-09（10.5.0） |
+> | 改动性质 | 以**安全加固和新版兼容**为主；另外加了两个可选的实用小功能 |
 >
-> 依据本项目的授权协议 **GNU General Public License v3**（或更新版本）第 5 条要求，
-> 修改后的版本必须带有**显著的修改声明与日期**，故在此说明。修改要点见
-> [与上游的差异](#与上游的差异)，逐项明细见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
+> GPL-3.0 第 5 条要求修改版写明「改了什么、什么时候改的」，所以有了上面这段。
+> 具体改动见 [和原版有什么不同](#和原版有什么不同)，逐条明细见
+> [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
 
 [![GitHub issues](https://img.shields.io/github/issues/tjsky/WP-Editor.md.svg)](https://github.com/tjsky/WP-Editor.md/issues)
 [![GitHub stars](https://img.shields.io/github/stars/tjsky/WP-Editor.md.svg)](https://github.com/tjsky/WP-Editor.md/stargazers)
@@ -26,66 +33,112 @@
 [![Requires PHP](https://img.shields.io/badge/PHP-%E2%89%A5%207.4-blue)](https://www.php.net/supported-versions.php)
 [![Tested up to](https://img.shields.io/badge/WordPress-7.1-blue)](https://wordpress.org/download/)
 
-### 说明 Description
+---
 
-WP Editor.md 是一个漂亮又实用的在线 Markdown 文档编辑器。
+## 装它（三步）
 
-WP Editor.md is a beautiful and practical Markdown document editor.
+1. 到 [Releases](https://github.com/tjsky/WP-Editor.md/releases) 页面，下载 `wp-editormd-x.y.z.zip`
+2. WordPress 后台 → **插件 → 安装插件 → 上传插件** → 选中刚下载的 zip
+3. 点「启用」
 
-基于 [Editor.md](https://github.com/pandao/editor.md) 构建对 WordPress 平台的支持。
-
-Build support for the WordPress on [Editor.md](https://github.com/pandao/editor.md).
-
-使用 WordPress [Jetpack](http://jetpack.me) 的 Markdown 模块来解析和保存内容（该模块已内置于本插件，**无需安装 Jetpack**）。
-
-The plugin uses the Markdown module from WordPress [Jetpack](http://jetpack.me) for parsing and saving content (bundled in this plugin, **Jetpack is not required**).
-
-> 上游版本可从 WordPress 插件库下载，但该插件已于 2025-04-09 下架，官方目录已无可用安装包：
-> ~~https://wordpress.org/plugins/wp-editormd/~~（已关闭）
+> ⚠️ **别下载 GitHub 页面上的 `Source code (zip)`。**
+> 那种包是源码，里面缺了运行必需的 `vendor/`、编译好的前端文件和语言包，装上去会直接报错。
+> Release 里的 zip 是我们构建好的，装完就能用。
 
 ---
 
-## 与上游的差异
+## 它现在能做什么
 
-本分支只做**必要的安全加固与兼容适配**，没有改动功能设计与数据结构，**升级不需要迁移**。
-下面只列要点，逐项明细见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
+| 功能 | 说明 |
+| --- | --- |
+| **边写边看** | 左边写 Markdown，右边实时显示效果 |
+| **代码** | 语法高亮、行号、语言标签、一键复制代码 |
+| **公式** | 用 KaTeX 渲染，写成 `$…$` 就行 |
+| **图表** | 流程图、时序图、甘特图等，用 Mermaid 画 |
+| **表格 / 任务清单 / Emoji / 目录** | 都支持 |
+| **图片** | 从 WordPress 媒体库插入，或直接粘贴上传 |
+| **图片尺寸** | 写成 `![说明](图片地址 =600)`，指定显示宽度 |
+| **评论也能写 Markdown** | 可选功能；还能给访客换成「简版编辑器」 |
 
-* **安全修复**（本次维护的主要原因）—— 修复 KaTeX 公式渲染的**存储型 XSS**（同类问题即已公开的
-  **CVE-2025-31035**），以及图片粘贴接口的任意文件写入与资源耗尽、图床代理的 SSRF、
-  后台管理页的授权缺陷、选项保存未净化、设置页盲 SSRF、携带特定 Cookie 即白屏等一批漏洞；
-  升级了存在公开漏洞的捆绑库（**Mermaid → 10.9.8、KaTeX → 0.19.0**）、把图床令牌移出浏览器、
-  默认不再从第三方 CDN 加载资源
-* **兼容性** —— 适配 **WordPress 7.1** 与 **PHP 7.4 ~ 8.4**，含「插件加载期调用用户上下文函数
-  导致前台后台同时白屏」这类致命问题
-* **构建链** —— 替换已无法使用的 `node-sass`、`uglify` 插件，项目恢复可构建；新增 GitHub Actions 自动打包
-* **顺带修复** —— 思维导图设置项丢失、Mermaid 默认值串到 KaTeX 等历史遗留缺陷
-* **公式解析重写**（10.4.0）—— 修复代码块里的 `$` 被当公式、块级公式重复渲染、正文误配对的 `$` 被渲染
-* **新增（可选）**（10.4.0）—— 图片尺寸语法 `![说明](图片地址 =600)`，不写尺寸时渲染结果与原来完全一致
-* **编辑器预览与发布结果对齐**（10.4.5）—— 预览此前不认识上面那套图片尺寸语法（原样显示为 Markdown 源码），
-  还会把价格、函数签名、行内代码里的 `$` 当成公式渲染；现预览侧补齐同等能力，两侧渲染结果逐项一致
+更细的用法见上游 Wiki（部分内容可能已过期）：
+<https://github.com/LuRenJiasWorld/WP-Editor.md/wiki>
 
-有意**未做**的事：为避免影响面扩大，不做编辑器功能重构、不改数据存储结构、不改既有选项的命名与取值。
+**图片尺寸怎么写**（10.4.0 起，可选）：
 
----
+    ![说明](图片地址 =600)        宽度 600px，高度按原图比例
+    ![说明](图片地址 =600x400)    宽 600px、高 400px
+    ![说明](图片地址 =x400)       高度 400px
 
-## 安装 Installation
-
-**推荐从 [Releases](https://github.com/tjsky/WP-Editor.md/releases) 下载 zip 安装**：
-
-1. 下载 `wp-editormd-x.y.z.zip`
-2. WordPress 后台 → 插件 → 安装插件 → 上传插件 → 选择该 zip
-3. 启用插件
-
-> ⚠️ **不要**使用 GitHub 自动生成的 `Source code (zip)` 压缩包。
-> 本仓库的 `.gitignore` 忽略了 `vendor/`、前端编译产物与语言包 `.mo` 文件，
-> 源码包缺少这些**运行期必需**文件，安装后会因找不到 `vendor/autoload.php` 而致命报错。
-> Release 里的 zip 由 CI 从源码完整构建，已包含全部所需文件。
+不写尺寸就按原图显示。窄屏下会自动等比缩小，不会变形。
 
 ---
 
-## 从源码构建 Building
+## 这一版（10.5.0）改了什么
 
-若要从源码自行构建（CI 走的就是这套流程）：
+- **访客评论有了「简版编辑器」（默认关闭）**：手机上单栏、只留 8 个按钮，
+  去掉那些评论里本来就用不了的功能，免得「预览里好好的、发出去就没了」。
+- **链接和图片在评论里都不能点了**：防的是访客之间的钓鱼点击。
+- **后台不再到处弹「检验到插件资源包已过时」**：那条提示本来只该出现在设置页。
+- **前台编辑器的配色可以不再跟着后台走**：前台跟随你的主题，后台该深色还深色。
+- **修好了官方块主题下评论框多出一块输入框**的问题。
+- **去掉了 sm.ms 图床**：那家已经改成收费服务了。
+- **修掉一个会让站点每次都重跑一遍初始化的问题**。
+
+完整说明见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
+
+---
+
+## 和原版有什么不同
+
+一句话：**只做必要的安全加固和兼容适配，不动功能设计，也不动数据格式。**
+
+* **修安全**（维护它的主要原因）——
+  修掉公式渲染的**存储型 XSS**（就是被公开的那类问题，**CVE-2025-31035**），
+  以及图片粘贴接口的任意文件写入、图床代理被当成跳板、后台页面的越权、设置项保存不净化、
+  带某个 Cookie 就直接白屏等一批问题；同时升级了两个有公开漏洞的组件
+  （**Mermaid → 10.9.8、KaTeX → 0.19.0**），默认也不再从第三方 CDN 加载资源。
+* **适配新版** —— 支持 **WordPress 7.1** 和 **PHP 7.4 ~ 8.4**，包括修掉「插件加载时调用了
+  还不存在的函数，导致前台后台一起白屏」这种致命问题。
+* **修构建链** —— 换掉早就用不了的构建工具，项目重新能构建，并加上了自动打包发布。
+* **顺手修的老毛病** —— 比如思维导图设置丢失、Mermaid 的默认值被写进 KaTeX 等历史遗留问题。
+* **重写公式解析（10.4.0）** —— 修掉「代码块里的 `$` 被当成公式」「块级公式渲染两遍」
+  「正文里凑巧成对的 `$` 被当成公式」。
+* **新增：图片尺寸语法（10.4.0，可选）** —— 写法见上一节。不写尺寸时，效果和以前一模一样。
+* **预览和发布结果对齐（10.4.5）** —— 以前预览不认识图片尺寸语法，还会把价格、函数签名里的 `$`
+  当成公式；现在两边显示结果逐项一致。
+* **访客评论不再「发出去就没了」（10.4.4 / 10.5.0）** —— 原因见下面的常见问题。
+
+**明确不做的事**：不重构编辑器、不改数据存储结构、不改已有设置项的命名和取值。
+一切都是为了把影响面控制住。
+
+---
+
+## 常见问题
+
+**Q：后台一直在提示「检验到插件资源包已过时」，怎么办？**
+A：10.5.0 已经修好。这个提示原本只该出现在插件设置页，旧版本写错了输出位置，变成了全后台通告。
+升级到 10.5.0 即可，不需要手动改任何设置。
+
+**Q：为什么访客评论里的图片点不开、链接也不能点？**
+A：这是有意为之。评论属于不可信内容，防的是访客之间互相钓鱼。图片照样显示，只是不能点。
+链接会显示成「链接文字：`网址`」的样子。
+
+**Q：评论里为什么不能贴代码块、表格、标题？**
+A：WordPress 对评论内容只放行 15 个标签，代码块、表格、标题、列表本来就会被系统剥掉——
+不是插件不给你用，是贴了也留不住。开启「简版编辑器」后，工具栏会直接把用不了的按钮收起来。
+当前生效的标签清单，可以在**高级设置 → 调试信息**里查看。
+
+**Q：升级会不会弄丢我的文章或设置？**
+A：不会。本维护版从未改动数据结构，升级不需要迁移。
+
+**Q：装完白屏了？**
+A：几乎都是用了 `Source code (zip)` 源码包。请改用 Release 页面里的 zip。
+
+---
+
+## 从源码构建
+
+要自己构建的话（我们的自动发布流程走的就是这套）：
 
 ```bash
 # 1. PHP 依赖（生成 vendor/）
@@ -95,69 +148,22 @@ composer install --no-dev --prefer-dist --optimize-autoloader
 npm ci
 npm run build-prod
 
-# 3. sm.ms 图片管理页（Vue 子项目）
-cd src/Pages/page/sm-ms-management
-npm ci
-npm run build
-cd -
-
-# 4. 语言包
+# 3. 语言包
 for po in languages/*.po; do msgfmt -o "${po%.po}.mo" "$po"; done
 
-# 5. 打包成可安装 zip
-python3 .github/scripts/build_package.py . dist/wp-editormd-10.4.5.zip 10.4.5
+# 4. 打包成可安装的 zip
+python3 .github/scripts/build_package.py . dist/wp-editormd-10.5.0.zip 10.5.0
 ```
 
 环境要求：Node.js ≥ 18（推荐 22）、PHP ≥ 7.4、Composer、gettext（`msgfmt`）、Python 3。
 
 ---
 
-## 特征 Feature
-
-- [x] 支持实时预览 / 代码插入 / 代码折叠 / 列表插入 / 搜索替换 / 语法高亮等功能
-- [x] 支持 [Emoji 表情](http://www.emoji-cheat-sheet.com/)
-- [x] 支持 WordPress 的多媒体插入
-- [x] 支持 Toc 文章目录显示
-- [x] 支持 GFM Task lists
-- [x] 支持 [KaTeX 科学公式](https://khan.github.io/KaTeX/)
-- [x] 支持 [Mermaid](https://mermaidjs.github.io/)
-- [x] 支持图像粘贴
-
----
-
-- [x] Real-time Preview, Preformatted text/Code blocks/Tables insert, Search replace, Code syntax highlighting
-- [x] Support [Emoji](http://www.emoji-cheat-sheet.com/)
-- [x] Support WordPress multimedia insertion
-- [x] Support Toc
-- [x] Support GFM Task lists
-- [x] Support [KaTeX](https://khan.github.io/KaTeX/)
-- [x] Support [Mermaid](https://mermaidjs.github.io/)
-- [x] Support Image Paste
-
-### 使用说明 ReadMe
-
-请参考上游 Wiki（部分内容可能已过期）：
-<https://github.com/LuRenJiasWorld/WP-Editor.md/wiki>
-
-**图片尺寸语法（10.4.0 新增，可选）**：在图片地址后加 `=宽x高`，可只写一维：
-
-    ![说明](图片地址 =600)        显示宽度 600px，高度按原图比例
-    ![说明](图片地址 =600x400)    显示为 600×400
-    ![说明](图片地址 =x400)       显示高度 400px
-
-留空即按原尺寸显示。窄屏下会自动等比缩小，不会变形。
-
-### 更新日志 ChangeLog
-
-请见 [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)
-
----
-
-## 授权协议 License
+## 授权协议
 
 ![GPLv3](https://www.gnu.org/graphics/gplv3-127x51.png)
 
-本分支沿用上游的授权协议：**GNU General Public License Version 3 or later**。
+本分支沿用原版的授权协议：**GNU General Public License Version 3 or later**。
 
 WP-Editor.MD is licensed under [GNU General Public License](https://www.gnu.org/licenses/gpl.html) Version 3 or later.
 
@@ -178,9 +184,10 @@ along with WP-Editor.MD.  If not, see <http://www.gnu.org/licenses/>.
 
 **版权与归属**
 
-* 原始作品版权归 [LuRenJiasWorld](https://github.com/LuRenJiasWorld) 及 [WP-Editor.md 贡献者](https://github.com/LuRenJiasWorld/WP-Editor.md/graphs/contributors) 所有。
+* 原始作品版权归 [LuRenJiasWorld](https://github.com/LuRenJiasWorld) 及
+  [WP-Editor.md 贡献者](https://github.com/LuRenJiasWorld/WP-Editor.md/graphs/contributors) 所有。
 * 本分支的修改部分版权归 [tjsky](https://github.com/tjsky) 所有，同样以 GPL-3.0-or-later 授权。
 * 本项目依赖 [Editor.md](https://github.com/pandao/editor.md)、[KaTeX](https://katex.org/)、
   [Mermaid](https://mermaid.js.org/)、[Prism.js](https://prismjs.com/)、[CodeMirror](https://codemirror.net/)
   等第三方开源组件，其版权与许可见各组件自身的 LICENSE。
-* 依据 GPL-3.0 第 5 条，本修改版保留原有版权声明，并随源码一并提供完整的 `LICENSE` 全文。
+* 按 GPL-3.0 第 5 条，本修改版保留原有版权声明，并随源码附上完整的 `LICENSE` 全文。

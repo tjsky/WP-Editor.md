@@ -563,6 +563,7 @@ class WPComMarkdown {
     public function pre_comment_content($content) {
         return $this->transform($content, array(
             "id" => $this->comment_hash($content),
+            "simple_comment" => SimpleCommentMode::is_simple_context(),
         ));
     }
 
@@ -593,7 +594,8 @@ class WPComMarkdown {
         $args = wp_parse_args($args, array(
             "id"                 => false,
             "unslash"            => true,
-            "decode_code_blocks" => true
+            "decode_code_blocks" => true,
+            "simple_comment"     => false
         ));
         // 删除函数值中的斜线（\）
         if ($args["unslash"]) {
@@ -629,6 +631,11 @@ class WPComMarkdown {
         $text = preg_replace( '/((id|href)="#?fn(ref)?):/', "$1-", $text );
         // Markdown inserts extra spaces to make itself work. Buh-bye.
         $text = rtrim($text);
+
+        if (! empty($args["simple_comment"])) {
+            $text = SimpleCommentMode::degrade_links($text);
+            $text = SimpleCommentMode::decorate_images($text);
+        }
         /**
          * Filter the content to be run through Markdown, after it was transformed by Markdown.
          *

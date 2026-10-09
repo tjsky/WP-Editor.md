@@ -18,9 +18,6 @@ NO_PROXY="${NO_PROXY:-}"
 no_proxy="${no_proxy:-}"
 CLEAN_BUILD="${CLEAN_BUILD:-false}"
 BUILD_MODE="${BUILD_MODE:-dev}"
-BUILD_SM_MS_MANAGEMENT="${BUILD_SM_MS_MANAGEMENT:-true}"
-
-
 function build-js() {
     if [ "$BUILD_MODE" = "prod" ]; then
         npm run build-prod
@@ -67,18 +64,9 @@ step4_end_time=$(date +%s)
 echo "构建JS与CSS文件......"
 build-js &
 
-# sm-ms-management处理
-if [ $BUILD_SM_MS_MANAGEMENT = "true" ]; then
-    echo "构建sm-ms-management"
-    cd src/Pages/page/sm-ms-management
-    yarn install \
-      && cp yarn.lock ${source_dir}/src/Pages/page/sm-ms-management/yarn.lock
-    step5_end_time=$(date +%s)
-    npm run build &
-else
-    echo "不构建sm-ms-management"
-    step5_end_time=$step4_end_time
-fi
+# 说明：原 sm-ms-management（第三方图床管理页，Vue 子项目）已随图床功能
+# 一并移除（10.5.0），不再需要单独构建。
+step5_end_time=$step4_end_time
 
 wait
 step6_end_time=$(date +%s)
@@ -91,9 +79,6 @@ rsync -az --delete \
 
 cd $dist_dir/wp-editormd
 rm -rf `ls -A $dist_dir/wp-editormd | grep -v "assets\|languages\|src\|vendor\|readme.txt\|LICENSE\|wp-editormd.php\|uninstall.php"`
-
-cd $dist_dir/wp-editormd/src/Pages/page/sm-ms-management/
-rm -rf `ls -A $dist_dir/wp-editormd/src/Pages/page/sm-ms-management/ | grep -v "sm-ms-management.php\|html"`
 
 cd $dist_dir
 echo "打包数据"
@@ -115,7 +100,6 @@ echo "拷贝到工作目录耗时$(($step1_end_time-$begin_time))秒"
 echo "配置权限耗时$(($step2_end_time-$step1_end_time))秒"
 echo "安装依赖耗时$(($step3_end_time-$step2_end_time))秒"
 echo "构建语言文件耗时$(($step4_end_time-$step3_end_time))秒"
-echo "sm-ms-management安装依赖耗时$(($step5_end_time-$step4_end_time))秒"
 echo "总构建耗时$(($step6_end_time-$step4_end_time))秒"
 echo "打包数据耗时$(($step7_end_time-$step6_end_time))秒"
 echo "配置输出目录权限耗时$(($step8_end_time-$step7_end_time))秒"

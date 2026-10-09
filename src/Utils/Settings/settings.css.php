@@ -57,9 +57,20 @@
 		font-weight: 600;
 	}
 
+	@media screen and (min-width: 960px) {
+		.form-and-donate .form-table th {
+			width: 300px;
+			white-space: nowrap;
+		}
+	}
+
 	/* 用于将捐赠信息和设置面板横向并排 */
 	.form-and-donate #donate a {
 		display: block;
+	}
+
+	.form-and-donate #donate p.editormd-fork-note a {
+		display: inline;
 	}
 
 	.form-and-donate #donate a:focus {

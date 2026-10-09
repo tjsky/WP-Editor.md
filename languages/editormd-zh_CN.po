@@ -29,9 +29,6 @@ msgstr "我的博客"
 msgid "Browser Information"
 msgstr "浏览器信息"
 
-msgid "Change image paste upload source to https://smms.app"
-msgstr "修改图片上传源为https://smms.app，图片将不在本地存储！"
-
 msgid "Change the markdown editor style"
 msgstr "改变Markdown编辑器窗口风格"
 
@@ -119,9 +116,6 @@ msgstr "让编辑器支持粘贴图像（该功能在一部分浏览器下存在
 
 msgid "Image Uploading..."
 msgstr "图片上传中..."
-
-msgid "ImagePaste Upload Source"
-msgstr "更改图片粘贴(图片上传)上传源"
 
 msgid "Info"
 msgstr "获取信息（如果出现问题，请把调试信反馈给作者）"
@@ -287,13 +281,21 @@ msgid "jQuery Version"
 msgstr "jQuery版本"
 
 msgid "Support Front Comment"
-msgstr "支持前端评论(目前确定默认主题完全兼容，如果加载失败请及时反馈！)"
+msgstr "支持前端评论"
 
 msgid "Support Reply Comment For edit-comments.php"
 msgstr "支持后台回复评论管理"
 
 msgid "Hey, we've noticed that you're running an outdated version of PHP which is no longer supported. Make sure your site is fast and secure, by upgrading PHP to the latest version."
 msgstr "您正在运行一个过时的，不再受支持的 PHP 版本。通过升级 PHP (PHP5.3.29以上) 到最新版本，才能运行最新版插件！"
+
+#: src/Utils/Settings.php
+msgid "Apply The Styles Above To The Front-end Editor"
+msgstr "把以上风格应用到前台编辑器"
+
+#: src/Utils/Settings.php
+msgid "Off (default): the front-end comment editor keeps the default light style and follows your theme — write your own CSS if you need e.g. a dark mode. On: the two styles above apply to the front-end editor as well. The admin editor is never affected by this switch."
+msgstr "关闭（默认）：前台评论编辑器使用 Editor.md 自带的浅色样式、跟随你的主题 —— 需要夜间模式等效果请自行编写 CSS。开启：以上两项风格同样应用到前台编辑器。后台编辑器不受本开关影响。"
 
 msgid "Editor.md Static Resource Addres"
 msgstr "编辑器静态资源地址"
@@ -304,11 +306,17 @@ msgstr "请确保编辑器静态资源为最新版，否则会出现一些莫名
 msgid "Please upload the resource (the unzipped folder name is \"assets\") to your server or cdn. If your resource address is: \"http(s)://example.com/myfile/assets\", you should fill in: \"http(s)://example.com/myfile \". <br/>"
 msgstr "请把资源（解压文件夹为assets）上传到你的服务器或者cdn，如果你的资源地址是：“http(s)://example.com/myfile/assets”，那么应该填入：“http(s)://example.com/myfile”。<br/>"
 
-msgid "The resource package is corrupt, please download again!"
-msgstr "插件资源包已损坏，请在下面提示链接中重新下载！"
+#: src/Utils/Settings.php
+msgid "Status: Resource package missing or corrupt!"
+msgstr "状态：资源包缺失或损坏！"
 
-msgid "The resources used by the plugin check are outdated. Please upgrade the latest resources."
-msgstr "检验到插件资源包已过时，请在设置页面中进行配置！"
+#: src/Utils/Settings.php
+msgid "Cannot read assets/version.json — the resource package may not have been uploaded completely."
+msgstr "读不到 assets/version.json，资源包可能未完整上传。"
+
+#: src/Utils/Settings.php
+msgid "Resource package version %1$s does not match plugin version %2$s."
+msgstr "资源包版本 %1$s 与插件版本 %2$s 不一致。"
 
 msgid "Status: Please Update!"
 msgstr "状态：资源过时，请升级！"
@@ -352,15 +360,6 @@ msgstr "导出调试信息"
 msgid "Enabled Plugins List"
 msgstr "启用插件列表"
 
-msgid "sm.ms Auth Token"
-msgstr "sm.ms图床校验码"
-
-msgid "Optional, makes your uploaded image binded with your sm.ms account. Get token <a href=\"https://smms.app/home/apitoken\" target=\"_blank\">Here</a>."
-msgstr "可选，便于sm.ms用户将粘贴上传的图片与自己的账户绑定，在<a href=\"https://smms.app/home/apitoken\" target=\"_blank\">这里</a>获取Token"
-
-msgid "sm.ms Image Management"
-msgstr "sm.ms图床管理"
-
 msgid "Editor Style Preview"
 msgstr "编辑器样式预览"
 
@@ -369,3 +368,83 @@ msgstr "语法高亮样式预览"
 
 msgid "Successfully upgraded to version %s !"
 msgstr "成功升级到版本 %s ！"
+
+#: src/Utils/Settings.php
+msgid "Use Simple Editor For Front Comments"
+msgstr "访客评论使用简版编辑器"
+
+#: src/Utils/Settings.php
+msgid "Offers only bold, italic, strikethrough, blockquote, inline code, images and links in the visitor comment box — links and images are not clickable. The editor starts in single-column mode with a trimmed toolbar."
+msgstr "访客评论区只提供粗体、斜体、删除线、引用、行内代码、图片与链接（链接与图片不可点击），编辑器默认单栏、工具栏精简。"
+
+#: src/Utils/Settings.php
+msgid "Comment Syntax Limitation"
+msgstr "评论语法的限制"
+
+#: src/Utils/Settings.php
+msgid "Comment syntax is limited by the WordPress KSES whitelist for untrusted content. Whether or not the simple editor is enabled, images, tables, headings, lists and horizontal rules may not display correctly in comments — some are stripped outright. The currently effective whitelist is listed under “Advanced Settings → Debugger”."
+msgstr "评论区可用的语法受 WordPress 对不可信内容的 KSES 白名单限制。无论是否开启简版编辑器，图片、表格、多级标题、列表、分割线等在评论区的显示都可能受限（部分会被直接剥除）。当前实际生效的白名单见「高级设置 → 调试信息」。"
+
+#: src/Front/FrontEditor.php
+msgid "Supports **bold**, *italic*, ~~strikethrough~~, > quote, `code`, images and links (links and images are not clickable)"
+msgstr "支持 **粗体**、*斜体*、~~删除线~~、> 引用、`代码`、图片与链接（链接与图片不可点击）"
+
+#: src/Utils/Debugger.php
+msgid "Comment HTML Whitelist (KSES)"
+msgstr "评论区允许的 HTML 标签（KSES）"
+
+#: src/Utils/Debugger.php
+msgid "Comment Behavior Added By This Plugin"
+msgstr "本插件对评论区新增的行为（非 WordPress 原生支持）"
+
+#: src/Utils/Debugger.php
+msgid "(unavailable on this site)"
+msgstr "（本站不可用）"
+
+#: src/Utils/Debugger.php
+msgid "(no attribute)"
+msgstr "（无属性）"
+
+#: src/Utils/Debugger.php
+msgid "[WordPress native]"
+msgstr "［WordPress 原生］"
+
+#: src/Utils/Debugger.php
+msgid "[added by this plugin]"
+msgstr "［本插件扩展］"
+
+#: src/Utils/Debugger.php
+msgid "enabled"
+msgstr "已开启"
+
+#: src/Utils/Debugger.php
+msgid "disabled"
+msgstr "已关闭"
+
+#: src/Utils/Debugger.php
+msgid "Images: WordPress does not allow <img> inside comments natively; this plugin adds it to the whitelist above. Current state: %s"
+msgstr "图片：WordPress 原生不允许评论内嵌 <img>，是本插件把它加进了上面的白名单（非原生支持）。当前状态：%s"
+
+#: src/Utils/Debugger.php
+msgid "Links: external links inside comments are degraded to read-only text and no <a> tag is produced. Current state: %s"
+msgstr "链接：评论内的外链会被降级为只读文本，不生成 <a> 标签。当前状态：%s"
+
+#: src/Utils/Debugger.php
+msgid "Degraded link output template: %s"
+msgstr "链接降级后的输出模板：%s"
+
+#: src/Utils/Debugger.php
+msgid "Comment body wrapper (%1$s) scopes image width and turns off emoji shortcodes inside comments. Current state: %2$s"
+msgstr "评论正文容器（%1$s）：用于约束图片宽度，并关闭评论区的 emoji 短代码。当前状态：%2$s"
+
+#: src/Utils/Debugger.php
+msgid "Formulas / task lists / code blocks / emoji inside comments are turned off. Current state: %s"
+msgstr "评论区的公式 / 任务列表 / 代码块 / emoji 已关闭。当前状态：%s"
+
+#: src/Utils/Settings.php
+msgid "Currently confirmed to be fully compatible with the WordPress default themes. If it fails to load, please report it as soon as possible."
+msgstr "目前已确认与 WordPress 默认主题完全兼容，如果加载失败请及时反馈！"
+
+#: src/Utils/Settings.php
+msgid "I am the author of this modified / forked version. Compared with the original author's contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a> when you have time. Thank you!"
+msgstr "我是二次开发修改版的作者：和原作者的贡献比起来，我只是做了些没什么技术含量的小修小改，就不留捐赠信息了，如果修改版 WP-Editor.md 能得到你的喜爱，能有空来看看我的博客《<a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a>》就好啦，谢谢！"

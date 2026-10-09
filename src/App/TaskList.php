@@ -6,7 +6,10 @@ class TaskList {
 
     public function __construct() {
         add_filter("the_content", array($this, "taskList_markup")); // before wptexturize
-        add_filter("comment_text", array($this, "taskList_markup")); // before wptexturize
+
+        if (! SimpleCommentMode::enabled()) {
+            add_filter("comment_text", array($this, "taskList_markup")); // before wptexturize
+        }
     }
 
     public function taskList_markup($content) {
