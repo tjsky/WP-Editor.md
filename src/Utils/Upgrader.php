@@ -67,8 +67,14 @@ class Upgrader {
             case "10.4.2":
                 $this->upgrade_10_4_2_to_10_4_3();
                 // no break
+            case "10.4.3":
+                $this->upgrade_10_4_3_to_10_4_4();
+                // no break
             case "10.4.4":
                 $this->upgrade_10_4_4_to_10_4_5();
+                // no break
+            case "10.4.5":
+                $this->upgrade_10_4_5_to_10_5_0();
                 // no break
             default:
                 break;
@@ -81,6 +87,41 @@ class Upgrader {
         if ($current_version !== $next_version && "" !== $next_version) {
             $this->update_changelog_page($next_version);
         }
+    }
+
+    /**
+     * 10.4.5 → 10.5.0
+     *
+     * 本版新增「访客评论简版编辑器」（editor_basics → simple_comment_editor）。
+     * 新键在老站点的 editor_basics 数组里不存在，Config::get_option() 会回退到
+     * 默认值 ""，语义上等于「关闭」，与 Activator 里的默认值 "off" 一致 ——
+     * 因此**无需数据结构迁移**，只推进 editor_version。
+     *
+     * 顺带修复：本 switch 此前缺少 case "10.4.3" 与 case "10.4.5"。
+     * 停留在这两个版本上的站点匹配不到任何 case，会直接落到 default 分支，
+     * 于是 editor_version 永远不推进 —— 而 wp-editormd.php 正是用
+     * 「editor_version !== WP_EDITORMD_VER」来判断是否需要执行激活流程，
+     * 结果是**每个请求都重跑一次 Activator::activate()**（含 new Upgrader()）。
+     * 补上这两个 case 后，升级链才真正连续。
+     *
+     * 另清一次旧版遗留的 transient：`editormd_static_file_ver`（不带版本号）已被
+     * `editormd_static_file_ver_<插件版本>` 取代。不清理的话，升级后最长 12 小时
+     * 仍会读到旧资源包的版本号，被误判成「资源包过时」。
+     *
+     * 同时清理第三方图床（sm.ms）遗留的配置：该功能已整体移除，
+     * 留着 imagepaste_sm="on" 会让用户误以为仍在往第三方上传。
+     */
+    private function upgrade_10_4_5_to_10_5_0() {
+        delete_transient("editormd_static_file_ver");
+
+        // 移除已下线的第三方图床配置（upload source 开关与访问令牌）
+        $basics = get_option("editor_basics");
+        if (is_array($basics)) {
+            unset($basics["imagepaste_sm"], $basics["imagepaste_sm_token"]);
+            update_option("editor_basics", $basics);
+        }
+
+        $this->update_to_version("10.5.0");
     }
 
     /**
@@ -163,7 +204,8 @@ class Upgrader {
     }
 
     private function upgrade_10_1_2_to_10_2_0() {
-        Config::update_option("imagepaste_sm_token", "editor_basics", "");
+        // 10.5.0：原此处写入 imagepaste_sm_token 的默认空值，该选项已随
+        // 第三方图床功能一并移除，不再需要（写入只会多留一个无主键）。
         $this->update_to_version("10.2.0");
     }
 

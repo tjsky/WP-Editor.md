@@ -6,7 +6,18 @@ class TaskList {
 
     public function __construct() {
         add_filter("the_content", array($this, "taskList_markup")); // before wptexturize
-        add_filter("comment_text", array($this, "taskList_markup")); // before wptexturize
+
+        /**
+         * 评论路径是否渲染任务列表复选框（10.5.0）
+         *
+         * 简版评论模式不提供任务列表。除了编辑器侧关闭 `taskList`，
+         * 服务端也必须摘掉这条钩子：复选框是渲染期由本方法生成的 `<input>`，
+         * 不受保存期 KSES 约束，而 `<ul>/<li>` 早已被剥掉 —— 留着只会得到
+         * 「没有列表结构的孤立复选框」这种半残形态。
+         */
+        if (! SimpleCommentMode::enabled()) {
+            add_filter("comment_text", array($this, "taskList_markup")); // before wptexturize
+        }
     }
 
     public function taskList_markup($content) {

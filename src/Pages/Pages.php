@@ -48,15 +48,12 @@ class Pages {
     function __construct($text_domain) {
         $this->text_domain = $text_domain;
 
+        // 10.5.0：原本还有一张「第三方图床管理页」，已随图床功能一并移除。
         $this->pages = array(
-            "sm-ms-management"   =>    self::ADMIN_PRIV,
             "upgrade-release"    =>    self::ADMIN_PRIV,
         );
 
         $this->entries = array(
-            "sm-ms-management"   => array(
-                "sm_ms_proxy" => "wp_editormd_entry_sm_ms_proxy",
-            ),
             "upgrade-release"    => array(),
         );
 
@@ -69,7 +66,6 @@ class Pages {
          * 现改为插件前缀命名，并在调用前用 function_exists() 校验。
          */
         $this->renderers = array(
-            "sm-ms-management"   => "wp_editormd_render_sm_ms_management_page",
             "upgrade-release"    => "wp_editormd_render_upgrade_release_page",
         );
 

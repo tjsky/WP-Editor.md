@@ -199,7 +199,7 @@ class Logger {
      *
      * 安全修复（10.4.2）：
      *   WordPress 的 nonce 走 URL 查询串（_wpnonce / _ajax_nonce），本插件的
-     *   图片粘贴与后台页面 AJAX 都会带上它；sm.ms 令牌也可能出现在查询串里。
+     *   图片粘贴与后台页面 AJAX 都会带上它。
      *   日志默认只保留路径与「参数名」，值一律替换为 [REDACTED]，
      *   既不影响排障（路径与参数名已足够定位），也不会把凭据写进 error_log。
      *

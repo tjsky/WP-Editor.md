@@ -6,9 +6,9 @@
     python3 build_package.py <插件根目录> <输出 zip 路径> [版本号]
 
 为什么需要它：
-  本仓库的 .gitignore 忽略了 vendor/、所有 *.min.js / *.min.css、languages/*.mo
-  以及 Vue 子项目的 html/ 产物 —— 也就是说「从 GitHub 源码直接安装」必然因缺少
-  vendor/autoload.php 而致命报错。因此发布前必须先真实构建，再按本脚本的规则打包。
+  本仓库的 .gitignore 忽略了 vendor/、所有 *.min.js / *.min.css、languages/*.mo ——
+  也就是说「从 GitHub 源码直接安装」必然因缺少 vendor/autoload.php 而致命报错。
+  因此发布前必须先真实构建，再按本脚本的规则打包。
 
 要点：
   * zip 内顶层目录固定为 wp-editormd/（WordPress 安装包要求）
@@ -42,11 +42,6 @@ SKIP_REL_PREFIXES = (
     "assets/Editormd/tests/",
 )
 
-# Vue 子项目：只保留 html/ 产物与 PHP 页面，其余为构建期源码
-VUE_DIR = "src/Pages/page/sm-ms-management/"
-VUE_ALLOW_PREFIX = VUE_DIR + "html/"
-VUE_ALLOW_FILES = {VUE_DIR + "sm-ms-management.php"}
-
 # 打包后必须存在（否则视为打包失败）
 REQUIRED = [
     "wp-editormd.php",
@@ -67,7 +62,6 @@ REQUIRED = [
     "assets/version.json",
     "languages/editormd-zh_CN.mo",
     "languages/editormd-zh_TW.mo",
-    "src/Pages/page/sm-ms-management/html/index.html",
     "src/Pages/page/upgrade-release/release-note/10.2.1/zh-CN.md",
 ]
 
@@ -88,19 +82,6 @@ def should_skip(rel):
     for pref in SKIP_REL_PREFIXES:
         if rel.startswith(pref):
             return True
-
-    # Vue 子项目收敛
-    if rel.startswith(VUE_DIR):
-        # 注意：目录本身（如 ".../sm-ms-management/html"）不带尾斜杠，
-        # 若只判断 rel.startswith(VUE_ALLOW_PREFIX) 会把该目录整棵剪掉，
-        # 因此这里同时判断 (rel + "/") 的前缀。
-        if (
-            rel.startswith(VUE_ALLOW_PREFIX)
-            or (rel + "/").startswith(VUE_ALLOW_PREFIX)
-            or rel in VUE_ALLOW_FILES
-        ):
-            return False
-        return True
 
     if rel.endswith(".map"):
         return True

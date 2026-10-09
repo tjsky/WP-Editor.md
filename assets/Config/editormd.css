@@ -66,3 +66,95 @@
   padding: 2px 4px;
   width: calc(100% + 2px);
 }
+
+/* ------------------------------------------------------------------ *
+ * 访客评论「简版编辑器」（10.5.0）
+ *
+ * 作用域全部挂在 .editormd-comment-simple（编辑器容器，由 Config JS 在
+ * onload 时添加）与 .editormd-comment-body（评论正文容器，由服务端
+ * SimpleCommentMode::wrap_comment_body() 输出）上，不依赖具体主题的 DOM，
+ * 也不会影响文章编辑器与后台回复框。
+ * ------------------------------------------------------------------ */
+
+/* 注意：编辑器正文字号不在这里设 —— Editor.md 把 settings.fontSize 作为
+   CodeMirror 选项写进了 `.CodeMirror` 的**内联样式**，样式表压不过它。
+   简版在 assets/Config/editormd.js 里直接把 fontSize 传成 16px
+   （低于 16px 时 iOS Safari 会在聚焦输入框时自动放大页面）。 */
+
+.editormd-comment-simple .editormd-toolbar-container {
+  padding: 2px 4px;
+}
+
+/* 简版工具栏已收敛到 8 个按钮，窄屏也要能一行放下，否则又会挤占输入区 */
+@media (max-width: 767px) {
+  .editormd-comment-simple .CodeMirror {
+    min-height: 160px;
+  }
+
+  /* 分隔符在窄屏属于纯装饰，先让位给真实按钮 */
+  .editormd-comment-simple .editormd-menu > li.divider {
+    display: none;
+  }
+
+  .editormd-comment-simple .editormd-menu > li > a {
+    min-width: 20px;
+    padding: 0 4px;
+    font-size: 14px;
+  }
+
+  /* 工具栏收成一行后，「纯预览」按钮就落在这行的最右侧，而它的提示语是
+     Editor.md 的默认文案 "HTML Preview (Press Shift + ESC exit)"（约 275px），
+     按库里的 `left: 130%` 定位会一路向右冲出视口 —— 页面 scrollWidth 随它
+     涨到 600+px，手机上整页可以被横向拖着走（实测 375px 视口下溢出 248px）。
+     窄屏下把它翻到按钮左侧（与原来的 130% 间距对称），并把小箭头翻到右侧。
+
+     注意：只改定位，不要动 white-space / max-width。这个提示语的包含块是宽约
+     33px 的 li，`right: 130%`(=43px) 已经超过包含块宽度，可用宽度为负；此时
+     元素宽度取 min-content —— 保留 nowrap 才能拿到完整文案宽度(275px)，
+     一旦改成 normal + max-width，宽度会塌成最长单词的宽度（实测 24px / 27 行）。
+     只作用于简版容器：完整工具栏会换行，最后的按钮不在右边缘，没有这个问题。 */
+  .editormd-comment-simple .editormd-menu > li:last-child > a .tooltiptext {
+    left: auto;
+    right: 130%;
+  }
+
+  .editormd-comment-simple .editormd-menu > li:last-child > a .tooltiptext::after {
+    left: auto;
+    right: -10px;
+    margin-left: 0;
+    border-color: transparent transparent transparent #555;
+  }
+}
+
+/* 评论正文里的图片来自访客粘贴的任意地址，必须约束尺寸，避免撑破评论区 */
+.editormd-comment-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ------------------------------------------------------------------ *
+ * WordPress 块主题（Twenty Twenty-Four / Twenty-Five 等）下的评论框
+ *
+ * 块主题给评论表单里的 textarea 写了一条权重更高的规则：
+ *     .wp-block-post-comments-form .comment-form textarea { display:block; width:100% }
+ * 权重 0,2,1，而且主题样式表排在插件之后 —— 它压过了 Editor.md 自带的
+ *     .editormd .editormd-html-textarea { display:none }   （0,2,0）
+ *
+ * 结果：评论框下方会漏出一块原生 textarea，里面存的正是「渲染后的 HTML」，
+ * 看上去就像预览变成了一堆 HTML 源码。在自有主题下看不到这个问题，
+ * 只是因为那条主题规则恰好不存在。
+ *
+ * 这两个 textarea 是纯数据中转（Markdown 原文 / 渲染结果），任何时候都不该可见，
+ * 所以直接用 !important 钉死，不去跟主题比权重。
+ * ------------------------------------------------------------------ */
+.editormd > textarea,
+.editormd .editormd-html-textarea,
+.editormd .editormd-markdown-textarea {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  resize: none !important;
+}

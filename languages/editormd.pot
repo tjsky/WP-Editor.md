@@ -274,12 +274,6 @@ msgstr ""
 msgid "Hide Ads"
 msgstr ""
 
-msgid "ImagePaste Upload Source"
-msgstr ""
-
-msgid "Change image paste upload source to https://smms.app"
-msgstr ""
-
 msgid "Support Front Comment"
 msgstr ""
 
@@ -287,6 +281,14 @@ msgid "Support Reply Comment For edit-comments.php"
 msgstr ""
 
 msgid "Hey, we've noticed that you're running an outdated version of PHP which is no longer supported. Make sure your site is fast and secure, by upgrading PHP to the latest version."
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Apply The Styles Above To The Front-end Editor"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Off (default): the front-end comment editor keeps the default light style and follows your theme — write your own CSS if you need e.g. a dark mode. On: the two styles above apply to the front-end editor as well. The admin editor is never affected by this switch."
 msgstr ""
 
 msgid "Editor.md Static Resource Addres"
@@ -298,10 +300,16 @@ msgstr ""
 msgid "Please upload the resource (the unzipped folder name is \"assets\") to your server or cdn. If your resource address is: \"http(s)://example.com/myfile/assets\", you should fill in: \"http(s)://example.com/myfile \". <br/>"
 msgstr ""
 
-msgid "The resource package is corrupt, please download again!"
+#: src/Utils/Settings.php
+msgid "Status: Resource package missing or corrupt!"
 msgstr ""
 
-msgid "The resources used by the plugin check are outdated. Please upgrade the latest resources."
+#: src/Utils/Settings.php
+msgid "Cannot read assets/version.json — the resource package may not have been uploaded completely."
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Resource package version %1$s does not match plugin version %2$s."
 msgstr ""
 
 msgid "Status: Please Update!"
@@ -349,15 +357,6 @@ msgstr ""
 msgid "Enabled Plugins List"
 msgstr ""
 
-msgid "sm.ms Auth Token"
-msgstr ""
-
-msgid "Optional, makes your uploaded image binded with your sm.ms account. Get token <a href=\"https://smms.app/home/apitoken\" target=\"_blank\">Here</a>."
-msgstr ""
-
-msgid "sm.ms Image Management"
-msgstr ""
-
 msgid "Editor Style Preview"
 msgstr ""
 
@@ -365,4 +364,84 @@ msgid "Syntax Highlight Preview"
 msgstr ""
 
 msgid "Successfully upgraded to version %s !"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Use Simple Editor For Front Comments"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Offers only bold, italic, strikethrough, blockquote, inline code, images and links in the visitor comment box — links and images are not clickable. The editor starts in single-column mode with a trimmed toolbar."
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Comment Syntax Limitation"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Comment syntax is limited by the WordPress KSES whitelist for untrusted content. Whether or not the simple editor is enabled, images, tables, headings, lists and horizontal rules may not display correctly in comments — some are stripped outright. The currently effective whitelist is listed under “Advanced Settings → Debugger”."
+msgstr ""
+
+#: src/Front/FrontEditor.php
+msgid "Supports **bold**, *italic*, ~~strikethrough~~, > quote, `code`, images and links (links and images are not clickable)"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Comment HTML Whitelist (KSES)"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Comment Behavior Added By This Plugin"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "(unavailable on this site)"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "(no attribute)"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "[WordPress native]"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "[added by this plugin]"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "enabled"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "disabled"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Images: WordPress does not allow <img> inside comments natively; this plugin adds it to the whitelist above. Current state: %s"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Links: external links inside comments are degraded to read-only text and no <a> tag is produced. Current state: %s"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Degraded link output template: %s"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Comment body wrapper (%1$s) scopes image width and turns off emoji shortcodes inside comments. Current state: %2$s"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Formulas / task lists / code blocks / emoji inside comments are turned off. Current state: %s"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Currently confirmed to be fully compatible with the WordPress default themes. If it fails to load, please report it as soon as possible."
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "I am the author of this modified / forked version. Compared with the original author's contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a> when you have time. Thank you!"
 msgstr ""

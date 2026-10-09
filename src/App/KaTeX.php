@@ -38,7 +38,18 @@ class KaTeX {
         // 合并为一条正则（$$ 分支在前）后，该问题从结构上消失，同时少跑一次
         // wp_html_split()，大篇幅内容的开销减半。
         add_filter("the_content", array($this, "katex_markup"), 9);
-        add_filter("comment_text", array($this, "katex_markup"), 9);
+
+        /**
+         * 评论路径是否解析公式（10.5.0）
+         *
+         * 简版评论模式把公式列为「不提供」的语法。编辑器侧只需把实例选项
+         * `tex` 置为 false 就能让预览不渲染，但**服务端这条钩子必须一并摘掉** ——
+         * 否则访客手打 `$x$` 会出现「预览是源码、发布变公式」的新一处不一致。
+         * 文章路径（the_content）不受影响。
+         */
+        if (! SimpleCommentMode::enabled()) {
+            add_filter("comment_text", array($this, "katex_markup"), 9);
+        }
 
         //前端加载资源
         add_action("wp_enqueue_scripts", array($this, "katex_enqueue_scripts"));

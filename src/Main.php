@@ -13,6 +13,7 @@ use EditormdApp\Mermaid;
 use EditormdApp\TaskList;
 use EditormdApp\ImagePaste;
 use EditormdApp\MindMap;
+use EditormdApp\SimpleCommentMode;
 use EditormdPages\Pages;
 use EditormdUtils\Guide;
 use EditormdUtils\Internationalization;
@@ -98,6 +99,10 @@ class Main {
         Config::get_option("highlight_mode_auto", "syntax_highlighting") == "on"     ? new PrismJSAuto()       : null;
         Config::get_option("support_front", "editor_basics")             == "on" 
         || Config::get_option("support_other_text", "editor_basics")    !== ""       ? new ControllerFrontEditor()   : null;
+        // 访客评论简版模式的服务端约束层：KSES 白名单扩展 + 评论正文容器。
+        // 类内部还会再判一次「简版开关 && support_front」，这里只是避免在完全
+        // 不用前台评论编辑器的站点上给 comment_text 挂多余过滤器。
+        Config::get_option("support_front", "editor_basics")             == "on"     ? new SimpleCommentMode()       : null;
         Config::get_option("open_in_new_tab", "editor_basics")          !== "off"    ? new ControllerFrontStyle() : null;
     }
 
@@ -111,8 +116,9 @@ class Main {
         $language = get_bloginfo("language");
 
         // 安全加固：原实现未设置 SameSite / Secure，且读取 $_COOKIE 时未做净化。
-        // 该 Cookie 仅用于前端语言判断，不含敏感信息，但这里仍补全安全属性。
-        // 注意：不设置 httponly —— sm-ms 管理页前端应用（Vue）需要读取它来决定界面语言。
+        // 该 Cookie 仅用于后台弹窗页面（升级提示）判断界面语言，不含敏感信息，
+        // 但这里仍补全安全属性。注意：不设置 httponly —— 语言判断在服务端完成，
+        // 保持与原行为一致以免影响主题/其它集成方的读取。
         $cookie_lang = isset($_COOKIE["wp-editormd-lang"])
             ? sanitize_text_field(wp_unslash($_COOKIE["wp-editormd-lang"]))
             : "";

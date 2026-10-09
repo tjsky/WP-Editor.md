@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.4.5
+ * Version:           10.5.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,46 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.5.0 —— 新增「访客评论简版编辑器」
+ *   评论区属于**不可信输入**，WordPress 只用一张 15 个标签的 KSES 白名单过滤它，
+ *   而编辑器工具栏却提供了图片、代码块、表格、标题、列表等白名单之外的功能：
+ *   预览里看着正常（预览是纯前端的），保存时却被 wp_filter_kses 剥掉 ——
+ *   同一段内容「预览能看见、发出去就没了」。本版为访客评论提供一套受控的简版模式：
+ *   - 单栏编辑，不跟随站点的 live_preview 全局选项（手机不再被双栏挤压输入区），
+ *     工具栏收敛为「粗体 / 斜体 / 删除线 / 引用 / 行内代码 / 链接 / 图片 + 纯预览」；
+ *   - 链接降级为只读文本「文字：<code>url</code>」，不再生成 <a>；图片去掉外链包裹，
+ *     并强制 loading="lazy" 与 referrerpolicy="no-referrer"；
+ *   - 公式、任务列表、代码块、emoji 短代码在评论区一并关闭 —— 要点是**预览侧与
+ *     服务端同时关**，只关一边只会制造新的预览/发布不一致；
+ *   - KSES 白名单按需扩展（只加 img，且不含 class/style/srcset/on*），并在
+ *     「高级 → 调试信息」里把当前生效的白名单、以及「哪些条目是本插件扩展、
+ *     而非 WordPress 原生」摊开给管理员看；
+ *   - 默认关闭，开关位于「设置 → WP Editor.md → Basic Settings」。
+ *   另修：升级器的 switch 此前缺少 case "10.4.3" 与 case "10.4.5"，停在这两个版本
+ *   上的站点匹配不到任何分支，editor_version 永不推进 —— 而主文件正是用版本号是否
+ *   变化来判断要不要跑激活流程，结果每个请求都会重跑一次 Activator::activate()。
+ *
+ *   同版本一并处理的三件事：
+ *   - **移除第三方图床（sm.ms）**。该服务已转向收费模式，而它带来的维护面不小
+ *     （令牌代理、固定操作白名单、Vue 管理页、额外的 axios/Vue 依赖）。本次整体下线：
+ *     上传分流、访问令牌与代理接口、后台管理页及其子项目、设置项与语言包条目一并删除，
+ *     图片粘贴只保存到本站媒体库；升级器负责清理老站点遗留的 imagepaste_sm /
+ *     imagepaste_sm_token，避免开关残留让人误以为还在往第三方传；
+ *   - **前台编辑器风格可与后台解耦**。「工具栏/预览窗口风格」与「Markdown 编辑器风格」
+ *     原先同时喂给后台编辑器和前台评论框，但两者的使用场景（以及主题配色）通常不同。
+ *     新增 editor_style → front_style_sync（默认关）：关闭时前台一律用 Editor.md
+ *     自带浅色，跟随主题；后台编辑器不受该开关影响，需要夜间模式时由站点自行写 CSS；
+ *   - **后台满屏「检验到插件资源包已过时」**。该检查的输出原先挂在 admin_notices 上，
+ *     而它是被 get_settings_fields() 里的字段 desc 调用的、跑在 admin_init 阶段 ——
+ *     后台**每个**页面都会触发 admin_init，于是一条本该只出现在设置页的状态行变成了
+ *     全后台通告。现改为只在插件设置页显示一行状态，并直接写出资源包版本与插件版本；
+ *     资源包版本的 transient 键带上插件版本，升级后不再吃 12 小时旧缓存；
+ *   - **块主题下评论框漏出一个原生 textarea**。Twenty Twenty-Four / Twenty-Five 的
+ *     `.wp-block-post-comments-form .comment-form textarea{display:block}` 权重高于
+ *     Editor.md 隐藏中间元素的 `.editormd .editormd-html-textarea{display:none}`，
+ *     于是渲染后的 HTML 源码被当成可选文本露在评论框下方。现由插件自有样式直接钉死，
+ *     不再与主题比权重。
  *
  * 10.4.5 —— 修复「编辑器预览与保存结果不一致」
  *   预览走的是 Editor.md 自带的 marked，服务端走的是插件自己的解析器，
@@ -100,7 +140,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.4.5' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.0' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

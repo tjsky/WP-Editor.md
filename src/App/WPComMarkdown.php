@@ -591,6 +591,8 @@ class WPComMarkdown {
     public function pre_comment_content($content) {
         return $this->transform($content, array(
             "id" => $this->comment_hash($content),
+            // 简版评论模式：让 transform() 在产出 HTML 之后做链接降级与图片属性补全
+            "simple_comment" => SimpleCommentMode::is_simple_context(),
         ));
     }
 
@@ -621,7 +623,8 @@ class WPComMarkdown {
         $args = wp_parse_args($args, array(
             "id"                 => false,
             "unslash"            => true,
-            "decode_code_blocks" => true
+            "decode_code_blocks" => true,
+            "simple_comment"     => false
         ));
         // 删除函数值中的斜线（\）
         if ($args["unslash"]) {
@@ -657,6 +660,23 @@ class WPComMarkdown {
         $text = preg_replace( '/((id|href)="#?fn(ref)?):/', "$1-", $text );
         // Markdown inserts extra spaces to make itself work. Buh-bye.
         $text = rtrim($text);
+
+        /**
+         * 简版评论模式的两处降级（10.5.0）
+         *
+         * 放在脚注修正之后、`wpcom_markdown_transform_post` 过滤器之前：
+         *   - degrade_links() 只把外链换成只读文本，`#` 开头的页内锚点（脚注、目录）
+         *     由内部规则原样保留，因此不会破坏脚注导航；
+         *   - decorate_images() 给评论图片补 loading/referrerpolicy。
+         *
+         * 这里处理的是**解析后的 HTML**而不是覆写解析器的 doAnchors()/doAutoLinks()：
+         * 那两条父类回调返回的是 hashPart() 之后的占位符，那一刻 `<a>` 还不存在，
+         * 而引用式链接与 autolink 又各走一条回调 —— 统一在产物上处理才能一处覆盖全部来源。
+         */
+        if (! empty($args["simple_comment"])) {
+            $text = SimpleCommentMode::degrade_links($text);
+            $text = SimpleCommentMode::decorate_images($text);
+        }
         /**
          * Filter the content to be run through Markdown, after it was transformed by Markdown.
          *

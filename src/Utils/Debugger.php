@@ -2,12 +2,14 @@
 
 namespace EditormdUtils;
 
+use EditormdApp\SimpleCommentMode;
+
 /**
  * 调试信息面板
  *
  * 10.3.0 安全加固说明：
  *   原实现把全部选项值、$_SERVER 字段直接拼接进 HTML 输出，完全未做转义，
- *   且把 imagepaste_sm_token（sm.ms 图床令牌）明文展示，配合「导出调试信息为 PNG」
+ *   且把第三方图床的访问令牌明文展示，配合「导出调试信息为 PNG」
  *   功能会把令牌带出站点。现改为：
  *     1. 所有输出一律经过 esc_html()；
  *     2. 敏感字段（token / secret / key / password）一律打码；
@@ -92,6 +94,17 @@ class Debugger {
             $debug_info .= '<tr><th>' . esc_html__($label, $text_domain) . '</th><th>' . $rows . '</th></tr>';
         }
 
+        // ---- 评论区的 KSES 白名单与实际生效的额外行为 ----
+        // 这一块回答的是「为什么我在评论里写的 Markdown 有一部分不显示」：
+        // 评论属于不可信输入，WordPress 只用一张很小的 KSES 白名单过滤它，
+        // 插件工具栏上却可能提供了白名单之外的功能。把当前**实际生效**的表格
+        // 摊开给管理员看，比在文档里描述更可信。
+        $debug_info .= '<tr><th>' . esc_html__("Comment HTML Whitelist (KSES)", $text_domain) . '</th><th>'
+            . self::render_comment_kses($text_domain) . '</th></tr>';
+
+        $debug_info .= '<tr><th>' . esc_html__("Comment Behavior Added By This Plugin", $text_domain) . '</th><th>'
+            . self::render_comment_extras($text_domain) . '</th></tr>';
+
         // ---- 已启用插件 ----
         $plugins = array();
         foreach ((array) get_option("active_plugins") as $key => $value) {
@@ -128,6 +141,92 @@ class Debugger {
         }
 
         return $rows;
+    }
+
+    /**
+     * 渲染评论区当前生效的 KSES 白名单
+     *
+     * 取的是 `wp_kses_allowed_html("pre_comment_content")` —— 也就是
+     * `wp_filter_kses` 在评论保存期真正使用的那张表，因此这里列出的就是
+     * 「评论里能活下来的标签」。同时按 SimpleCommentMode::added_tags()
+     * 标注哪些条目**不是 WordPress 原生的**，而是本插件为了简版模式加的。
+     *
+     * @param string $text_domain
+     *
+     * @return string
+     */
+    private static function render_comment_kses($text_domain) {
+        $allowed = wp_kses_allowed_html("pre_comment_content");
+
+        if (! is_array($allowed) || empty($allowed)) {
+            return esc_html__("(unavailable on this site)", $text_domain);
+        }
+
+        $plugin_tags = SimpleCommentMode::added_tags();
+        $native_tpl  = __("[WordPress native]", $text_domain);
+        $plugin_tpl  = __("[added by this plugin]", $text_domain);
+
+        ksort($allowed);
+
+        $rows = "";
+
+        foreach ($allowed as $tag => $attributes) {
+            $attribute_names = array_keys((array) $attributes);
+            sort($attribute_names);
+
+            $rows .= esc_html($tag) . " => "
+                . esc_html(empty($attribute_names)
+                    ? __("(no attribute)", $text_domain)
+                    : implode(", ", $attribute_names))
+                . " " . esc_html(isset($plugin_tags[$tag]) ? $plugin_tpl : $native_tpl)
+                . " <br>";
+        }
+
+        return $rows;
+    }
+
+    /**
+     * 渲染本插件对评论区新增的行为（全部标注为非原生）
+     *
+     * @param string $text_domain
+     *
+     * @return string
+     */
+    private static function render_comment_extras($text_domain) {
+        $on    = __("enabled", $text_domain);
+        $off   = __("disabled", $text_domain);
+        $state = SimpleCommentMode::enabled() ? $on : $off;
+
+        $rows = array(
+            sprintf(
+                /* translators: %s: enabled/disabled */
+                __('Images: WordPress does not allow <img> inside comments natively; this plugin adds it to the whitelist above. Current state: %s', $text_domain),
+                $state
+            ),
+            sprintf(
+                /* translators: %s: enabled/disabled */
+                __('Links: external links inside comments are degraded to read-only text and no <a> tag is produced. Current state: %s', $text_domain),
+                $state
+            ),
+            sprintf(
+                /* translators: %s: output template used for degraded links */
+                __('Degraded link output template: %s', $text_domain),
+                SimpleCommentMode::link_template()
+            ),
+            sprintf(
+                /* translators: 1: CSS class names, 2: enabled/disabled */
+                __('Comment body wrapper (%1$s) scopes image width and turns off emoji shortcodes inside comments. Current state: %2$s', $text_domain),
+                SimpleCommentMode::BODY_CLASS . " / " . SimpleCommentMode::NO_EMOJIFY_CLASS,
+                $state
+            ),
+            sprintf(
+                /* translators: %s: enabled/disabled */
+                __('Formulas / task lists / code blocks / emoji inside comments are turned off. Current state: %s', $text_domain),
+                $state
+            ),
+        );
+
+        return implode("<br>", array_map("esc_html", $rows));
     }
 
     /**

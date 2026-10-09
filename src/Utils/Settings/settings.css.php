@@ -57,9 +57,25 @@
 		font-weight: 600;
 	}
 
+	/* 设置项标签列：WordPress 默认 200px，中文标签（如「使文章或者页面支持
+	   Markdown语法」）会被折成两行。PC 上放宽并禁止折行，让标签与右侧
+	   「跳转」等操作同处一行；窄屏保持默认换行，避免挤压输入控件。 */
+	@media screen and (min-width: 960px) {
+		.form-and-donate .form-table th {
+			width: 300px;
+			white-space: nowrap;
+		}
+	}
+
 	/* 用于将捐赠信息和设置面板横向并排 */
 	.form-and-donate #donate a {
 		display: block;
+	}
+
+	/* 二次开发版作者说明是段落里的行内链接，不能跟着上面那条变块级
+	   （否则整句话会被拆成两行） */
+	.form-and-donate #donate p.editormd-fork-note a {
+		display: inline;
 	}
 
 	.form-and-donate #donate a:focus {

@@ -1,868 +1,627 @@
-# WP Editor.md
+# WP Editor.md 更新日志
+
+这里只记**本维护分支**的改动（从 10.3.0 开始）。原版 10.2.1 及更早的历史附在文末。
+
+内容按语言分成三块，三块说的是同一件事：**简体中文 · English · 繁體中文**。
+看不懂的术语，多半是代码里的名字，保留原样反而好查。
+
+[简体中文](#简体中文) · [English](#english) · [繁體中文](#繁體中文) · [原版历史](#原版历史)
+
+---
+
+## 简体中文
+
+### Version 10.5.0
+
+> **这次给访客评论做了个「简版编辑器」，顺手清掉了几处旧毛病。**
+> 另外：第三方图床（sm.ms）功能整体下线，前台编辑器的配色不再跟随后台。
+> **没有改数据结构，升级不用迁移。**（sm.ms 的遗留设置会在升级时自动清掉。）
+
+#### 一、评论区的老问题：为什么「预览里有、发出去就没了」
+
+WordPress 把评论当成**不可信内容**，只允许里面出现 15 个标签：
+`a` `abbr` `acronym` `b` `blockquote` `cite` `code` `del` `em` `i` `q` `s` `span` `strike` `strong`。
+
+图片（`img`）、代码块（`pre`）、表格、标题、列表、分割线……**统统会被系统删掉**。
+可编辑器工具栏偏偏提供了这些按钮——预览是浏览器里画的，所以看着一切正常；
+等到保存时被系统一剥，东西就没了。
+
+这不是「WordPress 的硬限制」。插件可以通过 `wp_kses_allowed_html` 给评论多放行几个标签，
+只是以前一直没做。
+
+#### 二、新增：访客评论简版编辑器（默认关闭）
+
+* 开关在：**设置 → WP Editor.md → Basic Settings → 给前台评论使用简版编辑器**。
+* 打开后，评论框只留 8 个按钮：**粗体、斜体、删除线、引用、行内代码、链接、图片、纯预览**。
+  收起来的（标题、列表、分割线、表格、代码块、双栏预览、全屏、清除、关于），
+  要么系统会删掉、要么在手机上只会占地方。
+* **默认单栏**，输入框高 200px，字号 16px（小于 16px 时，iPhone 上点一下输入框会整页放大）。
+* **图片对话框里去掉了「图片链接」一栏**：既然评论图片一律不能点，这一栏填了也白填。
+* **窄屏下工具栏的提示气泡不再撑破页面**：以前手机上能把整页横向拖走，现在不会了。
+* **真正生效的限制在服务端**，不是靠藏按钮。想让某个站点强制开关，
+  用 `editormd_simple_comment_enabled` 过滤器。
+
+打开后，评论里会发生这些变化：
+
+* **链接不能点**：`[文字](http://x.com)` 会显示成「文字：`http://x.com`」。
+  这是防止访客之间互相钓鱼，跟 SEO 无关（WordPress 本来就给评论链接加了 `rel="nofollow ugc"`）。
+  页内跳转（`#` 开头）保留原样，`mailto:` 显示成纯文本。
+* **图片不能点**：评论图片不再被链接包住；同时强制加上「懒加载」和「不发送来源页地址」
+  两个属性，因为访客贴的图片地址可能是任意第三方网站。
+* **公式、任务列表、代码块、emoji 短代码一并关闭**——预览和服务端同时关，免得两边显示不一致。
+* **图片粘贴在评论里关闭**：访客没有上传权限，以前粘图只会得到一个「上传失败」。
+
+#### 三、调试信息面板新增「评论语法」两块
+
+**高级设置 → 调试信息**里，现在能看到评论区**真正生效**的标签清单，
+每一行都标了是「WordPress 原生」还是「本插件额外放行」；以及本插件对评论做了哪些改造。
+
+#### 四、顺手修好：升级器漏了两个分支，站点每次请求都重跑一遍初始化
+
+升级器少写了 10.4.3 和 10.4.5 两个分支，停在这两个版本上的站点匹配不到升级路径，
+版本号永远不前进——于是**每次访问都要重跑一遍激活流程**。现在补齐了。
+
+#### 五、修好：后台每个页面都在弹「检验到插件资源包已过时」
+
+升级后，写文章、审评论、看仪表盘……后台**每个页面**都有这么一条红字。
+两个原因：一是资源包里的版本号没跟着一起升；二是**提示挂到了错误的钩子上**——
+本该只在设置页显示的一行状态，被放大成了全后台通告。
+现在只在插件设置页显示一行状态，并直接写出「资源包版本 X / 插件版本 Y」，一眼能看出哪里对不上。
+
+#### 六、新增：前台编辑器配色是否跟随后台（默认关闭）
+
+以前后台把编辑器设成深色，访客在浅色主题的站点上看到的评论框也是深色。
+现在默认**不跟随**：前台用 Editor.md 自带的浅色样式，跟你的主题走；后台该什么样还什么样。
+想自定义夜间样式，README 里列了可以挂钩子的选择器。
+
+#### 七、修好：官方块主题下，评论框下方多出一块输入框
+
+在 Twenty Twenty-Four / Twenty Five 这类官方块主题下，评论框下面会露出一块原生输入框，
+里面是一堆 HTML，看着像「预览变成了源码」。
+原因是块主题给评论框写的样式权重更高，盖住了插件「把这块中间元素藏起来」的规则。
+现在插件不再跟主题比优先级，直接钉死。
+
+#### 八、移除：第三方图床（sm.ms）上传功能
+
+那家免费图床已经全面转向收费，继续留着只是徒增维护面。
+本次一并删掉：上传分流、访问令牌与后台代理接口、配套的后台管理页，以及只为它引入的设置项。
+**图片粘贴统一保存到本站媒体库**，升级时会自动清掉遗留的图床配置。
+
+#### 九、设置页与文案调整
+
+* 「支持前端评论」后面那句括号说明，挪到选项下方单独一行，和别的选项排版一致。
+* PC 上把设置项标签列加宽，中文标签不再折成两行。
+* 「高级设置 → 捐赠」末尾加了一段说明：本修改版只做安全加固与兼容适配，不单独接受捐赠。
+
+#### 十、发布流程调整
+
+GitHub Release 的「本版变更」改为**直接从本文件对应版本段落生成**，不再只给一个链接；
+「维护分支累计改动」不再逐条列出，压缩成一句话。这样 Release 页面和本文件只有一个事实来源。
 
 ### Version 10.4.5
 
-> 本版修的是「编辑器预览与保存结果不一致」—— 同一段内容预览里是乱码、发布后却正常。
-> **无数据结构变更，升级无需迁移。**
+> **这次修的是「预览里是乱码、发出去却正常」。没有改数据结构，升级不用迁移。**
 
-* **缺陷修复：预览不认识插件的图片尺寸语法。** `![alt](img =600)` / `=300x200` / `=x400`
-  以及 `{#id .class}` 只实现在服务端解析器（保存那一刻才生效），而编辑器预览用的是
-  Editor.md 自带的 marked，完全不认识这套写法，会把它当成「不是图片」原样吐出裸 Markdown。
-  现由 `assets/Config/editormd.js` 在解析前把尺寸与属性搬进 URL 的 fragment、并覆写
-  `renderer.image` 还原成带 `width` / `height` / `style` / `id` / `class` 的 `<img>`，
-  输出规则与服务端逐条对齐（含属性块里显式 `width=` / `height=` 的优先级）
-* **缺陷修复：预览会把普通文本当成公式。** Editor.md 的段落渲染只做 `$…$` 正则配对、
-  不判断内容像不像公式，于是「价格从 $100 涨到 $200」「function update( $a, $b )」
-  以及行内代码里的 `$` 都会被渲染成公式 —— 而服务端是有防护的，这又是一处预览与发布不一致。
-  现把服务端的判定规则（定界符必须紧贴内容、内容须含字母/数字/反斜杠）与「跳过 code/pre」
-  一并搬到预览侧，实测同一篇文章两侧的公式数量、正文 `$` 数量完全一致
-* **测试脚本修正**：`e2e-create-post.php` 把未 slash 的内容直接交给 `wp_insert_post()`，
-  而它内部会先做 `wp_unslash()` —— 于是脚本里的 `\frac` 被存成 `frac`、`\alpha` 变成 `alpha`，
-  测试文章本身就是坏的（真实场景走 `$_POST`，PHP 已自动 slash，不受影响）。现改为 `wp_slash()`
-  并在脚本里加了反斜杠保留自检
-* **回归补充**：新增 `tools/vm/regression-preview-parity.py` —— 对同一篇文章分别抓编辑器预览与
-  前台渲染的 DOM，逐项比对图片尺寸/属性、公式数量、正文 `$` 数量、代码块数量。
-  此前的回归只覆盖「保存后的 HTML」与「前台渲染」，**完全没覆盖编辑器预览**，本版补上
-
+* **预览不认识插件的图片尺寸写法。** `![说明](图片 =600)` 这类写法只做在了服务端（保存那一刻才生效），
+  预览用的是 Editor.md 自带的解析器，完全不认识，会把整行当普通文字原样吐出来。
+  现在预览也认识这套写法，显示结果和服务端逐项对齐。
+* **预览把普通文字当成公式。** 比如「价格从 $100 涨到 $200」、`function update( $a, $b )`、
+  行内代码里的 `$`，都会被渲染成公式——而服务端是有防护的，这又是一处两边不一致。
+  现在预览和服务端用同一套判断规则，同一篇文章两边的公式数量完全一致。
+* 顺带修了测试脚本自己的 bug（它把内容里本该保留的反斜杠吃掉了，导致被拿去测试的文章本身就是坏的），
+  并补上了一个新回归：把「编辑器预览」和「前台显示」的 DOM 抓下来逐项比对。
+  以前的回归只测「保存后的结果」，**完全没测过编辑器预览**。
 
 ### Version 10.4.4
 
-> 本版修的是评论侧的 Markdown 链路，以及页面上同时加载两套 Prism 的历史问题。
-> **无数据结构变更，升级无需迁移。**
+> **评论里的 Markdown 现在真的会被转换了；页面上也不再同时加载两套代码高亮库。**
 
-#### 1. 访客评论的 Markdown 现在真的会被转换
-
-* 此前游客在评论框里写的 Markdown，提交后会**原样存进数据库** —— 前台看到的还是
-  `**粗体**`、`[链接](...)` 这类源码，而编辑器里的预览是前端渲染的，所以看起来一切正常。
-* 根因是评论的 Markdown 转换开关沿用自 WordPress.com 的 Markdown 模块，落在
-  「设置 → 讨论 → Markdown」，默认关闭、入口很深，而且和插件自己的
-  「支持前端评论 / 支持后台回复」没有任何联动。
-* 现在：只要插件开着评论编辑器（任一开关为开），评论的 Markdown 转换就一并启用。
-  同时把那个遗留勾选框从「设置 → 讨论」里隐藏 —— 它此刻只是个会误导人的摆设。
-* 需要单站点关掉，可以用过滤器：
-  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
-* 关闭 `html_decode`（默认值）时才存在的解析缺陷一并修掉：源码此前会被整段
-  `htmlspecialchars(ENT_COMPAT)` 转义，导致
-  - 行首的 `>` 变成 `&gt;`，**引用块永远渲染不出来**；
-  - `[文字](http://x "标题")` 的标题引号变成 `&quot;`，**链接语法直接失配**。
-  现改为只转义 `&` 与 `<`（已足以阻止任何标签成形，安全性不变），`"` 不再动，
-  行首被转义的引用标记再还原回来（支持 `>>` 嵌套）。
-
-#### 2. Prism 只保留一套
-
-* 编辑器预览会额外加载 Editor.md 自带的 `lib/prism.min.js`：一整套 286 KB、
-  132 种语言、版本还是 1.15.0 的独立构建。
-* 它和插件提供的 Prism 1.19（内核 + autoloader + toolbar / 行号 / 语言标签 /
-  复制按钮 + 主题）互相覆盖 `window.Prism`。后加载的那份会把先挂上去的插件顶掉 ——
-  实测 `window.Prism.plugins` 只剩 `lineNumbers`，`toolbar` 与 `autoloader` 都不见了，
-  于是代码块没有复制按钮、没有语言标签，语言包也不再按需加载。
-* 现在 `lib/prism.min.js` 只是一个占位文件（避免 Editor.md 的加载链 404），
-  wp-admin 也改为复用插件同一套 Prism。实测同一个页面：Prism 脚本从 **302.5 KB 降到
-  24.2 KB**，`window.Prism.plugins` 恢复为 `autoloader / toolbar / lineNumbers`。
-* Prism 资源的缓存指纹由写死的 `1.15.0` 改为插件实际随包发布的 `1.19.0`。
-
-#### 升级
-
-* 升级器新增 `10.4.3 → 10.4.4` 迁移，仅推进版本号，无数据变更。
-
-------
+* **访客评论的 Markdown 以前根本不生效。** 访客写的 `**粗体**`、`[链接](...)` 会**原样存进数据库**，
+  前台看到的还是这些源码。编辑器里的预览是浏览器画的，所以写的时候看着一切正常。
+  根因是这个开关藏在**「设置 → 讨论 → Markdown」**里，默认关闭、入口很深，
+  还和插件自己的「支持前端评论 / 支持后台回复」没有任何联动。
+  现在只要插件开着评论编辑器，评论的 Markdown 转换就一并启用，那个容易误导人的勾选框也隐藏了。
+* 修了 `html_decode` 关闭时的一处解析问题：行首的 `>` 和链接标题里的引号被错误转义，
+  导致**引用块渲染不出来**、**带标题的链接解析失败**。
+* **页面上曾同时加载两套 Prism。** 一套是 Editor.md 自带的（286KB、132 种语言），
+  和插件提供的那套互相覆盖，结果代码块没有复制按钮、没有语言标签。
+  现在只保留插件这一套，同一个页面上 Prism 从 **302.5KB 降到 24.2KB**。
 
 ### Version 10.4.3
 
-> 本版集中修前端：Prism 代码高亮的加载顺序与语言包路径、编辑器工具栏与 Bootstrap 的
-> 类名冲突、后台回复框的宽度，以及一处每秒刷屏的控制台报错。
-> **无数据结构变更，升级无需迁移。**
+> **这次集中修前端：代码高亮的加载顺序、工具栏图标消失、后台回复框一片空白、控制台每秒刷屏。**
 
-#### 1. Prism 代码高亮
-
-* 修复控制台 `Uncaught ReferenceError: Prism is not defined`。设置 autoloader 语言包路径的
-  内联脚本原先挂在 `wp_print_footer_scripts` 的默认优先级上直接输出，而 WordPress 打印页脚
-  脚本用的是优先级 20 —— 脚本跑在 Prism 前面。现改为挂在本插件自己的脚本句柄之后，
-  由 WordPress 保证执行顺序。
-* 修复 `https://站点/components/prism-*.min.js` 这类 404。上面那条脚本没执行成功时
-  `languages_path` 是空的，autoloader 会退回默认的相对路径。路径设置正常后不再出现。
-* `plaintext` / `plain` / `text` / `txt` 这四个纯文本语言：Prism 既不随内核预置、也没有
-  对应的组件文件，现在预先声明为空语法，省掉一次必然 404 的请求。
-* Prism 内核改为显式声明所有 Prism 插件的依赖，不再依赖入队顺序。
-
-#### 2. 编辑器工具栏
-
-* 修复「主题引入 Bootstrap 之后工具栏只剩零星几个图标」。工具栏按钮的类名是 `tooltip`
-  （配合 `.tooltiptext` 实现悬停提示），与 Bootstrap 3 的全局 `.tooltip`
-  （`position: absolute; z-index: 1070; opacity: 0`）撞名，所有按钮被置为透明、绝对定位并
-  堆叠到一起。现在由插件按自己的语义把定位与透明度钉回来，使用 Bootstrap 的主题不再受影响。
-  前台评论框、自定义目标元素编辑器与后台编辑器均适用。
-
-#### 3. 后台回复框（edit-comments.php）
-
-* 修复回复框右半边永远是一片空白。编辑器宽度原先被 `!important` 钉死在 50%，而回复框的
-  预览面板默认是隐藏的。现改为跟着预览的显隐走 —— 关闭时占满整行，打开时各占一半。
-
-#### 4. 其它
-
-* 修复控制台每秒一次的 `wp is not defined`。字数统计的判断写成了 `wp && wp.utils`，
-  而前台并没有 `wp` 这个全局变量，读取未声明的标识符会抛 ReferenceError。改为 `typeof` 判断。
-
-#### 升级
-
-* 升级器新增 `10.4.2 → 10.4.3` 迁移，仅推进版本号，无数据变更。
-
-------
+* 修 `Prism is not defined`：设置语言包路径的脚本跑在了 Prism 前面，现在改成挂在 Prism 之后。
+* 修 `https://站点/components/prism-*.min.js` 这类 404。
+* 修「主题引入 Bootstrap 之后，工具栏只剩零星几个图标」：
+  按钮的类名和 Bootstrap 的全局样式撞了名，导致按钮全部透明堆叠。现在由插件钉回自己的样式。
+* 修后台回复框**右半边永远是一片空白**：现在跟着预览开关走，关闭时占满整行。
+* 修控制台**每秒刷一次**的 `wp is not defined`。
 
 ### Version 10.4.2
 
-> 本版按代码审查报告的 P1 / P2 清单做**小而集中的安全加固**：升级两个存在公开漏洞的
-> 捆绑库、给图片接口补上真正缺失的资源预算、把 sm.ms 令牌移出浏览器、收紧后台 AJAX 授权。
-> **无数据结构变更，升级无需迁移。**
+> **按一份代码审查报告，做了一轮小而集中的安全加固。没有改数据结构，升级不用迁移。**
 
-#### 1. 安全修复
-
-* **Mermaid 8.4.8 → 10.9.8**（`assets/Mermaid/`）。8.x 存在 CVE-2021-43861
-  （恶意图表通过 `%%{init: ...}%%` 指令把 `securityLevel` 降级后执行注入内容），
-  8.x 与 9.x 分支内均无修复版本。渲染侧同时把 `securityLevel` 强制为 `strict`、
-  `startOnLoad` 强制为 `false`（在合并用户配置**之后**覆盖，站点配置与图表指令都无法降级）。
-  10.x 移除了打包的 Editor.md 预览器仍在调用的 `mermaid.init()`，
-  故新增 `assets/Mermaid/mermaid-compat.js` 兼容垫片
-* **顺带修复：Mermaid 图表此前在正文里根本渲染不出来**。原实现把图表源码拼成
-  `<div class="mermaid"><script>document.write(window.atob("…"))</script></div>`，
-  站点的内容过滤器会改写脚本里的引号，内联脚本必然语法错误。现改为数据驱动：
-  服务端输出 `<div class="mermaid" data-mermaid="<base64>">`，由前端脚本还原文本后渲染；
-  前端脚本同时兼容旧格式（能从旧的 `<script>` 中还原源码），因此**升级前的历史文章无需重新保存**
-* **KaTeX 0.11.1 → 0.19.0**（`assets/KaTeX/`）。0.11.x 落在 CVE-2024-28245
-  （`\includegraphics` 文件名未转义）、CVE-2025-23207（`\htmlData` 未校验属性名）等公告范围内；
-  渲染调用显式传入 `trust: false` 与 `maxExpand`
-* **图片粘贴的资源耗尽路径**（`src/App/ImagePaste.php`）。原实现只限制请求体积，
-  一张几 MB 的高压缩 PNG 可展开成数百 MB 像素缓冲区，解码还要再造一张同尺寸画布；
-  sm.ms 上游超时 120 秒。现补充：解码后二进制上限、单边上限、总像素预算、
-  解码内存预算（对比 `memory_limit` 余量），全部在进入 `imagecreatefrom*()` **之前**拦截；
-  上游超时 10 秒（连接 3 秒）；新增按用户的速率限制
-* **sm.ms 令牌不再下发浏览器**（`src/Pages/page/sm-ms-management/`）。
-  引导数据只保留接口地址，`Authorization` 由服务端按配置注入，客户端传入的任何请求头一律忽略；
-  代理由「任意 `service/api/v2/*` + 任意 method」收紧为**固定操作白名单**
-  （`profile` / `upload_history` / `delete/<hash>`，方法与地址由服务端决定）
-* **后台 AJAX 授权收紧**（`src/Pages/Pages.php`）。删掉「nonce 失败后按 Host 判同源」的兜底
-  （该判断不比较 scheme 与 port，且 Origin/Referer 可被非浏览器客户端伪造），
-  并移除管理员页面的 `wp_ajax_nopriv_*` 入口
-* **临时文件唯一化**（`src/App/ImagePaste.php`）。`md5(dataurl)` 拼系统临时目录的方案
-  文件名可预测、同输入并发会互相覆盖，改用 `wp_tempnam()`
-* **日志脱敏**（`src/Utils/Logger.php`）。请求 URI 中的查询参数一律记为 `[REDACTED]`，
-  避免 nonce 被写进 `error_log`
-* **前端依赖升级**：axios 0.19.2 → 1.20.0（0.19.x / 1.x 早期版本存在多项原型链污染与请求劫持公告）。
-  Vue 仍为 2.6.11 —— 2.x 全系落在 GHSA-5j4c-8p2g-v4jx 范围内，官方修复只存在于 3.0，
-  属于 Vue 3 迁移范畴，本版不做
-
-#### 2. 兼容性
-
-* 前台不再默认移除 `wp-block-library` / `wp-block-library-theme` / `wc-blocks-style`，
-  改为显式 opt-in：`add_filter("editormd_dequeue_block_styles", "__return_true");`
-  （原判断是「当前文章不含区块就全站移除」，但短代码、主题模板、小工具同样可能依赖这些样式）
-* 页面渲染函数由全局 `display_page()` 改为 `wp_editormd_render_*_page()`，
-  避免与主题 / 其它插件的同名函数冲突导致 `Cannot redeclare`
-
-#### 3. 可靠性
-
-* 升级/迁移不再要求「当前用户已登录」（原先升级后若长期只有匿名访客访问，迁移会一直不执行），
-  并增加 transient 并发锁与失败日志
-* CI 新增**安全不变量检查**（`check_security_invariants.py`：依赖安全基线 + 关键防护点 +
-  不得复现的高危写法）、`composer validate` 与 `composer audit`
-
-#### 4. 升级
-
-* 升级器新增 `10.4.1 → 10.4.2` 迁移，仅推进版本号，无数据变更
-
-#### 5. 本版未处理
-
-* 代码审查报告中的「推荐整体重构方案」（安全入口统一、图片处理服务化、
-  Mermaid/KaTeX 数据驱动渲染、sm.ms 改服务端 Client）留待后续版本；
-  P2-05（`editor_addres` 第三方资源根地址）本版暂不修改
-* PHPUnit / WordPress 集成测试 / 浏览器级 XSS 回归仍未进入 CI（当前以安全不变量检查兜底）
-
-------
+* **升级两个有公开漏洞的组件**：Mermaid 8.4.8 → **10.9.8**、KaTeX 0.11.1 → **0.19.0**。
+  老版本没有修复版可用，且恶意图表可以把安全等级降下来再执行注入内容。
+* **顺带修好：Mermaid 图表以前在正文里根本渲染不出来**（输出的内联脚本必然语法错误）。
+  现在改成数据驱动渲染，并且兼容旧格式，**历史文章不需要重新保存**。
+* **图片粘贴接口补上资源用量限制**。以前只限制了请求体积，
+  但一张几 MB 的高压缩 PNG 解压后能吃掉几百 MB 内存。现在在解码前就拦下来。
+* **sm.ms 令牌不再下发到浏览器**，改由服务端注入；后台代理收窄为固定操作白名单。
+* **后台 AJAX 授权收紧**：删掉「校验失败就看域名」的兜底，并移除未登录入口。
+* 前端依赖 axios 0.19.2 → **1.20.0**。
+* 升级/迁移**不再要求用户登录**（以前只有匿名访客访问时，迁移会一直不执行）。
+* CI 新增安全检查，防止已修的问题被改回去。
 
 ### Version 10.4.1
 
-> 本版修正 10.3.0 / 10.4.0 发布包的一处元数据缺陷，**无代码逻辑与数据结构变更，升级无需迁移**。
+> **修 10.3.0 / 10.4.0 的安装包在后台不显示插件信息。没有逻辑改动，升级不用迁移。**
 
-#### 缺陷修复
-
-* 修复**发布包在后台不显示插件信息**：插件主文件头部注释中的
-  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
-  丢失，导致「插件 → 上传插件」界面看不到版本、作者与所需环境，更新检查也拿不到版本号
-* 成因：这些行与块注释续行形态一致（都以 ` * ` 开头），被注释清理脚本当成新增注释删除 ——
-  它们所在的 diff hunk 中 `-` / `+` 行数不等（-3 / +6），
-  「成对改写则还原基线原文」的兜底因此没有触发
-* 语法校验与 token 流比对都发现不了（注释本就被排除在 token 比对之外），
-  故本次一并补上**插件头字段校验脚本**与 **CI 闸门**（缺字段、或 Version 与构建版本不符即失败）
-
-#### 升级
-
-* 升级器新增 `10.4.0 → 10.4.1` 迁移，仅推进版本号，无数据变更
-
-------
+* 安装包里，插件主文件头部的 `Version`、`Author`、所需的 WordPress / PHP 版本等信息**丢失了**，
+  导致后台「上传插件」界面看不到版本和作者，更新检查也读不到版本号。
+* 成因：这些行的写法和注释续行**一模一样**，被清理脚本当成注释删掉了。
+  语法检查和代码比对都发现不了（注释本来就被排除在比对之外）。
+  所以这次加了**专门的插件头校验脚本**和 **CI 闸门**：缺字段、或版本号对不上，直接构建失败。
 
 ### Version 10.4.0
 
-> 本版继续由 [@tjsky](https://github.com/tjsky) 维护。相较 10.3.0，本版修复了公式解析与
-> xmlrpc 的长期缺陷，并新增可选的图片尺寸语法。**不写尺寸的图片渲染结果与之前完全一致，
-> 升级无需迁移。**
+> **修公式解析和 xmlrpc 的老问题，新增一个可选的图片尺寸语法。**
+> **不写尺寸的图片，显示效果和以前完全一样，升级不用迁移。**
 
-#### 1. 公式解析
+* **修「代码块里的 `$` 被当成公式渲染」**：原来的跳过判断永远不成立，
+  现在改成按标签白名单加嵌套深度判断。这是上游被反复反馈的一类问题。
+* **修「块级公式渲染两遍」**：两个过滤器各管各的，判断条件对不上。现在合并成一次处理。
+* **修「正文里凑巧成对的 `$` 被当成公式」**：比如 `function update( $a, $b )`。
+  行内公式加了两道判断，也可以用过滤器关掉。
+* **修 xmlrpc 下报 `IXR_Message not found`**（采用上游 PR #546 的修法）。
+* **新增：图片尺寸语法（可选）**：`![说明](图片 =600)` / `=600x400` / `=x400`。
+  宽屏按设定尺寸显示，窄屏等比缩放、不变形。
 
-* 修复**代码块 / 行内代码中的 `$` 被当成公式渲染**：原实现的跳过判断写作
-  `htmlspecialchars_decode($element) === "<pre>"`，而真实代码块是 `<pre class="...">` 或
-  `<pre><code>`，精确等值判断永远不成立。现改为「标签白名单（`pre`/`code`/`style`/`script`/`textarea`）
-  + 嵌套深度计数」。这是上游被长期反复反馈的一类问题
-* 修复**块级公式被二次解析导致重复渲染**：两个过滤器分别处理 `$$...$$` 与 `$...$`，
-  后者判断「是否已处理」时查找的 class 名与实际输出的不一致。现改为单条正则、单次遍历
-* 修复**正文中误配对的 `$` 被渲染成公式**：例如 `function update( $a, $b )`、
-  `价格从 $100 涨到 $200`。内联公式增加两道防护 —— 定界符须紧贴内容、内容须含字母/数字/反斜杠
-  （可用过滤器 `editormd_katex_require_tight_delimiters` 关闭）
-* 输出侧的 `esc_html()` 转义保持并扩展到新的统一回调中，10.3.0 修复的存储型 XSS 不会回退
-
-#### 2. 缺陷修复
-
-* 修复 **xmlrpc 请求下抛出 `Class 'EditormdApp\IXR_Message' not found`**
-  （`src/App/WPComMarkdown.php`）。该文件声明了命名空间，而 include 进来的 `IXR_Message`
-  位于全局命名空间，需要前导反斜杠。**采纳上游 [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)** 的修法
-
-#### 3. 新功能
-
-* 新增**图片尺寸语法**（可选）：`![alt](img.jpg =600)` / `=600x400` / `=x400`，
-  可与 `"title"` 及 `{#id .class}` 共存。尺寸以
-  `width` + `max-width:100%` + `height:auto`（同时指定宽高时另加 `aspect-ratio`）的内联样式输出，
-  因此宽屏按设定尺寸显示、窄屏等比缩放不变形，且不影响 Medium Zoom 一类看图插件
-* 上游 PR [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) 与
-  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的**思路被参考但未直接合并**：
-  #602 会丢失 `{#id .class}` 属性语法与 `ref_attr` 支持；#603 的输出处缺少转义，
-  合并会回退 10.3.0 的安全修复，且其防护规则可被绕过
-
-#### 4. 升级
-
-* 升级器新增 `10.3.0 → 10.4.0` 迁移，仅推进版本号，无数据变更
-
-------
 ### Version 10.3.0
 
-> 本版由 [@tjsky](https://github.com/tjsky) 在原作者停止维护后继续维护。
-> 上游自 10.2.1 起长期未更新，且该插件已于 2025-04-09 因安全问题被 WordPress.org 下架
-> （关联 **CVE-2025-31035**，Stored XSS，影响 `<= 10.2.1`，上游无修复版本）。
-> 本版**仅做安全加固与新版兼容性适配，未改动功能设计与数据结构，升级无需迁移**。
+> **原作者停止维护之后，本维护版从这里开始。核心是把安全问题修掉，并适配新版 WordPress。**
+> 原插件已于 **2025-04-09 因安全问题被 WordPress.org 下架**
+> （**CVE-2025-31035**，影响 10.2.1 及更早版本，上游没有修复版）。
+> **没有改功能设计和数据结构，升级不用迁移。**
 
-#### 1. 安全修复
+* **修公式渲染的存储型 XSS**：在文章**或评论**里发一段特定内容就能执行脚本。
+  因为评论路径同样受影响，利用门槛比公开披露的那些还要低。
+* **修图片粘贴接口的任意文件写入**：补上权限校验、按文件内容判断是不是真图片、限制体积。
+* **修图床代理被当成跳板（SSRF / 开放代理）**：上游地址改为固定白名单，只转发必要的请求头。
+* **修后台页面的越权、设置项保存不净化、后台卡顿（盲 SSRF）等一批问题**。
+* 修「带某个 Cookie 就直接白屏」「卸载时报语法错误」「日志功能一调就抛异常」。
+* **默认不再从第三方 CDN 加载编辑器脚本和样式**，改由插件本地提供。
+* **适配 WordPress 7.1 和 PHP 7.4 ~ 8.4**，修掉「插件加载时调用了还不存在的函数，
+  导致前台后台一起白屏」这种致命问题。
+* **换掉已经用不了的构建工具**（`node-sass` → `dart-sass` 等），项目重新能构建，
+  并加上了 GitHub Actions 自动打包发布。
+* **顺手修的老毛病**：思维导图设置项丢失、Mermaid 的默认值被错误地写进了 KaTeX。
 
-* 修复 KaTeX 公式渲染链路的**存储型 XSS**（`src/App/KaTeX.php`）。实体编码的公式内容会被解码回真实字符后未转义直接输出，而 `the_content` 与 `comment_text` 均晚于保存期 kses，因此 kses 无法拦截。在文章或评论中投递 `$ &lt; img src=x onerror=... &gt; $` 即可执行脚本；因评论路径同样受影响，可利用门槛低于公开披露的同批问题
-* 修复图片粘贴接口（`src/App/ImagePaste.php`）的**无鉴权任意文件写入**：补齐 `upload_files` 能力校验与 nonce（CSRF）校验；改为按文件内容判定真实图片类型；限制单次负载体积；改用 WordPress 官方 API 落盘并在失败时清理残留；图床上传开启 TLS 证书校验
-* 修复 sm.ms 图床代理的 **SSRF / 开放代理**（`src/Pages/page/sm-ms-management/`）：上游地址改为固定白名单（仅 `https://smms.app/api/v2/*`），仅透传 `Authorization` 头，开启证书校验，补超时与响应体积上限，补同源校验
-* 修复后台管理页渲染器的**授权缺陷**（`src/Pages/Pages.php`）：能力校验由角色名改为 `manage_options`，修掉一处恒真的授权分支，`page` / `entry` 参数改为白名单分发以消除路径穿越，`$_GET` 补 `isset` 与 `sanitize_key`，消除 ReDoS 正则
-* 修复设置页**选项写入净化完全失效**（`src/Utils/Settings.php`）：第三方设置库只对显式声明 `sanitize_callback` 的字段生效，此前一个都未声明，等于全部选项未经净化即入库。改为挂 `pre_update_option_*` 按字段类型统一兜底
-* 修复**盲 SSRF 与后台卡顿**：设置页初始化会同步拉取远端 `version.json`，使每个后台请求最坏阻塞数秒。改为 `wp_remote_get` + 白名单 + 缓存，并移出后台同步路径
-* 修复携带 `wp-editormd-dev-logmode` Cookie 即触发致命错误（白屏）的缺陷
-* 修复插件卸载时的语法级致命错误（文件顶层非法使用 `static`）
-* 修复日志组件空实现导致所有日志调用抛异常的问题
-* 修复调试与设置页面的输出未转义与令牌经 GET 泄漏问题
-* 默认不再从第三方 CDN 加载编辑器脚本与样式，改由插件本地提供
+---
 
-#### 2. 兼容性
+## English
 
-* `Tested up to` 更新为 WordPress 7.1，`Requires PHP` 明确为 7.4，实测通过 7.4 ~ 8.4
-* 修复**插件主文件在插件加载期调用用户上下文函数导致整站白屏**的问题（`pluggable.php` 尚未加载）
-* 修复 PHP 8.1+ `htmlspecialchars()` 默认 flags 变化影响存量内容渲染的问题（显式传入 flags 冻结行为）
-* 修复 `$GLOBALS['pagenow']` 未定义、Mermaid 配置为空时生成非法 JS、思维导图地址为空时误加载当前页等问题
-* 版本号比较改用 `version_compare`；移除会注销 WordPress 自带 jQuery 并改用 1.12.4 的分支
-* 多站点激活与卸载改为逐站点处理
+### Version 10.5.0
 
-#### 3. 构建链
+> **A "simple editor" for visitor comments, plus a handful of long-standing annoyances cleaned up.**
+> Also: the third-party image host (sm.ms) feature is gone, and the front-end editor no longer follows
+> the admin colour scheme. **No data-structure changes, so upgrading needs no migration.**
+> (Leftover sm.ms settings are cleaned up automatically on upgrade.)
 
-* `node-sass`（仅支持 Node ≤ 18）更换为 `dart-sass`，项目因此可在现代 Node 下构建
-* 停止维护的 `webpack-parallel-uglify-plugin` 更换为 `terser-webpack-plugin`
-* Vue 子项目修复 `tsconfig`、`peerDependencies` 与 `publicPath` 硬编码插件目录名的问题
-* 清理 `assets/FrontStyle/FrontStyle.scss` 中一行残缺语句（libsass 静默忽略，dart-sass 会构建失败）
-* 新增 GitHub Actions 发布流程，打 tag 即从源码构建并自动附加可安装 zip
+#### 1. Why comments used to lose half of what you typed
 
-#### 4. 顺带修复的历史遗留缺陷
+WordPress treats comments as **untrusted input** and allows only 15 tags inside them:
+`a` `abbr` `acronym` `b` `blockquote` `cite` `code` `del` `em` `i` `q` `s` `span` `strike` `strong`.
 
-* `editor_mindmap` 选项被 `editor_style` 数组整体覆盖，导致思维导图设置项丢失、功能失效
-* Mermaid 的默认配置被错误地写入了 KaTeX 的默认值
+Images (`img`), code blocks (`pre`), tables, headings, lists and horizontal rules are **all stripped**.
+The toolbar offered buttons for exactly those things — the preview is drawn in the browser, so it looked
+fine until you saved, at which point the tags were removed.
 
-------
+This is not a hard WordPress limit: a plugin can allow extra tags for comments through
+`wp_kses_allowed_html`. It just had never been done here.
+
+#### 2. New: a simple editor for visitor comments (off by default)
+
+* Switch: **Settings → WP Editor.md → Basic Settings → Use Simple Editor For Front Comments**.
+* When on, the comment box keeps just 8 buttons: **bold, italic, strikethrough, quote, inline code,
+  link, image, preview**. The rest are hidden — they would either be stripped by WordPress anyway,
+  or simply eat screen space on a phone.
+* **Single column by default**, 200px tall, 16px font (below 16px, iOS Safari zooms the page in when
+  you tap the box).
+* **The "image link" field is gone from the image dialog** — comments never get clickable images,
+  so the field did nothing.
+* **Tooltips no longer stretch the page on narrow screens** (on a phone the whole page used to be
+  draggable sideways).
+* **The real limit lives on the server**, not in hidden buttons. To force the switch on or off per site,
+  use the `editormd_simple_comment_enabled` filter.
+
+With it on, comments change like this:
+
+* **Links are not clickable**: `[text](http://x.com)` renders as `text：http://x.com`.
+  This is to stop phishing between visitors, not for SEO — WordPress already adds
+  `rel="nofollow ugc"` to comment links. In-page anchors (`#…`) stay as-is; `mailto:` becomes plain text.
+* **Images are not clickable**: comment images are no longer wrapped in a link, and they always get
+  `loading="lazy"` plus `referrerpolicy="no-referrer"`, because a visitor can point at any third-party URL.
+* **Formulas, task lists, code blocks and emoji shortcodes are all turned off** — on both the preview
+  and the server, so the two cannot disagree.
+* **Image paste is off for comments**: visitors have no upload permission, so it only ever produced
+  an "upload failed" placeholder.
+
+#### 3. Debug screen: a new "comment syntax" section
+
+Under **Advanced Settings → Debugger** you can now see the tag list that is **actually in effect** for
+comments, each line marked as "[WordPress native]" or "[added by this plugin]", plus what this plugin
+changes about comments.
+
+#### 4. Fixed: the upgrader missed two branches, so the site re-ran activation on every request
+
+The upgrader had no branch for 10.4.3 or 10.4.5. Sites sitting on those versions matched nothing,
+the version number never advanced, and the **activation routine ran again on every single request**.
+Both branches are now in place.
+
+#### 5. Fixed: "the plugin asset bundle is out of date" popped up all over the admin
+
+After upgrading, every admin page — writing a post, reviewing comments, the dashboard — showed a red
+notice. Two causes: the asset bundle's version number had not been bumped, and **the notice was printed
+on the wrong hook** — a one-line status meant for the settings page was turned into a site-wide admin
+notice. It now appears only on the plugin settings page, and it names both versions
+("bundle 10.4.5 vs plugin 10.5.0") so the mismatch is obvious.
+
+#### 6. New: choose whether the front-end editor follows the admin style (off by default)
+
+The admin used to set a dark editor style, and visitors on a light theme saw a dark comment box too.
+By default the front end now **does not follow**: it uses Editor.md's own light style and your theme.
+The admin editor is unaffected either way. README lists the selectors you can hook for custom dark styling.
+
+#### 7. Fixed: block themes showed a stray input box under the comment form
+
+On official block themes such as Twenty Twenty-Four / Twenty Five, a raw textarea leaked out below the
+comment box, showing a pile of HTML — it looked like "the preview turned into source code".
+The block theme's CSS was more specific than the rule the plugin used to hide that intermediate element.
+The plugin no longer competes on specificity; it pins the rule down.
+
+#### 8. Removed: the third-party image host (sm.ms)
+
+That free image host has moved to a paid model, so keeping it only added maintenance surface. Removed in
+one go: the upload branch, the access token and proxy endpoint, the companion admin page, and the settings
+that existed only for it. **Image paste now always saves to your own media library**, and leftover image
+host settings are cleaned up on upgrade.
+
+#### 9. Settings page and wording
+
+* The parenthetical note after "Support Front Comment" moved to its own line under the option, matching
+  the other options.
+* The settings label column is wider on desktop, so Chinese labels no longer wrap onto two lines.
+* The "Advanced Settings → Donate" section gained a note explaining that this maintained fork only does
+  security and compatibility work and does not accept donations.
+
+#### 10. Release process
+
+The "What's new" section of a GitHub Release is now **generated directly from the matching version
+section of this file**, instead of just linking to it. "Cumulative changes on this branch" is no longer
+listed in full and is compressed into a single sentence — one source of truth for both.
 
 ### Version 10.4.5
 
-> This release fixes the mismatch between the editor preview and the saved result —
-> the same content that looked like garbage in the preview rendered correctly once published.
-> **No data-structure changes, so upgrading requires no migration.**
+> **This release fixes "it looks like garbage in the preview but is fine once published".**
+> **No data-structure changes, so upgrading needs no migration.**
 
-* **Fixed: the preview did not understand the plugin's image-size syntax.** `![alt](img =600)`,
-  `=300x200`, `=x400` and `{#id .class}` exist only in the server-side parser (applied at save
-  time), while the editor preview uses Editor.md's bundled marked, which does not recognise the
-  syntax at all and emits the raw Markdown verbatim. `assets/Config/editormd.js` now moves the
-  size and attribute block into a URL fragment before parsing and overrides `renderer.image` to
-  rebuild an `<img>` carrying `width` / `height` / `style` / `id` / `class`, matching the
-  server-side output rule for rule (including the precedence of an explicit `width=` / `height=`
-  inside the attribute block)
-* **Fixed: the preview rendered ordinary text as formulas.** Editor.md's paragraph renderer only
-  pairs `$…$` with a regex and never asks whether the content looks like a formula, so
-  "prices from $100 to $200", "function update( $a, $b )" and even `$` inside inline code were
-  all rendered as maths — while the server side guards against exactly that. Another preview vs
-  published mismatch. The server-side rules (delimiters must hug the content; the content must
-  contain a letter, digit or backslash) and the "skip code/pre" behaviour are now mirrored in the
-  preview; the formula count and the number of literal `$` now match on both sides
-* **Test-harness fix**: `e2e-create-post.php` handed unslashed content straight to
-  `wp_insert_post()`, which runs `wp_unslash()` internally — so `\frac` was stored as `frac` and
-  `\alpha` as `alpha`, meaning the test post itself was broken (real submissions arrive via
-  `$_POST`, which PHP already slashes, so they are unaffected). The script now uses `wp_slash()`
-  and self-checks that backslashes survive
-* **New regression**: `tools/vm/regression-preview-parity.py` scrapes both the editor preview and
-  the published page for the same post and compares image sizes/attributes, formula count, the
-  number of literal `$` and code-block count. Previous regressions only covered the saved HTML and
-  the front-end rendering and **never touched the editor preview** at all
-
+* **The preview did not understand the plugin's image-size syntax.** `![alt](img =600)` and friends are
+  implemented on the server (applied at save time), but the preview uses Editor.md's own parser, which
+  does not know the syntax at all and emits the raw Markdown. The preview now understands it, matching
+  the server rule for rule.
+* **The preview rendered ordinary text as formulas** — "prices from $100 to $200",
+  `function update( $a, $b )`, or a `$` inside inline code. The server had guards for exactly that, so
+  this was another preview/published mismatch. Both sides now share one set of rules, and the formula
+  count matches on the same article.
+* A **bug in the test harness itself** was fixed (it swallowed backslashes that should have been kept,
+  so the test article was broken before it was even tested), and a new regression now compares the
+  **editor preview** against the published page. Previous regressions only checked the saved result and
+  **never touched the editor preview at all**.
 
 ### Version 10.4.4
 
-> This release fixes the Markdown pipeline on the comment side, plus a long-standing issue
-> where two separate copies of Prism were loaded on the same page.
-> **No data-structure changes, so upgrading requires no migration.**
+> **Markdown in visitor comments is now actually converted, and pages no longer load two copies of the
+> syntax highlighter.**
 
-#### 1. Markdown in visitor comments is now actually converted
-
-* Until now, Markdown written by a guest in the comment box was **stored verbatim** —
-  the front end still showed `**bold**`, `[link](...)` and friends. The editor preview is
-  rendered client-side, which is why everything looked fine while typing.
-* The root cause is that the comment-side Markdown switch is inherited from the
-  WordPress.com Markdown module and lives under **Settings → Discussion → Markdown**:
-  off by default, buried, and completely unconnected to the plugin's own
-  "Support Front Comment / Support Reply Comment" options.
-* Now, as soon as the plugin enables a comment editor (either switch on), comment
-  Markdown conversion is enabled alongside it, and the leftover checkbox is hidden from
-  Settings → Discussion — at that point it is only a misleading no-op.
-* To turn it off per site:
-  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
-* A parser defect that only shows up with `html_decode` off (the default) is fixed too:
-  the whole source used to be escaped with `htmlspecialchars(ENT_COMPAT)`, so
-  - a line-leading `>` became `&gt;` and **blockquotes never rendered**;
-  - the title quotes in `[text](http://x "title")` became `&quot;` and the **link failed
-    to parse**.
-  Only `&` and `<` are escaped now (which is already enough to keep any tag from forming,
-  so security is unchanged), `"` is left alone, and line-leading quote markers are
-  restored (nested `>>` included).
-
-#### 2. A single copy of Prism
-
-* The editor preview additionally loaded Editor.md's bundled `lib/prism.min.js`: a
-  self-contained 286 KB build with 132 languages, and version 1.15.0 to boot.
-* It and the plugin's Prism 1.19 (core + autoloader + toolbar / line numbers / language
-  label / copy button + themes) overwrite each other's `window.Prism`. Whichever loads last
-  wipes out the plugins registered on the earlier object — measured: `window.Prism.plugins`
-  was down to `lineNumbers`, with `toolbar` and `autoloader` gone, so code blocks had no
-  copy button, no language label, and languages were no longer loaded on demand.
-* `lib/prism.min.js` is now a placeholder (so Editor.md's loader chain does not 404) and
-  wp-admin reuses the plugin's copy as well. Measured on the same page: Prism scripts went
-  from **302.5 KB down to 24.2 KB**, and `window.Prism.plugins` is back to
-  `autoloader / toolbar / lineNumbers`.
-* The cache-buster for Prism assets changed from the hard-coded `1.15.0` to the `1.19.0`
-  that the plugin actually ships.
-
-#### Upgrade
-
-* The upgrader gains a `10.4.3 → 10.4.4` migration that only bumps the version number;
-  there are no data changes.
-
-------
+* **Markdown in visitor comments did nothing.** A visitor's `**bold**` or `[link](...)` was **stored
+  verbatim**, so the front end showed the raw source. The in-editor preview is drawn in the browser,
+  which is why it looked fine while typing. The switch lived under
+  **Settings → Discussion → Markdown** — off by default, buried, and completely disconnected from the
+  plugin's own "Support Front Comment / Support Reply Comment" options. Now, whenever the plugin has a
+  comment editor enabled, comment Markdown is enabled with it, and the misleading checkbox is hidden.
+* Fixed a parser issue that only appeared with `html_decode` off: a line-leading `>` and the quotes in a
+  link title were escaped by mistake, so **blockquotes never rendered** and **links with titles failed
+  to parse**.
+* **Two copies of Prism used to load on the same page.** Editor.md's bundled copy (286 KB, 132 languages)
+  overwrote the plugin's, so code blocks lost their copy button and language label. Only the plugin's
+  copy remains now: on the same page, Prism went from **302.5 KB to 24.2 KB**.
 
 ### Version 10.4.3
 
-> This release is a front-end fix-up: the loading order and language-pack path of Prism,
-> a class-name collision between the editor toolbar and Bootstrap, the width of the admin
-> reply box, and a console error that fired once per second.
-> **No data-structure changes, so upgrading requires no migration.**
+> **A front-end fix-up: highlight loading order, missing toolbar icons, a blank admin reply box, and a
+> console error firing once a second.**
 
-#### 1. Prism syntax highlighting
-
-* Fixed `Uncaught ReferenceError: Prism is not defined`. The inline script that sets the
-  autoloader's language path used to be printed on the default priority of
-  `wp_print_footer_scripts`, while WordPress prints footer scripts at priority 20 — so it ran
-  before Prism existed. It is now attached after this plugin's own script handle, and
-  WordPress guarantees the order.
-* Fixed the `https://example.com/components/prism-*.min.js` 404s. When the script above failed,
-  `languages_path` was never set and the autoloader fell back to its default relative path.
-* The four plain-text languages (`plaintext` / `plain` / `text` / `txt`) ship neither inside
-  Prism core nor as component files; they are now pre-declared as empty grammars, which removes
-  a request that could only ever 404.
-* Prism core is now declared as a dependency of every Prism plugin instead of relying on
-  enqueue order.
-
-#### 2. Editor toolbar
-
-* Fixed "after a theme loads Bootstrap the toolbar only shows a couple of icons". The toolbar
-  buttons carry the class `tooltip` (paired with `.tooltiptext` for hover hints), which collides
-  with Bootstrap 3's global `.tooltip` (`position: absolute; z-index: 1070; opacity: 0`) —
-  every button became transparent, absolutely positioned and stacked on top of each other.
-  The plugin now pins the positioning and opacity back to its own semantics, so Bootstrap-based
-  themes are no longer affected. This covers the front-end comment box, the custom-target editor
-  and the admin editor alike.
-
-#### 3. Admin reply box (edit-comments.php)
-
-* Fixed the permanently blank right half of the reply box. The editor width was pinned to 50%
-  with `!important` while the preview pane of the reply box is hidden by default. It now follows
-  the preview's visibility: full width when closed, half each when open.
-
-#### 4. Other
-
-* Fixed the once-per-second `wp is not defined` console error. The word-count guard was written
-  as `wp && wp.utils`, but there is no `wp` global on the front end, and reading an undeclared
-  identifier throws. It now uses a `typeof` guard.
-
-#### Upgrade
-
-* The upgrader gains a `10.4.2 → 10.4.3` migration; it only advances the version number, no data changes.
-
-------
+* Fixed `Prism is not defined`: the script that sets the language pack path ran before Prism existed.
+* Fixed the `https://example.com/components/prism-*.min.js` 404s.
+* Fixed "after a theme loads Bootstrap, the toolbar only shows a couple of icons" — the button class name
+  collided with Bootstrap's global style, making every button transparent and stacked.
+* Fixed the admin reply box's **permanently blank right half**; it now follows the preview toggle.
+* Fixed a `wp is not defined` console error that fired **once per second**.
 
 ### Version 10.4.2
 
-> This release follows a code review report and applies **focused security hardening**:
-> upgrading two bundled libraries with public advisories, adding the missing resource
-> budgets to the image endpoint, moving the sm.ms token out of the browser, and tightening
-> admin AJAX authorization. **No data-structure changes, so upgrading requires no migration.**
+> **Focused security hardening following a code review report. No data-structure changes, so upgrading
+> needs no migration.**
 
-#### 1. Security Fixes
-
-* **Mermaid 8.4.8 → 10.9.8** (`assets/Mermaid/`). The 8.x line is affected by
-  CVE-2021-43861 (a malicious diagram can downgrade `securityLevel` through a
-  `%%{init: ...}%%` directive and then execute injected content), and neither 8.x nor 9.x
-  has a released fix. `securityLevel` is now forced to `strict` and `startOnLoad` to `false`
-  **after** merging user config, so neither the site configuration nor diagram directives can
-  weaken it. Since 10.x removed `mermaid.init()`, which the bundled Editor.md previewer still
-  calls, a small compatibility shim was added (`assets/Mermaid/mermaid-compat.js`)
-* **Incidental fix: Mermaid diagrams never actually rendered in post content.** The old markup
-  wrapped the source in `<div class="mermaid"><script>document.write(window.atob("…"))</script></div>`,
-  and content filters rewrite the quotes inside that script, so the inline script was always a
-  syntax error. Rendering is now data-driven: the server emits
-  `<div class="mermaid" data-mermaid="<base64>">` and the front-end script restores the text
-  before rendering. That script also understands the legacy format (it can recover the source
-  from the old `<script>`), so **existing posts do not need to be re-saved**
-* **KaTeX 0.11.1 → 0.19.0** (`assets/KaTeX/`). The 0.11.x line is covered by
-  CVE-2024-28245 (`\includegraphics` filename not escaped) and CVE-2025-23207
-  (`\htmlData` attribute names not validated), among others. Rendering now passes
-  `trust: false` and `maxExpand` explicitly
-* **Resource exhaustion in the image paste endpoint** (`src/App/ImagePaste.php`).
-  The old code only limited request size: a few-MB compressed PNG can expand into hundreds of
-  MB of pixel buffers, and converting requires a second canvas of the same size. The sm.ms
-  upstream timeout was 120 seconds. Added: decoded binary limit, per-side limit, total pixel
-  budget and a decode memory budget checked against `memory_limit` — all of them **before**
-  any `imagecreatefrom*()` call; upstream timeout 10s (3s connect); per-user rate limiting
-* **The sm.ms token is no longer sent to the browser**
-  (`src/Pages/page/sm-ms-management/`). The bootstrap payload only carries the endpoint URL now;
-  `Authorization` is injected server-side and any client-supplied headers are ignored. The proxy
-  was narrowed from "any `service/api/v2/*` with any method" to a **fixed operation allowlist**
-  (`profile` / `upload_history` / `delete/<hash>`, with method and URL decided by the server)
-* **Admin AJAX authorization** (`src/Pages/Pages.php`). Removed the "treat a matching Host as
-  same-origin when the nonce fails" fallback (it does not compare scheme or port, and
-  Origin/Referer can be forged by non-browser clients), and removed the
-  `wp_ajax_nopriv_*` entry for admin pages
-* **Unique temporary files** (`src/App/ImagePaste.php`). The old `md5(dataurl)` filename was
-  predictable and concurrent requests with the same input overwrote each other; now uses
-  `wp_tempnam()`
-* **Log redaction** (`src/Utils/Logger.php`). Query parameters in the request URI are logged as
-  `[REDACTED]`, so nonces no longer end up in `error_log`
-* **Front-end dependency upgraded**: axios 0.19.2 → 1.20.0 (the 0.19.x line and early 1.x
-  releases carry multiple prototype-pollution and request-hijacking advisories).
-  Vue stays at 2.6.11 — the whole 2.x line is inside GHSA-5j4c-8p2g-v4jx and the official fix
-  only exists in 3.0, which is a Vue 3 migration and out of scope here
-
-#### 2. Compatibility
-
-* The front end no longer removes `wp-block-library` / `wp-block-library-theme` /
-  `wc-blocks-style` by default; it is now explicit opt-in:
-  `add_filter("editormd_dequeue_block_styles", "__return_true");`
-  (the old rule removed them site-wide whenever the current post had no blocks, but shortcodes,
-  theme templates and widgets may still depend on them)
-* Page render functions were renamed from the global `display_page()` to
-  `wp_editormd_render_*_page()` to avoid `Cannot redeclare` conflicts with themes and plugins
-
-#### 3. Reliability
-
-* Upgrade/migration no longer requires a logged-in user (previously, if only anonymous visitors
-  hit the site after an update, the migration would never run); a transient lock and failure
-  logging were added
-* CI gained a **security invariants check** (dependency security baseline, key guards, and
-  forbidden regressions), plus `composer validate` and `composer audit`
-
-#### 4. Upgrade
-
-* The upgrader gains a `10.4.1 → 10.4.2` migration; it only advances the version number
-
-#### 5. Not addressed in this release
-
-* The report's "overall refactoring plan" (unified security entry point, image pipeline as a
-  service, data-driven Mermaid/KaTeX rendering, server-side sm.ms client) is deferred
-* P2-05 (`editor_addres` arbitrary third-party asset root) is left unchanged
-* PHPUnit / WordPress integration tests / browser-level XSS regression are still not part of CI
-  (the security invariants check covers the specific regressions for now)
-
-------
+* **Two bundled libraries upgraded**: Mermaid 8.4.8 → **10.9.8**, KaTeX 0.11.1 → **0.19.0**. The old
+  lines have no fixed release, and a malicious diagram could downgrade the security level and execute
+  injected content.
+* **Incidental fix: Mermaid diagrams never rendered in post content at all** (the emitted inline script
+  was always a syntax error). Rendering is now data-driven and backward compatible, so **existing posts
+  do not need re-saving**.
+* **Resource budgets added to the image paste endpoint.** It only limited request size before, while a
+  few-MB compressed PNG can expand into hundreds of MB of memory. Requests are now rejected before decoding.
+* **The sm.ms token is no longer sent to the browser**; the proxy was narrowed to a fixed operation allowlist.
+* **Admin AJAX authorization tightened**: the "fall back to the host name when the nonce fails" path was
+  removed, along with the logged-out entry point.
+* Front-end dependency axios 0.19.2 → **1.20.0**.
+* Upgrades/migrations **no longer require a logged-in user** (previously, a site only visited by anonymous
+  users would never run them).
+* CI gained a security check so that already-fixed issues cannot silently come back.
 
 ### Version 10.4.1
 
-> Fixes a metadata defect in the 10.3.0 / 10.4.0 packages. **No logic or data-structure
-> changes, so upgrading requires no migration.**
+> **Fixes the 10.3.0 / 10.4.0 packages not showing plugin information in the admin. No logic changes, so
+> upgrading needs no migration.**
 
-#### Bug Fixes
-
-* Fixed **the released package not showing plugin information in the admin**. The
-  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
-  fields of the plugin file header were missing, so the
-  "Plugins → Add New → Upload Plugin" screen showed no version, author, or required
-  environment, and the update check could not read the version
-* Cause: those lines look exactly like block-comment continuation lines (they start with ` * `),
-  so the comment-stripping script deleted them as newly added comments — the hunk they lived in
-  had unequal `-` / `+` counts (-3 / +6), so the "paired rewrite → restore the upstream line"
-  fallback never fired
-* Neither the syntax check nor the token-stream comparison could catch this (comments are
-  excluded from the token comparison by design), so this release adds a **plugin header field
-  checker** and a **CI gate** (fails when a field is missing or when Version does not match the
-  build version)
-
-#### Upgrade
-
-* The upgrader gains a `10.4.0 → 10.4.1` migration; it only advances the version number, no data changes
-
-------
+* The plugin file header in the released package had **lost** `Version`, `Author` and the required
+  WordPress / PHP versions, so the admin's "Upload Plugin" screen showed no version or author, and the
+  update check could not read a version at all.
+* Cause: those lines look **exactly** like block-comment continuation lines, so the comment-stripping
+  script deleted them. Neither the syntax check nor the code comparison could catch it (comments are
+  excluded from the comparison by design). This release adds a **dedicated plugin-header checker** and a
+  **CI gate**: a missing field or a version mismatch now fails the build.
 
 ### Version 10.4.0
 
-> Maintained by [@tjsky](https://github.com/tjsky). Compared with 10.3.0, this release fixes
-> long-standing issues in formula parsing and xmlrpc, and adds an optional image size syntax.
-> **Images without a size are rendered exactly as before, so upgrading requires no migration.**
+> **Fixes long-standing formula-parsing and xmlrpc issues, and adds an optional image-size syntax.**
+> **Images without a size render exactly as before, so upgrading needs no migration.**
 
-#### 1. Formula Parsing
+* **Fixed `$` inside code blocks being parsed as formulas** — the original skip check could never
+  succeed. It now uses a tag allowlist plus nesting depth. This was one of the most frequently reported
+  issues upstream.
+* **Fixed block formulas rendering twice** — two filters each handled part of the job and disagreed on
+  the marker. Now a single pass.
+* **Fixed coincidentally paired `$` in body text being rendered as formulas**, e.g.
+  `function update( $a, $b )`. Two guards were added, and they can be disabled with a filter.
+* **Fixed `IXR_Message not found` on xmlrpc requests** (adopts upstream PR #546).
+* **New: optional image-size syntax** — `![alt](img =600)` / `=600x400` / `=x400`. Renders at the
+  requested size on wide screens and scales proportionally, without distortion, on narrow ones.
 
-* Fixed **`$` inside code blocks / inline code being parsed as formulas**. The original skip check was
-  `htmlspecialchars_decode($element) === "<pre>"`, while real code blocks render as
-  `<pre class="...">` or `<pre><code>` — an exact-match test that never succeeds. It now uses a
-  tag whitelist (`pre`/`code`/`style`/`script`/`textarea`) with nesting-depth counting.
-  This was among the most frequently reported issues upstream
-* Fixed **block formulas being parsed twice (duplicate rendering)**: two filters handled `$$...$$` and
-  `$...$` separately, and the class name the latter looked for never matched the emitted markup.
-  Now a single regex in a single pass
-* Fixed **mismatched `$` pairs in body text being rendered as formulas**, e.g.
-  `function update( $a, $b )` or `price from $100 to $200`. Two guards were added for inline formulas:
-  delimiters must be tight against the content, and the content must contain a letter, digit or backslash
-  (disable via the `editormd_katex_require_tight_delimiters` filter)
-* The output-side `esc_html()` escaping is retained and carried over to the new unified callback, so the
-  stored XSS fixed in 10.3.0 cannot regress
-
-#### 2. Bug Fixes
-
-* Fixed **`Class 'EditormdApp\IXR_Message' not found` on xmlrpc requests**
-  (`src/App/WPComMarkdown.php`). The file declares a namespace while the included `IXR_Message`
-  lives in the global namespace, so a leading backslash is required.
-  **Adopts the fix from upstream [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)**
-
-#### 3. New Feature
-
-* Added an **optional image size syntax**: `![alt](img.jpg =600)` / `=600x400` / `=x400`,
-  combinable with `"title"` and `{#id .class}`. Sizes are emitted as an inline style of
-  `width` + `max-width:100%` + `height:auto` (plus `aspect-ratio` when both dimensions are given), so
-  images render at the requested size on wide screens, scale proportionally on narrow ones without
-  distortion, and do not interfere with zoom plugins such as Medium Zoom
-* The approaches of upstream PRs [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) and
-  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) were **taken as reference but not merged
-  directly**: #602 drops `{#id .class}` attribute syntax and `ref_attr` support, while #603 lacks output
-  escaping (merging it would regress the 10.3.0 security fixes) and its guard can be bypassed
-
-#### 4. Upgrade
-
-* The upgrader gains a `10.3.0 → 10.4.0` migration; it only advances the version number, no data changes
-
-------
 ### Version 10.3.0
 
-> Maintained by [@tjsky](https://github.com/tjsky) after the original author stopped maintaining this project.
-> The plugin was **removed from WordPress.org on 2025-04-09 for a security issue** (related to
-> **CVE-2025-31035**, Stored XSS, affecting `<= 10.2.1`), and upstream has never released a fix.
-> This release contains **security hardening and compatibility fixes only** — no functional or
-> data-structure changes, so upgrading requires no migration.
+> **Where this maintained fork begins, after the original author stopped maintaining the project.**
+> The plugin was **removed from WordPress.org on 2025-04-09 over a security issue**
+> (**CVE-2025-31035**, affecting 10.2.1 and earlier, with no upstream fix).
+> **No functional or data-structure changes, so upgrading needs no migration.**
 
-#### 1. Security Fixes
+* **Fixed a stored XSS in formula rendering**: posting a specific snippet in a post **or a comment**
+  executed script. Because the comment path was affected too, the bar to exploit it was lower than for
+  the publicly disclosed issues of the same batch.
+* **Fixed unauthenticated arbitrary file write** in the image paste endpoint: added permission checks,
+  real image type detection by content, and a payload size limit.
+* **Fixed the image host proxy being usable as an open proxy (SSRF)**: the upstream is now a strict
+  allowlist and only the necessary header is forwarded.
+* **Fixed a batch of admin-side issues**: authorization flaws, option saving with no sanitization, and a
+  slow admin (blind SSRF).
+* Fixed "a specific cookie causes a white screen", a syntax error on uninstall, and a logger that threw
+  on every call.
+* **No longer loads editor scripts and styles from a third-party CDN by default.**
+* **Works with WordPress 7.1 and PHP 7.4 – 8.4**, including a fatal "the plugin calls a function that
+  does not exist yet, taking down both the admin and the front end" issue.
+* **Replaced build tools that no longer work** (`node-sass` → `dart-sass`, and others), so the project
+  builds again, and added automated packaging and release through GitHub Actions.
+* **Other latent bugs fixed**: the mind map setting was being lost, and Mermaid's defaults were mistakenly
+  written into KaTeX's.
 
-* Fixed a **stored XSS** in the KaTeX rendering path (`src/App/KaTeX.php`). Entity-encoded formula content is decoded back to real characters and then emitted without escaping; both `the_content` and `comment_text` run *after* save-time kses, so kses cannot stop it. Posting `$ &lt; img src=x onerror=... &gt; $` in a post **or a comment** executes script
-* Fixed **unauthenticated arbitrary file write** in the image paste endpoint (`src/App/ImagePaste.php`): added `upload_files` capability and nonce (CSRF) checks, real image type detection by content, payload size limit, WordPress-native file handling with cleanup on failure, and TLS verification for remote uploads
-* Fixed **SSRF / open proxy** in the sm.ms image host proxy: upstream is now a strict allowlist (`https://smms.app/api/v2/*`), only the `Authorization` header is forwarded, TLS verification is enabled, and timeouts/size limits/same-origin checks were added
-* Fixed **authorization flaws** in the admin page renderer (`src/Pages/Pages.php`): capability check now uses `manage_options` instead of a role name, a permanently-true authorization branch was removed, `page`/`entry` are dispatched via an explicit allowlist (removing path traversal), and `$_GET` is validated/sanitized
-* Fixed **completely ineffective option sanitization** (`src/Utils/Settings.php`): the bundled settings library only sanitizes fields with an explicit `sanitize_callback`, and none were declared. Now enforced centrally via `pre_update_option_*`
-* Fixed **blind SSRF and admin slowdown**: settings init fetched a remote `version.json` synchronously on every admin request. Now uses `wp_remote_get` with an allowlist and caching, outside the admin sync path
-* Fixed a fatal error (white screen) triggered by a specific cookie
-* Fixed a syntax-level fatal error on plugin uninstall (illegal top-level `static`)
-* Fixed an empty logger implementation that made every logging call throw
-* Fixed unescaped output and token leakage in the debug/settings pages
-* Editor scripts and styles are no longer loaded from a third-party CDN by default
+---
 
-#### 2. Compatibility
+## 繁體中文
 
-* `Tested up to` is now WordPress 7.1; `Requires PHP` is 7.4, verified on 7.4 – 8.4
-* Fixed a **full-site white screen caused by calling user-context functions at plugin load time**
-* Fixed `htmlspecialchars()` default-flag changes (PHP 8.1+) altering existing content rendering
-* Fixed undefined `$GLOBALS['pagenow']`, invalid JS when Mermaid config is empty, and mind map script URL falling back to the current page
-* Version comparison now uses `version_compare`; removed the branch that deregistered WordPress' bundled jQuery in favor of 1.12.4
-* Multisite activation/uninstall now handled per site
+### Version 10.5.0
 
-#### 3. Build Chain
+> **這次為訪客留言做了一個「簡版編輯器」，順手清掉幾處老毛病。**
+> 另外：第三方圖床（sm.ms）功能整體下線，前台編輯器的配色不再跟隨後台。
+> **沒有更動資料結構，升級無需遷移。**（sm.ms 的殘留設定會在升級時自動清除。）
 
-* `node-sass` (Node ≤ 18 only) → **`dart-sass`**, so the project builds on modern Node
-* Unmaintained `webpack-parallel-uglify-plugin` → **`terser-webpack-plugin`**
-* Vue sub-project: fixed `tsconfig`, peer dependencies, and hardcoded plugin-directory `publicPath`
-* Removed a malformed statement in `assets/FrontStyle/FrontStyle.scss` (ignored by libsass, fatal for dart-sass)
-* Added a GitHub Actions release workflow that builds from source and attaches an installable zip
+#### 一、留言區的老問題：為什麼「預覽裡有、送出去就沒了」
 
-#### 4. Other Latent Bugs Fixed
+WordPress 把留言當成**不可信內容**，只允許裡面出現 15 個標籤：
+`a` `abbr` `acronym` `b` `blockquote` `cite` `code` `del` `em` `i` `q` `s` `span` `strike` `strong`。
 
-* `editor_mindmap` option was overwritten by the `editor_style` array, breaking the mind map feature
-* Mermaid's default config was mistakenly written with KaTeX's defaults
+圖片（`img`）、程式碼區塊（`pre`）、表格、標題、清單、分隔線……**全部會被系統刪掉**。
+可是編輯器工具列偏偏提供了這些按鈕——預覽是瀏覽器畫出來的，所以看起來一切正常；
+等到儲存時被系統剝掉，東西就沒了。
 
-------
+這不是「WordPress 的硬限制」。外掛可以透過 `wp_kses_allowed_html` 為留言多放行幾個標籤，
+只是以前一直沒做。
+
+#### 二、新增：訪客留言簡版編輯器（預設關閉）
+
+* 開關在：**設定 → WP Editor.md → Basic Settings → 給前台留言使用簡版編輯器**。
+* 開啟後，留言框只留 8 個按鈕：**粗體、斜體、刪除線、引用、行內程式碼、連結、圖片、純預覽**。
+  收起來的（標題、清單、分隔線、表格、程式碼區塊、雙欄預覽、全螢幕、清除、關於），
+  不是系統會刪掉，就是在手機上只會佔位子。
+* **預設單欄**，輸入框高 200px，字級 16px（低於 16px 時，iPhone 上點一下輸入框會整頁放大）。
+* **圖片對話框裡移除了「圖片連結」欄位**：既然留言圖片一律不能點，填了也是白填。
+* **窄螢幕下工具列的提示氣泡不再撐破頁面**（以前手機上整頁可以被橫向拖走）。
+* **真正生效的限制在伺服端**，不是靠藏按鈕。想讓某個站台強制開關，
+  用 `editormd_simple_comment_enabled` 過濾器。
+
+開啟後，留言會有這些變化：
+
+* **連結不能點**：`[文字](http://x.com)` 會顯示成「文字：`http://x.com`」。
+  這是為了防止訪客之間互相釣魚，與 SEO 無關（WordPress 本來就為留言連結加上 `rel="nofollow ugc"`）。
+  頁內錨點（`#` 開頭）保留原樣，`mailto:` 顯示為純文字。
+* **圖片不能點**：留言圖片不再被連結包住；並強制加上「延遲載入」與「不送出來源頁網址」兩個屬性，
+  因為訪客貼的圖片網址可能是任意第三方網站。
+* **公式、任務清單、程式碼區塊、emoji 短碼一併關閉**——預覽與伺服端同時關，避免兩邊顯示不一致。
+* **留言的圖片貼上功能關閉**：訪客沒有上傳權限，以前貼圖只會得到一個「上傳失敗」。
+
+#### 三、除錯資訊面板新增「留言語法」兩塊
+
+在**進階設定 → 除錯資訊**裡，現在能看到留言區**真正生效**的標籤清單，
+每一行都標示是「WordPress 原生」還是「本外掛額外放行」；以及本外掛對留言做了哪些調整。
+
+#### 四、順手修好：升級器漏了兩個分支，站台每次請求都重跑一次初始化
+
+升級器漏寫了 10.4.3 與 10.4.5 兩個分支，停在這些版本的站台比對不到升級路徑，
+版本號永遠不會前進——於是**每次存取都要重跑一次啟用流程**。現在補齊了。
+
+#### 五、修好：後台每個頁面都在跳「檢驗到外掛資源包已過時」
+
+升級後，寫文章、審留言、看儀表板……後台**每個頁面**都有這麼一條紅字。
+兩個原因：一是資源包裡的版本號沒有跟著一起升；二是**提示掛到了錯誤的鉤子上**——
+本來只該在設定頁顯示的一行狀態，被放大成全後台通告。
+現在只在設定頁顯示一行狀態，並直接寫出「資源包版本 X / 外掛版本 Y」，一眼看得出哪裡對不上。
+
+#### 六、新增：前台編輯器配色是否跟隨後台（預設關閉）
+
+以前後台把編輯器設成深色，訪客在淺色主題的站台上看到的留言框也是深色。
+現在預設**不跟隨**：前台使用 Editor.md 自帶的淺色樣式，跟著你的主題走；後台該什麼樣還什麼樣。
+想自訂夜間樣式，README 裡列出了可以掛鉤子的選擇器。
+
+#### 七、修好：官方區塊佈景主題下，留言框下方多出一塊輸入框
+
+在 Twenty Twenty-Four / Twenty Five 這類官方區塊佈景主題下，留言框下面會露出一塊原生輸入框，
+裡面是一堆 HTML，看起來像「預覽變成了原始碼」。
+原因是佈景主題給留言框寫的樣式權重更高，蓋過了外掛「把這塊中間元素藏起來」的規則。
+現在外掛不再跟佈景主題比權重，直接釘死。
+
+#### 八、移除：第三方圖床（sm.ms）上傳功能
+
+那家免費圖床已經全面轉向收費，繼續留著只是徒增維護面。
+本次一併刪除：上傳分流、存取權杖與後台代理介面、配套的後台管理頁，以及只為它引入的設定項。
+**圖片貼上一律存到本站媒體庫**，升級時會自動清除殘留的圖床設定。
+
+#### 九、設定頁與文案調整
+
+* 「支援前端留言」後面那句括號說明，移到選項下方單獨一行，與其他選項排版一致。
+* PC 上把設定項標籤欄加寬，中文標籤不再折成兩行。
+* 「進階設定 → 捐贈」末尾加了一段說明：本修改版只做安全強化與相容性調整，不單獨接受捐贈。
+
+#### 十、發佈流程調整
+
+GitHub Release 的「本版變更」改為**直接從本檔案對應版本段落產生**，不再只給一個連結；
+「維護分支累計改動」不再逐條列出，壓縮成一句話。這樣 Release 頁面與本檔案只有一個事實來源。
 
 ### Version 10.4.5
 
-> 本版修正「編輯器預覽與儲存結果不一致」—— 同一段內容預覽裡是亂碼、發佈後卻正常。
-> **無資料結構變更，升級無需遷移。**
+> **這次修的是「預覽裡是亂碼、發佈後卻正常」。沒有更動資料結構，升級無需遷移。**
 
-* **缺陷修正：預覽不認識外掛的圖片尺寸語法。** `![alt](img =600)` / `=300x200` / `=x400`
-  以及 `{#id .class}` 只實作在伺服端解析器（儲存那一刻才生效），而編輯器預覽用的是
-  Editor.md 內附的 marked，完全看不懂這套寫法，會把它當成「不是圖片」原樣吐出裸 Markdown。
-  現由 `assets/Config/editormd.js` 在解析前把尺寸與屬性搬進 URL 的 fragment、並覆寫
-  `renderer.image` 還原成帶 `width` / `height` / `style` / `id` / `class` 的 `<img>`，
-  輸出規則與伺服端逐條對齊（含屬性區塊裡明確 `width=` / `height=` 的優先順序）
-* **缺陷修正：預覽會把普通文字當成公式。** Editor.md 的段落渲染只做 `$…$` 正則配對、
-  不判斷內容像不像公式，於是「價格從 $100 漲到 $200」「function update( $a, $b )」
-  以及行內程式碼裡的 `$` 都會被渲染成公式 —— 而伺服端是有防護的，這又是一處預覽與發佈不一致。
-  現把伺服端的判定規則（定界符必須緊貼內容、內容須含字母/數字/反斜線）與「跳過 code/pre」
-  一併搬到預覽側；實測同一篇文章兩側的公式數量、正文 `$` 數量完全一致
-* **測試腳本修正**：`e2e-create-post.php` 把未 slash 的內容直接交給 `wp_insert_post()`，
-  而它內部會先做 `wp_unslash()` —— 於是腳本裡的 `\frac` 被存成 `frac`、`\alpha` 變成 `alpha`，
-  測試文章本身就是壞的（真實情境走 `$_POST`，PHP 已自動 slash，不受影響）。現改為 `wp_slash()`
-  並在腳本裡加了反斜線保留自檢
-* **回歸補充**：新增 `tools/vm/regression-preview-parity.py` —— 對同一篇文章分別抓編輯器預覽與
-  前台渲染的 DOM，逐項比對圖片尺寸/屬性、公式數量、正文 `$` 數量、程式碼區塊數量。
-  先前的回歸只涵蓋「儲存後的 HTML」與「前台渲染」，**完全沒有涵蓋編輯器預覽**，本版補上
-
+* **預覽不認識外掛的圖片尺寸寫法。** `![說明](圖片 =600)` 這類寫法只做在伺服端（儲存那一刻才生效），
+  預覽用的是 Editor.md 自帶的解析器，完全看不懂，會把整行當普通文字原樣吐出來。
+  現在預覽也認識這套寫法，顯示結果與伺服端逐項對齊。
+* **預覽把普通文字當成公式。** 例如「價格從 $100 漲到 $200」、`function update( $a, $b )`、
+  行內程式碼裡的 `$`，都會被算成公式——而伺服端是有防護的，這又是一處兩邊不一致。
+  現在預覽與伺服端用同一套判斷規則，同一篇文章兩邊的公式數量完全一致。
+* 順帶修了測試腳本自己的 bug（它把內容裡本該保留的反斜線吃掉了，導致用來測試的文章本身就是壞的），
+  並補上一個新回歸：把「編輯器預覽」與「前台顯示」的 DOM 抓下來逐項比對。
+  以前只測「儲存後的結果」，**完全沒測過編輯器預覽**。
 
 ### Version 10.4.4
 
-> 本版修正評論側的 Markdown 鏈路，以及頁面上同時載入兩套 Prism 的歷史問題。
-> **無資料結構變更，升級無需遷移。**
+> **留言裡的 Markdown 現在真的會被轉換了；頁面上也不再同時載入兩套程式碼高亮函式庫。**
 
-#### 1. 訪客評論的 Markdown 現在真的會被轉換
-
-* 此前訪客在評論框裡寫的 Markdown，送出後會**原樣存進資料庫** —— 前台看到的還是
-  `**粗體**`、`[連結](...)` 這類原始碼，而編輯器裡的預覽是前端渲染的，所以看起來一切正常。
-* 根因是評論的 Markdown 轉換開關沿用自 WordPress.com 的 Markdown 模組，位於
-  「設定 → 討論 → Markdown」，預設關閉、入口很深，而且和插件自己的
-  「支援前端評論 / 支援後台回覆」沒有任何連動。
-* 現在：只要插件開著評論編輯器（任一開關為開），評論的 Markdown 轉換就一併啟用。
-  同時把那個遺留勾選框從「設定 → 討論」裡隱藏 —— 它此刻只是個會誤導人的擺設。
-* 需要單站台關掉，可以用過濾器：
-  `add_filter("editormd_comment_markdown_enabled", "__return_false");`
-* 關閉 `html_decode`（預設值）時才存在的解析缺陷一併修掉：原始碼此前會被整段
-  `htmlspecialchars(ENT_COMPAT)` 轉義，導致
-  - 行首的 `>` 變成 `&gt;`，**引用區塊永遠渲染不出來**；
-  - `[文字](http://x "標題")` 的標題引號變成 `&quot;`，**連結語法直接失配**。
-  現改為只轉義 `&` 與 `<`（已足以阻止任何標籤成形，安全性不變），`"` 不再動，
-  行首被轉義的引用標記再還原回來（支援 `>>` 嵌套）。
-
-#### 2. Prism 只保留一套
-
-* 編輯器預覽會額外載入 Editor.md 自帶的 `lib/prism.min.js`：一整套 286 KB、
-  132 種語言、版本還是 1.15.0 的獨立建置。
-* 它和插件提供的 Prism 1.19（內核 + autoloader + toolbar / 行號 / 語言標籤 /
-  複製按鈕 + 主題）互相覆蓋 `window.Prism`。後載入的那份會把先掛上去的插件頂掉 ——
-  實測 `window.Prism.plugins` 只剩 `lineNumbers`，`toolbar` 與 `autoloader` 都不見了，
-  於是程式碼區塊沒有複製按鈕、沒有語言標籤，語言包也不再按需載入。
-* 現在 `lib/prism.min.js` 只是一個佔位檔案（避免 Editor.md 的載入鏈 404），
-  wp-admin 也改為重用插件同一套 Prism。實測同一個頁面：Prism 腳本從 **302.5 KB 降到
-  24.2 KB**，`window.Prism.plugins` 恢復為 `autoloader / toolbar / lineNumbers`。
-* Prism 資源的快取指紋由寫死的 `1.15.0` 改為插件實際隨包發佈的 `1.19.0`。
-
-#### 升級
-
-* 升級器新增 `10.4.3 → 10.4.4` 遷移，僅推進版本號，無資料變更。
-
-------
+* **訪客留言的 Markdown 以前根本沒生效。** 訪客寫的 `**粗體**`、`[連結](...)` 會**原樣存進資料庫**，
+  前台看到的還是這些原始碼。編輯器裡的預覽是瀏覽器畫的，所以寫的時候看起來一切正常。
+  根因是這個開關藏在**「設定 → 討論 → Markdown」**裡，預設關閉、入口很深，
+  還與外掛自己的「支援前端留言 / 支援後台回覆」沒有任何連動。
+  現在只要外掛開著留言編輯器，留言的 Markdown 轉換就一併啟用，那個容易誤導人的勾選框也隱藏了。
+* 修了 `html_decode` 關閉時的一處解析問題：行首的 `>` 與連結標題裡的引號被錯誤轉義，
+  導致**引用區塊渲染不出來**、**帶標題的連結解析失敗**。
+* **頁面上曾同時載入兩套 Prism。** 一套是 Editor.md 自帶的（286KB、132 種語言），
+  與外掛提供的那套互相覆蓋，結果程式碼區塊沒有複製按鈕、沒有語言標籤。
+  現在只保留外掛這一套，同一個頁面上 Prism 從 **302.5KB 降到 24.2KB**。
 
 ### Version 10.4.3
 
-> 本版集中修正前端問題：Prism 程式碼高亮的載入順序與語言包路徑、編輯器工具列與 Bootstrap 的
-> 類名衝突、後台回覆框的寬度，以及一處每秒刷屏的主控台錯誤。
-> **無資料結構變更，升級無需遷移。**
+> **這次集中修前端：程式碼高亮的載入順序、工具列圖示消失、後台回覆框一片空白、主控台每秒洗頻。**
 
-#### 1. Prism 程式碼高亮
-
-* 修正主控台 `Uncaught ReferenceError: Prism is not defined`。設定 autoloader 語言包路徑的
-  內聯腳本原本掛在 `wp_print_footer_scripts` 的預設優先級上直接輸出，而 WordPress 列印頁尾
-  腳本用的是優先級 20 —— 腳本跑在 Prism 之前。現改為掛在外掛自己的腳本控制代碼之後，
-  由 WordPress 保證執行順序。
-* 修正 `https://站點/components/prism-*.min.js` 這類 404。上一條腳本沒執行成功時
-  `languages_path` 是空的，autoloader 會退回預設的相對路徑。路徑設定正常後不再出現。
-* `plaintext` / `plain` / `text` / `txt` 這四個純文字語言：Prism 既不隨核心預置、也沒有對應的
-  元件檔案，現在預先宣告為空語法，省掉一次必然 404 的請求。
-* Prism 核心改為顯式宣告所有 Prism 外掛的依賴，不再依賴入隊順序。
-
-#### 2. 編輯器工具列
-
-* 修正「主題引入 Bootstrap 之後工具列只剩零星幾個圖示」。工具列按鈕的類名是 `tooltip`
-  （配合 `.tooltiptext` 實現懸停提示），與 Bootstrap 3 的全域 `.tooltip`
-  （`position: absolute; z-index: 1070; opacity: 0`）撞名，所有按鈕被設為透明、絕對定位並
-  堆疊在一起。現在由外掛按自己的語意把定位與透明度釘回來，使用 Bootstrap 的主題不再受影響。
-  前台評論框、自訂目標元素編輯器與後台編輯器皆適用。
-
-#### 3. 後台回覆框（edit-comments.php）
-
-* 修正回覆框右半邊永遠是一片空白。編輯器寬度原本被 `!important` 釘死在 50%，而回覆框的
-  預覽面板預設是隱藏的。現改為跟著預覽的顯隱走 —— 關閉時佔滿整行，開啟時各佔一半。
-
-#### 4. 其他
-
-* 修正主控台每秒一次的 `wp is not defined`。字數統計的判斷寫成了 `wp && wp.utils`，
-  而前台並沒有 `wp` 這個全域變數，讀取未宣告的識別字會拋出 ReferenceError。改為 `typeof` 判斷。
-
-#### 升級
-
-* 升級器新增 `10.4.2 → 10.4.3` 遷移，僅推進版本號，無資料變更。
-
-------
+* 修 `Prism is not defined`：設定語言包路徑的腳本跑在 Prism 前面，現在改為掛在 Prism 之後。
+* 修 `https://站台/components/prism-*.min.js` 這類 404。
+* 修「佈景主題引入 Bootstrap 之後，工具列只剩零星幾個圖示」：
+  按鈕的類名與 Bootstrap 的全域樣式撞名，導致按鈕全部透明堆疊。
+* 修後台回覆框**右半邊永遠是一片空白**：現在跟著預覽開關走。
+* 修主控台**每秒刷一次**的 `wp is not defined`。
 
 ### Version 10.4.2
 
-> 本版依程式碼審查報告的 P1 / P2 清單做**小而集中的安全加固**：升級兩個有公開漏洞的綑綁
-> 函式庫、為圖片介面補上真正缺失的資源預算、把 sm.ms 權杖移出瀏覽器、收緊後台 AJAX 授權。
-> **無資料結構變更，升級無需遷移。**
+> **依一份程式碼審查報告，做了一輪小而集中的安全強化。沒有更動資料結構，升級無需遷移。**
 
-#### 1. 安全修正
-
-* **Mermaid 8.4.8 → 10.9.8**：8.x / 9.x 分支皆無可用修正；`securityLevel` 強制釘為 strict，
-  且在使用者設定合併**之後**覆蓋，站點設定與圖表指令都無法降低安全等級
-* **KaTeX 0.11.1 → 0.19.0**，渲染時顯式 `trust: false`
-* 圖片貼上新增解碼後體積、像素與記憶體預算，全部在進入 GD 解碼前攔截；sm.ms 上游逾時
-  120 秒 → 10 秒（連線 3 秒）；新增依使用者的速率限制
-* sm.ms 權杖不再下發到瀏覽器，改由伺服端代理注入；代理改為固定操作白名單
-* 後台 AJAX 不再以 Origin/Referer 主機名作為 nonce 失敗的兜底授權，並移除未登入入口
-* 暫存檔改用 `wp_tempnam()`；日誌中的請求 URI 對查詢參數脫敏
-* 前端依賴 axios 0.19.2 → 1.20.0（Vue 2.x 全系無可用修正，留待 Vue 3 遷移）
-
-#### 2. 缺陷修正
-
-* Mermaid 圖表先前在正文裡無法渲染（內聯腳本被內容篩選器改寫引號），改為資料驅動渲染，
-  並相容舊格式，歷史文章無需重新儲存
-
-#### 升級
-
-* 升級器新增 `10.4.1 → 10.4.2` 遷移，僅推進版本號，無資料變更。
-
-------
+* **升級兩個有公開漏洞的元件**：Mermaid 8.4.8 → **10.9.8**、KaTeX 0.11.1 → **0.19.0**。
+  舊分支沒有可用修正版，且惡意圖表可以把安全等級降下來再執行注入內容。
+* **順帶修好：Mermaid 圖表以前在正文裡根本渲染不出來**（輸出的內聯腳本必然語法錯誤）。
+  現在改為資料驅動渲染並相容舊格式，**歷史文章無需重新儲存**。
+* **圖片貼上介面補上資源用量限制**。以前只限制請求大小，
+  但一張幾 MB 的高壓縮 PNG 解開後能吃掉數百 MB 記憶體。現在在解碼前就攔下來。
+* **sm.ms 權杖不再下發到瀏覽器**，改由伺服端注入；代理收窄為固定操作白名單。
+* **後台 AJAX 授權收緊**：移除「驗證失敗就看網域」的兜底，並移除未登入入口。
+* 前端依賴 axios 0.19.2 → **1.20.0**。
+* 升級/遷移**不再要求使用者登入**（以前只有匿名訪客造訪時，遷移會一直不執行）。
+* CI 新增安全檢查，避免已修好的問題被改回去。
 
 ### Version 10.4.1
 
-> 本版修正 10.3.0 / 10.4.0 發布包的一處中繼資料缺陷，**無程式邏輯與資料結構變更，升級無需遷移**。
+> **修 10.3.0 / 10.4.0 的安裝包在後台不顯示外掛資訊。沒有邏輯改動，升級無需遷移。**
 
-#### 缺陷修正
-
-* 修正**發布包在後台不顯示外掛資訊**：外掛主檔頭部註解中的
-  `Version` / `Author` / `Author URI` / `Requires at least` / `Requires PHP` / `Tested up to`
-  遺失，導致「外掛 → 安裝外掛 → 上傳外掛」介面看不到版本、作者與所需環境，更新檢查也讀不到版本號
-* 成因：這些行與區塊註解續行形態一致（都以 ` * ` 開頭），被註解清理腳本當成新增註解刪除 ——
-  它們所在的 diff hunk 中 `-` / `+` 行數不等（-3 / +6），
-  「成對改寫則還原基線原文」的兜底因此沒有觸發
-* 語法檢查與 token 流比對都無法發現（註解本就被排除在 token 比對之外），
-  故本次一併補上**外掛頭欄位檢查腳本**與 **CI 閘門**（缺欄位、或 Version 與建置版本不符即失敗）
-
-#### 升級
-
-* 升級器新增 `10.4.0 → 10.4.1` 遷移，僅推進版本號，無資料變更
-
-------
+* 安裝包裡，外掛主檔頭部的 `Version`、`Author`、所需的 WordPress / PHP 版本等資訊**遺失了**，
+  導致後台「上傳外掛」介面看不到版本與作者，更新檢查也讀不到版本號。
+* 成因：這些行的寫法與區塊註解續行**一模一樣**，被清理腳本當成註解刪掉了。
+  語法檢查與程式碼比對都發現不了（註解本來就被排除在比對之外）。
+  因此這次加了**專用的外掛頭檢查腳本**與 **CI 閘門**：缺欄位、或版本號對不上，直接建置失敗。
 
 ### Version 10.4.0
 
-> 本版繼續由 [@tjsky](https://github.com/tjsky) 維護。相較 10.3.0，本版修正了公式解析與
-> xmlrpc 的長期缺陷，並新增可選的圖片尺寸語法。**不寫尺寸的圖片呈現結果與之前完全一致，
-> 升級無需遷移。**
+> **修公式解析與 xmlrpc 的老問題，新增一個可選的圖片尺寸語法。**
+> **不寫尺寸的圖片，顯示結果與以前完全一樣，升級無需遷移。**
 
-#### 1. 公式解析
+* **修「程式碼區塊裡的 `$` 被當成公式渲染」**：原本的跳過判斷永遠不成立，
+  現在改為標籤白名單加上巢狀深度判斷。這是上游被反覆回報的一類問題。
+* **修「區塊公式渲染兩次」**：兩個過濾器各管各的，判斷條件對不上。現在合併成一次處理。
+* **修「正文裡湊巧成對的 `$` 被當成公式」**：例如 `function update( $a, $b )`。
+  行內公式加了兩道判斷，也可以用過濾器關閉。
+* **修 xmlrpc 下擲出 `IXR_Message not found`**（採用上游 PR #546 的修法）。
+* **新增：圖片尺寸語法（可選）**：`![說明](圖片 =600)` / `=600x400` / `=x400`。
+  寬螢幕依設定尺寸顯示，窄螢幕等比縮放、不變形。
 
-* 修正**程式碼區塊 / 行內程式碼中的 `$` 被當成公式渲染**：原實作的跳過判斷寫成
-  `htmlspecialchars_decode($element) === "<pre>"`，而真實程式碼區塊是 `<pre class="...">` 或
-  `<pre><code>`，精確等值判斷永遠不成立。現改為「標籤白名單（`pre`/`code`/`style`/`script`/`textarea`）
-  + 巢狀深度計數」。這是上游長期反覆被回報的一類問題
-* 修正**區塊公式被二次解析導致重複渲染**：兩個過濾器分別處理 `$$...$$` 與 `$...$`，
-  後者判斷「是否已處理」時查找的 class 名與實際輸出的不一致。現改為單條正規表示式、單次走訪
-* 修正**正文中誤配對的 `$` 被渲染成公式**：例如 `function update( $a, $b )`、
-  `價格從 $100 漲到 $200`。行內公式增加兩道防護 —— 定界符須緊貼內容、內容須含字母/數字/反斜線
-  （可用過濾器 `editormd_katex_require_tight_delimiters` 關閉）
-* 輸出側的 `esc_html()` 轉義保持並擴展到新的統一回呼中，10.3.0 修正的儲存型 XSS 不會回退
-
-#### 2. 缺陷修正
-
-* 修正 **xmlrpc 請求下拋出 `Class 'EditormdApp\IXR_Message' not found`**
-  （`src/App/WPComMarkdown.php`）。該檔宣告了命名空間，而 include 進來的 `IXR_Message`
-  位於全域命名空間，需要前置反斜線。**採用上游 [PR #546](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/546)** 的修法
-
-#### 3. 新功能
-
-* 新增**圖片尺寸語法**（可選）：`![alt](img.jpg =600)` / `=600x400` / `=x400`，
-  可與 `"title"` 及 `{#id .class}` 共存。尺寸以
-  `width` + `max-width:100%` + `height:auto`（同時指定寬高時另加 `aspect-ratio`）的行內樣式輸出，
-  因此寬螢幕依設定尺寸顯示、窄螢幕等比縮放不變形，且不影響 Medium Zoom 一類看圖外掛
-* 上游 PR [#602](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/602) 與
-  [#603](https://github.com/LuRenJiasWorld/WP-Editor.md/pull/603) 的**思路被參考但未直接合併**：
-  #602 會遺失 `{#id .class}` 屬性語法與 `ref_attr` 支援；#603 的輸出處缺少轉義，
-  合併會回退 10.3.0 的安全性修正，且其防護規則可被繞過
-
-#### 4. 升級
-
-* 升級器新增 `10.3.0 → 10.4.0` 遷移，僅推進版本號，無資料變更
-
-------
 ### Version 10.3.0
 
-> 本版本由 [@tjsky](https://github.com/tjsky) 在原作者停止維護後繼續維護。
-> 本外掛已於 2025-04-09 因安全問題遭 WordPress.org 下架（對應 **CVE-2025-31035**，
-> Stored XSS，影響 `<= 10.2.1`），上游並無修復版本。
-> 本版**僅進行安全強化與新版相容性調整，未更動功能設計與資料結構，升級無需遷移**。
+> **原作者停止維護之後，本維護版從這裡開始。核心是把安全問題修掉，並相容新版 WordPress。**
+> 本外掛已於 **2025-04-09 因安全問題被 WordPress.org 下架**
+> （**CVE-2025-31035**，影響 10.2.1 及更早版本，上游沒有修正版）。
+> **沒有更動功能設計與資料結構，升級無需遷移。**
 
-#### 1. 安全性修正
+* **修公式渲染的儲存型 XSS**：在文章**或留言**裡發一段特定內容就能執行腳本。
+  因為留言路徑同樣受影響，利用門檻比公開揭露的同批問題更低。
+* **修圖片貼上介面的未授權任意檔案寫入**：補上權限檢查、依檔案內容判斷是否為真圖片、限制大小。
+* **修圖床代理被當成跳板（SSRF / 開放代理）**：上游位址改為固定白名單，只轉送必要的標頭。
+* **修後台頁面的越權、設定項寫入未淨化、後台卡頓（盲 SSRF）等一批問題**。
+* 修「帶某個 Cookie 就直接白畫面」「移除外掛時報語法錯誤」「日誌功能一呼叫就擲出例外」。
+* **預設不再從第三方 CDN 載入編輯器腳本與樣式**，改由外掛本地提供。
+* **相容 WordPress 7.1 與 PHP 7.4 ~ 8.4**，修掉「外掛載入時呼叫了還不存在的函式，
+  導致前台與後台一起白畫面」這類致命問題。
+* **汰換已經不能用的建置工具**（`node-sass` → `dart-sass` 等），專案重新可以建置，
+  並加上 GitHub Actions 自動打包發佈。
+* **順手修的老毛病**：心智圖設定項遺失、Mermaid 的預設值被誤寫進 KaTeX。
 
-* 修正 KaTeX 公式渲染路徑的**儲存型 XSS**（`src/App/KaTeX.php`）。實體編碼的公式內容會被解碼回真實字元後未轉義直接輸出，而 `the_content` 與 `comment_text` 皆晚於儲存期 kses，故 kses 無法攔阻。於文章**或留言**中投遞 `$ &lt; img src=x onerror=... &gt; $` 即可執行腳本
-* 修正圖片貼上介面的**未授權任意檔案寫入**：補上 `upload_files` 能力與 nonce（CSRF）檢查、依檔案內容判定真實圖片類型、限制酬載大小、改用 WordPress 官方 API 寫入並於失敗時清理、遠端上傳啟用 TLS 憑證檢查
-* 修正 sm.ms 圖床代理的 **SSRF / 開放代理**：上游位址改為固定白名單、僅轉送 `Authorization` 標頭、啟用憑證檢查、補上逾時與大小限制及同源檢查
-* 修正後台管理頁渲染器的**授權缺陷**：能力檢查由角色名改為 `manage_options`、移除一處恆真的授權分支、`page` / `entry` 改為白名單分派以消除路徑穿越
-* 修正設定頁**選項寫入淨化完全失效**的問題，改以 `pre_update_option_*` 統一依欄位型別處理
-* 修正**盲 SSRF 與後台卡頓**：設定頁初始化會同步抓取遠端 `version.json`，改為 `wp_remote_get` 加白名單與快取
-* 修正特定 Cookie 即觸發致命錯誤（白畫面）、外掛移除時的語法級致命錯誤、日誌元件空實作導致所有日誌呼叫拋出例外
-* 預設不再自第三方 CDN 載入編輯器腳本與樣式
+---
 
-#### 2. 相容性
+## 原版历史
 
-* `Tested up to` 更新為 WordPress 7.1，`Requires PHP` 明確為 7.4，實測通過 7.4 ~ 8.4
-* 修正**外掛主檔於載入期呼叫使用者情境函式導致整站白畫面**的問題
-* 修正 PHP 8.1+ `htmlspecialchars()` 預設 flags 變更影響既有內容渲染的問題
-* 版本號比較改用 `version_compare`；移除會註銷 WordPress 內建 jQuery 的分支
-* 多站點啟用與移除改為逐站處理
-
-#### 3. 建置鏈
-
-* `node-sass` 更換為 `dart-sass`，專案因此可在現代 Node 下建置
-* 停止維護的 `webpack-parallel-uglify-plugin` 更換為 `terser-webpack-plugin`
-* Vue 子專案修正 `tsconfig`、同儕依賴與寫死外掛目錄的 `publicPath`
-* 新增 GitHub Actions 發行流程，推送 tag 即自原始碼建置並附上可安裝 zip
-
-#### 4. 一併修正的歷史缺陷
-
-* `editor_mindmap` 選項被 `editor_style` 陣列覆蓋，導致心智圖功能失效
-* Mermaid 的預設設定被誤寫入 KaTeX 的預設值
-
-------
+下面这些是**原版**（10.2.1 及更早，直到 1.0）的更新记录，原样保留，方便对照。
 
 ### Version 10.2.1
 
