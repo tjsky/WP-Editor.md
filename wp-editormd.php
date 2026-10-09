@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.5.1
+ * Version:           10.5.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,12 +15,6 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
- *
- * 10.5.1 —— 修复后台「回复评论」编辑器的聚焦与行号显示
- *   编辑器在页面加载时就已创建，而它所在的「回复行」默认 display:none。在隐藏状态下
- *   初始化会让 CodeMirror 量到 0 宽的行号栏（行号叠在正文第一个字上），并把「已聚焦」
- *   标记挂上而真实焦点仍在 body（打开后没有光标、键盘输入无效）。现在回复行变为可见时
- *   会重新测量并真正取回焦点。仅影响后台回复框，文章编辑器与前台评论不受影响。
  *
  * 10.5.0 —— 新增「访客评论简版编辑器」
  *   评论区属于**不可信输入**，WordPress 只用一张 15 个标签的 KSES 白名单过滤它，
@@ -40,6 +34,10 @@
  *   另修：升级器的 switch 此前缺少 case "10.4.3" 与 case "10.4.5"，停在这两个版本
  *   上的站点匹配不到任何分支，editor_version 永不推进 —— 而主文件正是用版本号是否
  *   变化来判断要不要跑激活流程，结果每个请求都会重跑一次 Activator::activate()。
+ *
+ *   另修：后台「回复评论」编辑器在隐藏状态下（回复行 display:none）初始化，会导致
+ *   打开后没有光标、键盘无法输入，且左侧行号压住正文第一个字。现在回复行变为可见时
+ *   会重新测量并真正取回焦点；仅影响后台回复框。
  *
  *   同版本一并处理的三件事：
  *   - **移除第三方图床（sm.ms）**。该服务已转向收费模式，而它带来的维护面不小
@@ -146,7 +144,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.5.1' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.0' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.1
+Stable tag: 10.5.0
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -70,11 +70,9 @@ We recommend that you enable plugins in a clean environment (please disable othe
 
 == Changelog ==
 
-= 10.5.1 =
+= 10.5.0 =
 * 缺陷修复：后台「回复评论」框打开后没有光标、键盘输入无效，必须点一下工具栏按钮才能开始输入
 * 缺陷修复：后台「回复评论」框左侧行号与正文重叠，输入的第一个字被行号盖住
-
-= 10.5.0 =
 * 新功能：**访客评论「简版编辑器」**（设置 → 基本设置，默认关闭）。开启后评论区只提供
   粗体、斜体、删除线、引用、行内代码、图片与链接，工具栏精简、默认单栏、字号 16px
   （防 iOS 聚焦缩放）；链接降级为「文字：`地址`」不可点击，图片去掉外层链接并强制

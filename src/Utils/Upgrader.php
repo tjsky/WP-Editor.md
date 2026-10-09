@@ -76,9 +76,6 @@ class Upgrader {
             case "10.4.5":
                 $this->upgrade_10_4_5_to_10_5_0();
                 // no break
-            case "10.5.0":
-                $this->upgrade_10_5_0_to_10_5_1();
-                // no break
             default:
                 break;
         }
@@ -125,19 +122,6 @@ class Upgrader {
         }
 
         $this->update_to_version("10.5.0");
-    }
-
-    /**
-     * 10.5.0 → 10.5.1
-     *
-     * 本版修的是后台「回复评论」编辑器的两个显示/交互问题（打开后没有光标、
-     * 行号压住正文第一个字）。改动全在前端脚本（assets/Config/editormd.min.js），
-     * 没有新增或修改任何选项与数据结构，因此只需把 editor_version 推进到
-     * 新版本号 —— 若漏掉这一步，停在 10.5.0 的站点会落进 default 分支，
-     * editor_version 永不前进，激活流程被每个请求重复执行（10.5.0 刚修过同类问题）。
-     */
-    private function upgrade_10_5_0_to_10_5_1() {
-        $this->update_to_version("10.5.1");
     }
 
     /**
