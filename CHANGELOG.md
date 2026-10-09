@@ -42,7 +42,8 @@
 **修复**
 
 * 后台「回复评论」框打开后可以直接输入了 —— 此前光标并不在输入框里，要先点一下工具栏按钮才能打字。
-* 后台「回复评论」框左侧的行号不再与正文重叠，输入的第一个字不会被行号盖住。
+* 后台「回复评论」框的工具栏不再压住正文：此前正文第一行（含左侧的行号）被工具栏挡住，
+  看起来像「行号显示异常、输入的第一个字被盖住」。
 * 后台**每个页面**都在弹「检验到插件资源包已过时」—— 现在只在插件设置页显示一行状态。
 * 官方块主题（Twenty Twenty-Four / Twenty-Five）下，评论框下方多出一块显示 HTML 源码的输入框。
 * 停留在 10.4.3 / 10.4.5 的站点升级后，会反复执行一次初始化动作。
@@ -169,7 +170,9 @@ Write your own CSS if you want a dark front-end style.
 
 * The admin "Reply" box now accepts typing as soon as it opens — previously the caret was not actually in
   the editor and you had to click a toolbar button first.
-* The line numbers in that box no longer overlap the text, so the first character is no longer hidden.
+* The toolbar in that box no longer covers the text: it used to sit on top of the first line
+  (including its line number), which looked like "the line numbers are broken and the first
+  character is hidden".
 * Every admin page showed a red "the plugin asset bundle is out of date" notice — it now appears only
   as a single status line on the plugin settings page.
 * On official block themes (Twenty Twenty-Four / Twenty-Five) a raw HTML textarea leaked out below the
@@ -305,7 +308,8 @@ settings are cleaned up on upgrade.
 **修正**
 
 * 後台「回覆留言」框開啟後可以直接輸入了 —— 先前游標其實不在輸入框裡，要先點一下工具列按鈕才能打字。
-* 後台「回覆留言」框左側的行號不再與正文重疊，輸入的第一個字不會被行號蓋住。
+* 後台「回覆留言」框的工具列不再壓住正文：先前正文第一行（含左側行號）被工具列擋住，
+  看起來像「行號顯示異常、輸入的第一個字被蓋住」。
 * 後台**每個頁面**都在跳「檢驗到外掛資源包已過時」—— 現在只在設定頁顯示一行狀態。
 * 官方區塊佈景主題（Twenty Twenty-Four / Twenty-Five）下，留言框下方多出一塊顯示 HTML 原始碼的輸入框。
 * 停留在 10.4.3 / 10.4.5 的站台升級後，會反覆執行一次初始化動作。

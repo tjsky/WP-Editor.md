@@ -1071,6 +1071,22 @@ require("./editormd.css");
               instance.state.focused = false;
             }
 
+            // 工具栏是绝对定位的，Editor.md 在初始化时会把「工具栏高度 + 1」写进
+            // .CodeMirror 的 margin-top，并把编辑器高度减去同样的值。
+            // 隐藏状态下量到的工具栏高度是 0（实测隐藏时 toolbar.offsetHeight === 0），
+            // 于是 margin-top 也成了 0 —— 工具栏正好压在正文第一行上，行号「1」与
+            // 第一个字都被盖住；编辑器还因此比容器高出一个工具栏，溢出到下方。
+            // 容器真正可见后必须把这两处一起重算。
+            var toolbarEl = node.querySelector(".editormd-toolbar");
+            var toolbarHeight = toolbarEl ? toolbarEl.offsetHeight : 0;
+            if (toolbarHeight > 0) {
+              var wrapperEl = instance.getWrapperElement();
+              wrapperEl.style.marginTop = (toolbarHeight + 1) + "px";
+              if (node.clientHeight > toolbarHeight + 1) {
+                wrapperEl.style.height = (node.clientHeight - toolbarHeight - 1) + "px";
+              }
+            }
+
             instance.refresh();
 
             if (document.activeElement !== field) {
@@ -1129,10 +1145,10 @@ require("./editormd.css");
 
           $(".reply").click(function () {
             setTimeout(function () {
-              $(".edit-comments-php .CodeMirror.cm-s-default.CodeMirror-wrap").css("margin-top", $(".editormd-toolbar").height());
               syncReplyEditorWidth();
               // WP 自己会把焦点交给那个被我们隐藏掉的原生 textarea（无效），
-              // 所以打开回复行后要在这里把真实的焦点与尺寸补上。
+              // 所以打开回复行后要在这里把真实的排版（工具栏留白、行号栏宽度）
+              // 与焦点一起补上。
               prepareReplyEditor();
             }, 100);
           });
