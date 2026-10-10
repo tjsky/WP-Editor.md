@@ -448,3 +448,79 @@ msgstr "目前已确认与 WordPress 默认主题完全兼容，如果加载失�
 #: src/Utils/Settings.php
 msgid "I am the author of this modified / forked version. Compared with the original author's contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a> when you have time. Thank you!"
 msgstr "我是二次开发修改版的作者：和原作者的贡献比起来，我只是做了些没什么技术含量的小修小改，就不留捐赠信息了，如果修改版 WP-Editor.md 能得到你的喜爱，能有空来看看我的博客《<a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a>》就好啦，谢谢！"
+
+#: src/Utils/Settings.php
+msgid "Static Resource Integrity (integrity)"
+msgstr "静态资源完整性校验（integrity）"
+
+#: src/Utils/Debugger.php
+msgid "Static Resource Integrity"
+msgstr "静态资源完整性校验"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Current resource address is on this site, so integrity is not required."
+msgstr "当前资源地址在本站，无需配置完整性校验。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "%d integrity entries configured. Resources on another host are verified by the browser, and any mismatch is refused."
+msgstr "已配置 %d 条完整性校验。别的主机提供的资源由浏览器核对指纹，对不上即拒绝加载。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The resource address is on another host. Fill in the integrity values above."
+msgstr "资源地址不在本站，请填写上方的完整性校验值。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "One entry per line, format: path=sha384-xxxx. The path is relative to the resource address above; a full URL is also accepted."
+msgstr "每行一条，格式为「路径=sha384-xxxx」。路径相对于上面的资源地址，也可以直接填完整网址。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "A wrong CDN setting, or a compromised CDN, may inject malicious code into the JavaScript and CSS it serves. Please set the <code>integrity</code> attribute — how to set it up:"
+msgstr "错误的CDN设置或遭到入侵的CDN可能在加载的JS、CSS内植入恶意代码，请设置 <code>integrity</code> 属性，设置方式见："
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Documentation"
+msgstr "说明文档"
+
+#: src/Utils/Settings.php
+msgid "Fill in with the local files"
+msgstr "用本机文件生成"
+
+#: src/Utils/Settings.php
+msgid "Not found locally, so skipped:"
+msgstr "本机缺失、已跳过："
+
+#: src/Utils/Settings/settings.js.php
+msgid "Filled in %d entries — remember to save."
+msgstr "已填入 %d 条，记得保存设置。"
+
+#: src/Utils/Debugger.php
+msgid "%d entries"
+msgstr "%d 条"
+
+#: src/Utils/Debugger.php
+msgid "Resource address"
+msgstr "资源地址"
+
+#: src/Utils/Debugger.php
+msgid "[on another host — integrity is required]"
+msgstr "【在别的主机，需要 integrity】"
+
+#: src/Utils/Debugger.php
+msgid "[on this site]"
+msgstr "【在本站】"
+
+#: src/Utils/Debugger.php
+msgid "Configured entries"
+msgstr "已配置条目"
+
+#: src/Utils/Debugger.php
+msgid "Verified on this page"
+msgstr "本页已校验的资源"
+
+#: src/Utils/Debugger.php
+msgid "Loaded from another host without integrity"
+msgstr "来自别的主机、但未加 integrity 的资源"
+
+#: src/Utils/Debugger.php
+msgid "Files used by this plugin that have no integrity entry"
+msgstr "本插件会用到、但没有 integrity 条目的文件"

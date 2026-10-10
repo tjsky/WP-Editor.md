@@ -76,6 +76,9 @@ class Upgrader {
             case "10.4.5":
                 $this->upgrade_10_4_5_to_10_5_0();
                 // no break
+            case "10.5.0":
+                $this->upgrade_10_5_0_to_10_5_1();
+                // no break
             default:
                 break;
         }
@@ -122,6 +125,18 @@ class Upgrader {
         }
 
         $this->update_to_version("10.5.0");
+    }
+
+    /**
+     * 10.5.0 → 10.5.1
+     *
+     * 本版新增跨站资源（CDN）的完整性校验：editor_style → editor_integrity（哈希表），
+     * 老站点没有这个键，Config::get_option() 回退到 ""，等于「没配哈希」——
+     * 与 Activator 的默认值一致，行为上只是设置页多一条提示。无需数据迁移，
+     * 只需推进 editor_version（漏掉这一步会让停在 10.5.0 的站点每个请求重跑激活流程）。
+     */
+    private function upgrade_10_5_0_to_10_5_1() {
+        $this->update_to_version("10.5.1");
     }
 
     /**

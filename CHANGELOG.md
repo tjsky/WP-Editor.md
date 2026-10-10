@@ -10,6 +10,29 @@
 
 ## 简体中文
 
+### Version 10.5.1
+
+> **给外站（CDN）的 JS / CSS 加了一道校验：文件被动过手脚，浏览器就不会执行。**
+
+**新增：资源完整性校验（integrity）**
+
+「编辑器静态资源地址」允许填本站以外的地址 —— 这样一来，页面里的 JS / CSS 就由那台主机提供。
+地址填错、或者对方主机被入侵、被替换，访客就会执行到别人的代码。现在可以为这些资源配置
+文件指纹，由浏览器在加载前核对，对不上直接拒绝执行：
+
+* 设置页点一下「用本机文件生成」即可算好指纹，不用自己动手；填进「静态资源完整性校验」一栏，保存生效。
+* 资源地址在别的主机、又没填指纹时，插件设置页会在相关选项旁**一直**提示，直到补上为止。
+  **高级设置 → 调试信息**里还会列出「本机会用到、但还没有指纹」的文件清单。
+* 覆盖范围包含页面直接引用的 JS / CSS，以及编辑器运行时按需加载的模块
+  （CodeMirror 附加模块、marked 等）。
+
+两点说明：
+
+* 只对「别的主机」的资源生效。本站资源不加这道校验 —— 同源文件本来就没有第三方能篡改，
+  而加校验会同时要求跨源许可，反而可能把本来正常的资源拦下来。
+* 按语言临时加载的语法高亮组件（Prism 语法包）无法逐个校验，因此资源地址指向外部主机时，
+  这部分固定从本机加载。
+
 ### Version 10.5.0
 
 > **给访客评论加了一个「简版编辑器」，去掉了已转收费的第三方图床，并修好后台到处弹提示的问题。**
@@ -131,6 +154,34 @@
 ---
 
 ## English
+
+### Version 10.5.1
+
+> **Adds a fingerprint check for JavaScript and CSS served from another host (a CDN):
+> if the file has been swapped, the browser refuses to run it.**
+
+**New: integrity check for external resources**
+
+The "Editor.md Static Resource Address" setting may point outside your site, which means the JavaScript
+and CSS on the page come from that host. A typo in the address, or a host that gets compromised, means
+visitors run someone else's code. You can now supply the file fingerprints so the browser verifies each
+file before running it, and refuses anything that does not match:
+
+* Click "Fill in with the local files" on the settings page to compute the fingerprints — no manual
+  hashing. They go into the "Static Resource Integrity (integrity)" field; save to apply.
+* While the resource address is on another host and no fingerprints are filled in, the settings page
+  keeps showing a reminder next to the option. Under **Advanced Settings → Debugging info** you can
+  also see which files the plugin uses that still have no fingerprint.
+* This covers both the JavaScript and CSS the page references directly, and the modules the editor
+  loads on demand at runtime (CodeMirror add-ons, marked, and so on).
+
+Two notes:
+
+* It applies only to resources on another host. Files on your own site are left alone: nothing
+  third-party can modify them, and adding the attribute would also require a CORS header, which could
+  block resources that used to load fine.
+* The syntax highlighting components loaded on demand (Prism language files) cannot be verified one by
+  one, so when the resource address points elsewhere, those are always loaded from your own site.
 
 ### Version 10.5.0
 
@@ -275,6 +326,29 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.1
+
+> **為外站（CDN）的 JS / CSS 加上一道校驗：檔案被動過手腳，瀏覽器就不會執行。**
+
+**新增：資源完整性校驗（integrity）**
+
+「編輯器靜態資源位址」允許填本站以外的位址 —— 如此一來，頁面裡的 JS / CSS 就由那台主機提供。
+位址填錯，或對方主機被入侵、被替換，訪客就會執行到別人的程式碼。現在可以為這些資源設定
+檔案指紋，由瀏覽器在載入前核對，不符即拒絕執行：
+
+* 在設定頁按一下「用本機檔案產生」就能算好指紋，不必自己動手；填進「靜態資源完整性校驗」一欄，儲存後生效。
+* 資源位址在其他主機、又沒填指紋時，外掛設定頁會在相關選項旁**持續**提示，直到補上為止。
+  **高級設定 → 偵錯資訊**裡還會列出「本機會用到、但還沒有指紋」的檔案清單。
+* 涵蓋範圍包含頁面直接引用的 JS / CSS，以及編輯器執行時按需載入的模組
+  （CodeMirror 附加模組、marked 等）。
+
+兩點說明：
+
+* 只對「其他主機」的資源生效。本站資源不加這道校驗 —— 同源檔案本來就沒有第三方能竄改，
+  而加上校驗會同時要求跨來源許可，反而可能把原本正常的資源擋下來。
+* 依語言臨時載入的語法高亮元件（Prism 語法包）無法逐個校驗，因此資源位址指向外部主機時，
+  這部分固定從本機載入。
 
 ### Version 10.5.0
 

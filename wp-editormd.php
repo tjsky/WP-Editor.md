@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.5.0
+ * Version:           10.5.1
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,21 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.5.1 —— 跨站资源的完整性校验（integrity）
+ *   「编辑器静态资源地址」允许指向本站以外的主机，页面里的 JS / CSS 就由对方提供：
+ *   设置填错，或对方主机被入侵、被替换，访客就会执行到别人的代码。本版把
+ *   editor_style → editor_integrity 里配置的 sha384 哈希套到插件输出的
+ *   <script> / <link> 上，交给浏览器校验，哈希对不上就拒绝执行：
+ *   - 只处理主机不在本站的资源。本站资源不加属性 —— 同源资源本就没有第三方能篡改，
+ *     而加 integrity 必须同时加 crossorigin，同主机仅协议/端口不同会被浏览器
+ *     判成跨源，反而可能把好资源拦下来；
+ *   - 两条路径都覆盖：PHP 入队（script_loader_tag / style_loader_tag）与编辑器
+ *     运行时按需加载（包装 editormd.loadScript / loadCSS）。Prism 的语法组件是按
+ *     语言惰性拉取的、无法逐个校验，故资源地址指向外部主机时固定从本机取；
+ *   - 哈希不必手算：设置页提供「用本机文件生成」（本机资源与发布包逐字节一致）；
+ *   - 资源地址在别的主机、又没配哈希时，设置页会在相关设置项旁**持续**显示提示；
+ *     「高级 → 调试信息」另列出「本机会用到、但还没有哈希」的文件清单。
  *
  * 10.5.0 —— 新增「访客评论简版编辑器」
  *   评论区属于**不可信输入**，WordPress 只用一张 15 个标签的 KSES 白名单过滤它，
@@ -145,7 +160,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.5.0' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.1' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称

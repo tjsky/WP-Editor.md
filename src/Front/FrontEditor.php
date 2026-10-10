@@ -4,6 +4,7 @@ namespace EditormdFront;
 
 use EditormdApp\PrismJSAuto;
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 class FrontEditor {
     /**
@@ -192,6 +193,8 @@ class FrontEditor {
             // 安全加固：AJAX 接口的 CSRF nonce（由 assets/Config/editormd-nonce.js 垫片消费）
             "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
             "pagesNonce"        => wp_create_nonce("wp_editormd_pages"),
+            // 跨站资源地址时，把哈希表交给前端脚本，给按需加载的资源补 integrity
+            "integrity"         => AssetsIntegrity::runtime_config(),
         ));
     }
 

@@ -3,6 +3,7 @@
 namespace EditormdApp;
 
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 class PrismJSAuto {
 
@@ -21,7 +22,24 @@ class PrismJSAuto {
      * @return string
      */
     private static function prism_languages_path() {
-        return esc_url_raw(Config::get_option("editor_addres", "editor_style") . "/assets/Prism.js/components/");
+        return esc_url_raw(self::prism_components_base() . "/assets/Prism.js/components/");
+    }
+
+    /**
+     * Prism 语法组件的来源
+     *
+     * 语法组件是 autoloader 在运行时按需加载的，无法逐个做完整性校验。
+     * 因此一旦资源地址指向别的主机，这部分就固定从本机取，不跟随 CDN，
+     * 免得留下一条「校验不到、但会执行」的路径。
+     *
+     * @return string
+     */
+    private static function prism_components_base() {
+        if (AssetsIntegrity::root_is_external()) {
+            return WP_EDITORMD_URL;
+        }
+
+        return Config::get_option("editor_addres", "editor_style");
     }
 
     public function prism_styles_scripts() {

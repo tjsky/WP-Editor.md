@@ -140,6 +140,42 @@
 		z-index: 1000000;
 	}
 
+	/* 资源完整性：非本站资源地址、又没配哈希时一直挂在这里 */
+	.editormd-integrity-warning {
+		margin-top: 8px;
+		padding: 8px 12px;
+		max-width: 900px;
+		border-left: 4px solid #d63638;
+		background: #fcf0f1;
+		color: #3c434a;
+	}
+
+	.editormd-integrity-tools {
+		margin-top: 6px;
+	}
+
+	#editormd-integrity-fill-note {
+		margin-left: 8px;
+		color: #006686;
+	}
+
+	.editormd-integrity-note {
+		margin-top: 4px;
+		color: #646970;
+	}
+
+	/* 本机哈希清单：给脚本读的，不给人看 */
+	.editormd-integrity-source {
+		display: none;
+	}
+
+	textarea[name="editor_style[editor_integrity]"] {
+		width: 560px;
+		height: 160px;
+		font-family: Consolas, Monaco, monospace;
+		font-size: 12px;
+	}
+
 	/* Modal悬浮窗样式 */
 	.modal {
 		max-width: none;

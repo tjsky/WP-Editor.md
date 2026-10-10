@@ -85,7 +85,10 @@ class Activator {
         // 前台编辑器（评论框等）是否沿用上面两项风格。默认 off：
         // 前台应当跟随主题走，用户要适配夜间模式请自行写 CSS。
         "front_style_sync"  => "off",
-        "editor_addres"     => ""
+        "editor_addres"     => "",
+        // 跨站 JS / CSS 的完整性哈希表（SRI）。默认为空：
+        // 资源地址是本站时用不上，指向别的主机时设置页会持续提示补上。
+        "editor_integrity"  => ""
     );
 
     public static $defaultOptionsSyntax = array(

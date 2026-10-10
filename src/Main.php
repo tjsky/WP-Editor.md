@@ -20,6 +20,7 @@ use EditormdUtils\Internationalization;
 use EditormdUtils\PluginMeta;
 use EditormdUtils\Settings;
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 /**
  * 核心插件类
@@ -74,6 +75,8 @@ class Main {
      * @return void
      */
     public function run_core() {
+        // 静态资源完整性校验（跨站 JS / CSS 的 integrity 属性）
+        new AssetsIntegrity();
         // 实现后台编辑器加载
         new ControllerAdmin();
         // 实现Markdown类

@@ -105,6 +105,9 @@ class Debugger {
         $debug_info .= '<tr><th>' . esc_html__("Comment Behavior Added By This Plugin", $text_domain) . '</th><th>'
             . self::render_comment_extras($text_domain) . '</th></tr>';
 
+        $debug_info .= '<tr><th>' . esc_html__("Static Resource Integrity", $text_domain) . '</th><th>'
+            . self::render_integrity($text_domain) . '</th></tr>';
+
         // ---- 已启用插件 ----
         $plugins = array();
         foreach ((array) get_option("active_plugins") as $key => $value) {
@@ -137,7 +140,83 @@ class Debugger {
                 $value = wp_json_encode($value);
             }
 
+            if (AssetsIntegrity::OPTION === $key) {
+                // 哈希表逐行列出来太长，这里只报条数
+                $value = sprintf(
+                    /* translators: %d: number of configured integrity entries */
+                    __("%d entries", "editormd"),
+                    count(AssetsIntegrity::map())
+                );
+            }
+
             $rows .= esc_html($key) . " => " . esc_html(self::mask_sensitive($key, (string) $value)) . " <br>";
+        }
+
+        return $rows;
+    }
+
+    /**
+     * 资源完整性校验的现场情况
+     *
+     * 设置页只能看出「配了几条」，这里补上「哪些真的加上了、哪些跨站却没配上」，
+     * 排查 CDN 配置问题时对着看即可。
+     *
+     * @param string $text_domain 翻译域
+     *
+     * @return string
+     */
+    private static function render_integrity($text_domain) {
+        $rows = "";
+
+        $external = AssetsIntegrity::root_is_external();
+        $map      = AssetsIntegrity::map();
+
+        $rows .= esc_html__("Resource address", $text_domain) . " => "
+            . esc_html(AssetsIntegrity::root()) . " "
+            . esc_html($external
+                ? __("[on another host — integrity is required]", $text_domain)
+                : __("[on this site]", $text_domain))
+            . " <br>";
+
+        $rows .= esc_html__("Configured entries", $text_domain) . " => "
+            . esc_html((string) count($map)) . " <br>";
+
+        if ($external) {
+            // 本机会用到、但哈希表里没配的文件：对着这份清单补就行
+            $uncovered = array_values(array_diff(AssetsIntegrity::candidates(), array_keys($map)));
+
+            $rows .= '<span class="' . (empty($uncovered) ? "updated" : "error") . '">'
+                . esc_html__("Files used by this plugin that have no integrity entry", $text_domain)
+                . " => " . esc_html((string) count($uncovered)) . "</span><br>";
+
+            foreach (array_slice($uncovered, 0, 30) as $relative) {
+                $rows .= "&nbsp;&nbsp;" . esc_html($relative) . " <br>";
+            }
+
+            if (count($uncovered) > 30) {
+                $rows .= "&nbsp;&nbsp;" . esc_html__("…", $text_domain) . " <br>";
+            }
+        }
+
+        $applied = AssetsIntegrity::$applied;
+
+        if (! empty($applied)) {
+            $rows .= esc_html__("Verified on this page", $text_domain) . " => <br>";
+
+            foreach ($applied as $handle => $item) {
+                $rows .= "&nbsp;&nbsp;" . esc_html((string) $handle) . " ⇐ "
+                    . esc_html((string) $item["url"]) . " <br>";
+            }
+        }
+
+        if (! empty(AssetsIntegrity::$missing)) {
+            $rows .= '<span class="error">'
+                . esc_html__("Loaded from another host without integrity", $text_domain)
+                . " => </span><br>";
+
+            foreach (array_keys(AssetsIntegrity::$missing) as $url) {
+                $rows .= "&nbsp;&nbsp;" . esc_html((string) $url) . " <br>";
+            }
         }
 
         return $rows;

@@ -789,6 +789,7 @@ require("./editormd.css");
   installRendererHook();
   patchPreviewHandler(editormd);
   installImageDialogHook(editormd);
+  installIntegrityHooks(editormd);
 
   /**
    * 简版评论：修复「纯预览一片空白」
@@ -836,6 +837,126 @@ require("./editormd.css");
     wrapped.__wpEditormdWrapped = true;
 
     editormd.toolbarHandlers.preview = wrapped;
+  }
+
+  /**
+   * 跨站资源：给「按需加载」的依赖补上 integrity
+   *
+   * PHP 侧只能给入队的 <script> / <link> 加属性，而 Editor.md 的一部分依赖是运行时
+   * 才去拉的（CodeMirror 本体与 modes / addons、marked、KaTeX 与 Mermaid 的兜底），
+   * 走的是 editormd.loadScript / loadCSS。这两个函数本身不支持 integrity，
+   * 所以这里在保留原语义的前提下自己建标签（含 id 生成与 loadFiles 记账）。
+   *
+   * 只在「资源在别的主机 + 配了哈希」时接管：其余情况原样调用原函数，
+   * 本站（默认配置）行为一字不变。哈希表由 PHP 侧放进 _Editormd.integrity，
+   * 没有跨站资源时是空对象，本函数直接返回。
+   */
+  function installIntegrityHooks(editormd) {
+    var config = window._Editormd && window._Editormd.integrity;
+    var map = config && config.map;
+
+    if (!editormd || !map || typeof map !== "object" || Object.keys(map).length === 0) {
+      return;
+    }
+
+    if (typeof editormd.loadScript !== "function" || typeof editormd.loadCSS !== "function") {
+      return;
+    }
+
+    if (editormd.loadScript.__wpEditormdWrapped) {
+      return;
+    }
+
+    var root = String(config.root || "").replace(/\/+$/, "");
+
+    function lookup(url) {
+      if (!url) {
+        return "";
+      }
+
+      var clean = String(url).replace(/[?#].*$/, "");
+
+      if (Object.prototype.hasOwnProperty.call(map, clean)) {
+        return map[clean];
+      }
+
+      if (root && clean.indexOf(root + "/") === 0) {
+        var relative = clean.substring(root.length + 1);
+
+        if (Object.prototype.hasOwnProperty.call(map, relative)) {
+          return map[relative];
+        }
+      }
+
+      return "";
+    }
+
+    function trackLoadFile(kind, url) {
+      if (editormd.loadFiles && editormd.loadFiles[kind]) {
+        editormd.loadFiles[kind].push(url);
+      }
+    }
+
+    function appendNode(node, target) {
+      if (target === "head") {
+        document.getElementsByTagName("head")[0].appendChild(node);
+      } else {
+        document.body.appendChild(node);
+      }
+    }
+
+    var originalLoadScript = editormd.loadScript;
+    var originalLoadCSS = editormd.loadCSS;
+
+    editormd.loadScript = function (url, callback, target) {
+      var hash = lookup(url + ".js");
+
+      if (!hash) {
+        return originalLoadScript.call(this, url, callback, target);
+      }
+
+      var script = document.createElement("script");
+      script.id = url.replace(/[\./]+/g, "-");
+      script.type = "text/javascript";
+      script.integrity = hash;
+      script.crossOrigin = "anonymous";
+      script.src = url + ".js";
+      script.onload = function () {
+        trackLoadFile("js", url);
+        if (typeof callback === "function") {
+          callback();
+        }
+      };
+      appendNode(script, target || "head");
+
+      return script;
+    };
+    editormd.loadScript.__wpEditormdWrapped = true;
+
+    editormd.loadCSS = function (url, callback, target, useExt) {
+      var hash = lookup(url + (useExt === false ? "" : ".css"));
+
+      if (!hash) {
+        return originalLoadCSS.call(this, url, callback, target, useExt);
+      }
+
+      var link = document.createElement("link");
+      link.type = "text/css";
+      link.rel = "stylesheet";
+      link.integrity = hash;
+      link.crossOrigin = "anonymous";
+      link.href = useExt === false ? url : url + ".css";
+      link.onload = link.onreadystatechange = function () {
+        trackLoadFile("css", url);
+        if (typeof callback === "function") {
+          callback();
+        }
+      };
+      appendNode(link, target || "head");
+
+      return link;
+    };
+    editormd.loadCSS.__wpEditormdWrapped = true;
   }
 })(window.editormd);
 
