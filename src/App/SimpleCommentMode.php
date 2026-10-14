@@ -180,8 +180,20 @@ class SimpleCommentMode {
             return $content;
         }
 
-        // 避免重复包裹（comment_text 可能被调用多次 / 被其它过滤器嵌套）
-        if (false !== strpos($content, self::BODY_CLASS)) {
+        // 避免重复包裹（comment_text 可能被调用多次 / 被其它过滤器嵌套）。
+        //
+        // 判断必须**锚定到我们自己写出的那个容器**：曾经用的是「正文里出现过
+        // editormd-comment-body 这串字符就跳过」，而评论正文是访客可控的 ——
+        // 评论里只要写了这串字（例如 <span class="editormd-comment-body">，
+        // KSES 放行 span 的 class 属性），整条评论就会跳过包裹，
+        // 图片的宽度约束与 no-emojify 一起失效。
+        // 这里要求它出现在一个 <div> 的 class 属性里，而评论正文里不可能有
+        // div（KSES 的评论白名单不含 div），所以只有我们自己的容器会命中。
+        if (preg_match(
+            '/<div\b[^>]*\bclass\s*=\s*["\'][^"\']*\b'
+                . preg_quote(self::BODY_CLASS, "/") . '\b/i',
+            $content
+        )) {
             return $content;
         }
 

@@ -43,6 +43,12 @@
 现在窄屏下把这一格固定成整行宽，编辑器、工具栏和按钮都会跟着撑满。只影响窄屏
 （宽度 782px 及以下）的后台回复框，桌面端与前台评论框不受影响。
 
+**修复：评论正文里写了插件的容器类名，整条评论会跳过插件容器**
+
+评论里出现 `editormd-comment-body` 这串字时（例如 `<span class="editormd-comment-body">` ——
+评论允许的标签里 span 是可以带 class 的），插件会误以为已经套过容器而跳过，
+图片的宽度约束、emoji 短代码关闭一并失效。现在只在真的套过容器时才跳过。
+
 ### Version 10.5.0
 
 > **给访客评论加了一个「简版编辑器」，去掉了已转收费的第三方图床，并修好后台到处弹提示的问题。**
@@ -205,6 +211,14 @@ onto three rows and wrapping the text badly.
 On narrow screens the cell is now pinned to the full row width, so the editor, toolbar and
 buttons fill it. This only affects the admin reply box on narrow screens (782px and below);
 the desktop layout and the front-end comment box are unchanged.
+
+**Fixed: a comment that merely contained the plugin's container class name skipped the wrapper**
+
+When a comment contained the string `editormd-comment-body` (for example
+`<span class="editormd-comment-body">` — `span` is one of the tags WordPress allows in a comment,
+and it may carry a class attribute), the plugin assumed the wrapper was already there and skipped
+it, losing both the image width limit and the disabled emoji shortcodes. It now skips only when the
+wrapper really is present.
 
 ### Version 10.5.0
 
@@ -382,6 +396,12 @@ settings are cleaned up on upgrade.
 
 現在窄螢幕下把這一格固定成整列寬，編輯器、工具列與按鈕都會跟著撐滿。只影響窄螢幕
 （寬度 782px 及以下）的後台回覆框，桌面端與前台留言框不受影響。
+
+**修正：留言正文寫了外掛的容器類名，整則留言會跳過外掛容器**
+
+留言裡出現 `editormd-comment-body` 這串字時（例如 `<span class="editormd-comment-body">` ——
+留言允許的標籤裡 span 是可以帶 class 的），外掛會誤以為已經套過容器而跳過，
+圖片的寬度約束、emoji 短碼關閉一同失效。現在只在真的套過容器時才跳過。
 
 ### Version 10.5.0
 
