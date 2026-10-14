@@ -33,6 +33,16 @@
 * 按语言临时加载的语法高亮组件（Prism 语法包）无法逐个校验，因此资源地址指向外部主机时，
   这部分固定从本机加载。
 
+**修复：手机上后台回复框只有半个屏幕宽**
+
+在手机上的 WordPress 管理后台里，评论列表的每一行会被排成横向布局。「回复评论」这一行
+只有一个单元格，又没有可以套用的宽度规则，于是它退化成「按内容宽度」：WordPress 自带的
+编辑框里有个宽度固定的输入区，看着还正常；换成插件的编辑器后，整块面板塌成半个屏幕宽
+（实测 390px 视口下只有 171px，而回复行有 366px），工具栏被挤成三行、正文折行严重。
+
+现在窄屏下把这一格固定成整行宽，编辑器、工具栏和按钮都会跟着撑满。只影响窄屏
+（宽度 782px 及以下）的后台回复框，桌面端与前台评论框不受影响。
+
 ### Version 10.5.0
 
 > **给访客评论加了一个「简版编辑器」，去掉了已转收费的第三方图床，并修好后台到处弹提示的问题。**
@@ -182,6 +192,19 @@ Two notes:
   block resources that used to load fine.
 * The syntax highlighting components loaded on demand (Prism language files) cannot be verified one by
   one, so when the resource address points elsewhere, those are always loaded from your own site.
+
+**Fixed: the admin reply box was only half a screen wide on phones**
+
+In the WordPress admin on a phone, the comment list lays out each row horizontally. The
+"Reply" row has a single cell and no width rule applies to it, so the cell fell back to
+"sized by its content". WordPress' own editor happens to contain an input area with a fixed
+width and so looked normal; with the plugin's editor, the whole panel collapsed to about half
+of the screen (measured: 171px inside a 366px row at a 390px viewport), squeezing the toolbar
+onto three rows and wrapping the text badly.
+
+On narrow screens the cell is now pinned to the full row width, so the editor, toolbar and
+buttons fill it. This only affects the admin reply box on narrow screens (782px and below);
+the desktop layout and the front-end comment box are unchanged.
 
 ### Version 10.5.0
 
@@ -349,6 +372,16 @@ settings are cleaned up on upgrade.
   而加上校驗會同時要求跨來源許可，反而可能把原本正常的資源擋下來。
 * 依語言臨時載入的語法高亮元件（Prism 語法包）無法逐個校驗，因此資源位址指向外部主機時，
   這部分固定從本機載入。
+
+**修正：手機上後台回覆框只有半個畫面寬**
+
+在手機上的 WordPress 管理後台裡，留言清單的每一列會被排成橫向版面。「回覆留言」這一列
+只有一個儲存格，又沒有可套用的寬度規則，於是它退化成「依內容寬度」：WordPress 內建的
+編輯框裡有個寬度固定的輸入區，看起來還正常；換成外掛的編輯器後，整塊面板塌成半個畫面寬
+（實測 390px 視窗下只有 171px，而回覆列有 366px），工具列被擠成三列、正文折行嚴重。
+
+現在窄螢幕下把這一格固定成整列寬，編輯器、工具列與按鈕都會跟著撐滿。只影響窄螢幕
+（寬度 782px 及以下）的後台回覆框，桌面端與前台留言框不受影響。
 
 ### Version 10.5.0
 

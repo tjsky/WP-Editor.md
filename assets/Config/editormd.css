@@ -59,6 +59,23 @@
   display: none;
 }
 
+/* 窄屏（手机）下回复框只有半屏宽 —— 起因在 WordPress 自己：
+ *     @media (max-width: 782px) { .wp-list-table tr { display:flex; flex-wrap:wrap } }
+ * 它把列表表格的每一行都变成了 flex 容器，但只给 .column-primary / .check-column /
+ * td:nth-child(n+3) 规定了宽度。「回复评论」行（#replyrow）只有一个
+ * <td class="colspanchange">，一条都命不中 → 作为 flex 项退化成「按内容宽度」。
+ *
+ * WP 自带的编辑框里有个 textarea，表单控件有固有宽度，看着还正常；换成
+ * Editor.md 后整棵子树都是可压缩的 div，宽度就塌到最小内容宽度
+ * （实测 390px 视口下只有 167px，而回复行有 366px —— 正好是用户看到的「半个屏幕」）。
+ * 编辑器用的是 width:100%，只要把这一格钉成整行宽，里面自然跟着撑满。 */
+@media screen and (max-width: 782px) {
+  #replyrow > td {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
 /* 后台文章编辑器底栏样式 */
 #poststuff #post-status-info {
   margin-top: -15px;
