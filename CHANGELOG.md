@@ -12,42 +12,30 @@
 
 ### Version 10.5.1
 
-> **给外站（CDN）的 JS / CSS 加了一道校验：文件被动过手脚，浏览器就不会执行。**
+> **给外站（CDN）的 JS / CSS 加了一道指纹校验，并修好后台回复框在手机上的宽度。**
 
 **新增：资源完整性校验（integrity）**
 
-「编辑器静态资源地址」允许填本站以外的地址 —— 这样一来，页面里的 JS / CSS 就由那台主机提供。
-地址填错、或者对方主机被入侵、被替换，访客就会执行到别人的代码。现在可以为这些资源配置
-文件指纹，由浏览器在加载前核对，对不上直接拒绝执行：
+资源地址填了本站以外的主机时，页面的 JS / CSS 由那台主机提供；地址填错、对方被入侵或被投毒，
+访客就会执行到别人的代码。现在可以给这些资源配置文件指纹，浏览器加载前先核对，对不上就拒绝执行：
 
-* 设置页点一下「用本机文件生成」即可算好指纹，不用自己动手；填进「静态资源完整性校验」一栏，保存生效。
-* 资源地址在别的主机、又没填指纹时，插件设置页会在相关选项旁**一直**提示，直到补上为止。
-  **高级设置 → 调试信息**里还会列出「本机会用到、但还没有指纹」的文件清单。
-* 覆盖范围包含页面直接引用的 JS / CSS，以及编辑器运行时按需加载的模块
-  （CodeMirror 附加模块、marked 等）。
+* 设置页点「用本机文件生成」算好指纹，填进「静态资源完整性校验」保存即可。
+* 没填指纹时设置页会一直提示；**高级设置 → 调试信息**里能看还差哪些文件。
+* 页面直接引用的资源与编辑器运行时按需加载的模块都覆盖在内。
 
-两点说明：
-
-* 只对「别的主机」的资源生效。本站资源不加这道校验 —— 同源文件本来就没有第三方能篡改，
-  而加校验会同时要求跨源许可，反而可能把本来正常的资源拦下来。
-* 按语言临时加载的语法高亮组件（Prism 语法包）无法逐个校验，因此资源地址指向外部主机时，
-  这部分固定从本机加载。
+只对「别的主机」生效：本站资源加校验反而会要求跨源许可，可能把好资源拦下来；
+按语言惰性加载的语法高亮包无法逐个校验，地址指向外部主机时固定从本机加载。
 
 **修复：手机上后台回复框只有半个屏幕宽**
 
-在手机上的 WordPress 管理后台里，评论列表的每一行会被排成横向布局。「回复评论」这一行
-只有一个单元格，又没有可以套用的宽度规则，于是它退化成「按内容宽度」：WordPress 自带的
-编辑框里有个宽度固定的输入区，看着还正常；换成插件的编辑器后，整块面板塌成半个屏幕宽
-（实测 390px 视口下只有 171px，而回复行有 366px），工具栏被挤成三行、正文折行严重。
+窄屏下 WordPress 把评论列表的行排成横向布局，回复行只有一个单元格、套不到任何宽度规则，
+于是退化成「按内容宽度」——换成插件编辑器后只剩半个屏幕（390px 视口实测 171px，回复行 366px），
+工具栏被挤成三行。现在窄屏下把这一格固定成整行宽。
 
-现在窄屏下把这一格固定成整行宽，编辑器、工具栏和按钮都会跟着撑满。只影响窄屏
-（宽度 782px 及以下）的后台回复框，桌面端与前台评论框不受影响。
+**修复：评论正文里写了插件容器类名，整条评论会跳过插件容器**
 
-**修复：评论正文里写了插件的容器类名，整条评论会跳过插件容器**
-
-评论里出现 `editormd-comment-body` 这串字时（例如 `<span class="editormd-comment-body">` ——
-评论允许的标签里 span 是可以带 class 的），插件会误以为已经套过容器而跳过，
-图片的宽度约束、emoji 短代码关闭一并失效。现在只在真的套过容器时才跳过。
+评论里写了 `editormd-comment-body` 这串字（例如 `<span class="editormd-comment-body">`）时，
+插件会误判成已经套过容器，图片宽度约束与 emoji 关闭一并失效。现在只在真的套过容器时才跳过。
 
 ### Version 10.5.0
 
@@ -173,52 +161,38 @@
 
 ### Version 10.5.1
 
-> **Adds a fingerprint check for JavaScript and CSS served from another host (a CDN):
-> if the file has been swapped, the browser refuses to run it.**
+> **Adds a fingerprint check for JavaScript and CSS served from another host, and fixes the width of
+> the admin reply box on phones.**
 
 **New: integrity check for external resources**
 
-The "Editor.md Static Resource Address" setting may point outside your site, which means the JavaScript
-and CSS on the page come from that host. A typo in the address, or a host that gets compromised, means
-visitors run someone else's code. You can now supply the file fingerprints so the browser verifies each
-file before running it, and refuses anything that does not match:
+When the resource address points away from your site, the page's JavaScript and CSS come from that
+host; a typo, or a host that gets compromised or poisoned, means visitors run someone else's code.
+You can now supply file fingerprints and have the browser verify each file before running it:
 
-* Click "Fill in with the local files" on the settings page to compute the fingerprints — no manual
-  hashing. They go into the "Static Resource Integrity (integrity)" field; save to apply.
-* While the resource address is on another host and no fingerprints are filled in, the settings page
-  keeps showing a reminder next to the option. Under **Advanced Settings → Debugging info** you can
-  also see which files the plugin uses that still have no fingerprint.
-* This covers both the JavaScript and CSS the page references directly, and the modules the editor
-  loads on demand at runtime (CodeMirror add-ons, marked, and so on).
+* Click "Fill in with the local files" on the settings page and save the result in the
+  "Static Resource Integrity" field.
+* If no fingerprints are set, the settings page keeps reminding you, and
+  **Advanced Settings → Debugging info** lists the files that are still missing one.
+* Covers both the files the page references directly and the modules the editor loads on demand.
 
-Two notes:
-
-* It applies only to resources on another host. Files on your own site are left alone: nothing
-  third-party can modify them, and adding the attribute would also require a CORS header, which could
-  block resources that used to load fine.
-* The syntax highlighting components loaded on demand (Prism language files) cannot be verified one by
-  one, so when the resource address points elsewhere, those are always loaded from your own site.
+It applies only to resources on another host: adding the attribute to same-site files would also
+require a CORS header and could block files that used to load fine. Syntax highlighting files loaded
+per language cannot be verified one by one, so with an external address those always come from your
+own site.
 
 **Fixed: the admin reply box was only half a screen wide on phones**
 
-In the WordPress admin on a phone, the comment list lays out each row horizontally. The
-"Reply" row has a single cell and no width rule applies to it, so the cell fell back to
-"sized by its content". WordPress' own editor happens to contain an input area with a fixed
-width and so looked normal; with the plugin's editor, the whole panel collapsed to about half
-of the screen (measured: 171px inside a 366px row at a 390px viewport), squeezing the toolbar
-onto three rows and wrapping the text badly.
-
-On narrow screens the cell is now pinned to the full row width, so the editor, toolbar and
-buttons fill it. This only affects the admin reply box on narrow screens (782px and below);
-the desktop layout and the front-end comment box are unchanged.
+On narrow screens WordPress lays the comment list rows out horizontally; the reply row has a single
+cell and no width rule applies to it, so it fell back to "sized by its content" — with the plugin's
+editor that meant half the screen (measured: 171px of a 366px row at a 390px viewport), squeezing the
+toolbar onto three rows. The cell is now pinned to the full row width.
 
 **Fixed: a comment that merely contained the plugin's container class name skipped the wrapper**
 
-When a comment contained the string `editormd-comment-body` (for example
-`<span class="editormd-comment-body">` — `span` is one of the tags WordPress allows in a comment,
-and it may carry a class attribute), the plugin assumed the wrapper was already there and skipped
-it, losing both the image width limit and the disabled emoji shortcodes. It now skips only when the
-wrapper really is present.
+If a comment contained the string `editormd-comment-body` (for example
+`<span class="editormd-comment-body">`), the plugin assumed the wrapper was already there, losing the
+image width limit and the disabled emoji shortcodes. It now skips only when the wrapper is present.
 
 ### Version 10.5.0
 
@@ -366,42 +340,30 @@ settings are cleaned up on upgrade.
 
 ### Version 10.5.1
 
-> **為外站（CDN）的 JS / CSS 加上一道校驗：檔案被動過手腳，瀏覽器就不會執行。**
+> **為外站（CDN）的 JS / CSS 加上指紋校驗，並修好後台回覆框在手機上的寬度。**
 
 **新增：資源完整性校驗（integrity）**
 
-「編輯器靜態資源位址」允許填本站以外的位址 —— 如此一來，頁面裡的 JS / CSS 就由那台主機提供。
-位址填錯，或對方主機被入侵、被替換，訪客就會執行到別人的程式碼。現在可以為這些資源設定
-檔案指紋，由瀏覽器在載入前核對，不符即拒絕執行：
+資源位址填了本站以外的主機時，頁面的 JS / CSS 由那台主機提供；位址填錯、對方被入侵或被投毒，
+訪客就會執行到別人的程式碼。現在可以為這些資源設定檔案指紋，瀏覽器載入前先核對，不符即拒絕執行：
 
-* 在設定頁按一下「用本機檔案產生」就能算好指紋，不必自己動手；填進「靜態資源完整性校驗」一欄，儲存後生效。
-* 資源位址在其他主機、又沒填指紋時，外掛設定頁會在相關選項旁**持續**提示，直到補上為止。
-  **高級設定 → 偵錯資訊**裡還會列出「本機會用到、但還沒有指紋」的檔案清單。
-* 涵蓋範圍包含頁面直接引用的 JS / CSS，以及編輯器執行時按需載入的模組
-  （CodeMirror 附加模組、marked 等）。
+* 在設定頁按「用本機檔案產生」算好指紋，填進「靜態資源完整性校驗」儲存即可。
+* 沒填指紋時設定頁會持續提示；**高級設定 → 偵錯資訊**裡能看到還缺哪些檔案。
+* 頁面直接引用的資源與編輯器執行時按需載入的模組都涵蓋在內。
 
-兩點說明：
-
-* 只對「其他主機」的資源生效。本站資源不加這道校驗 —— 同源檔案本來就沒有第三方能竄改，
-  而加上校驗會同時要求跨來源許可，反而可能把原本正常的資源擋下來。
-* 依語言臨時載入的語法高亮元件（Prism 語法包）無法逐個校驗，因此資源位址指向外部主機時，
-  這部分固定從本機載入。
+只對「其他主機」生效：本站資源加上校驗反而會要求跨來源許可，可能把正常資源擋下來；
+依語言臨時載入的語法高亮包無法逐個校驗，位址指向外部主機時固定從本機載入。
 
 **修正：手機上後台回覆框只有半個畫面寬**
 
-在手機上的 WordPress 管理後台裡，留言清單的每一列會被排成橫向版面。「回覆留言」這一列
-只有一個儲存格，又沒有可套用的寬度規則，於是它退化成「依內容寬度」：WordPress 內建的
-編輯框裡有個寬度固定的輸入區，看起來還正常；換成外掛的編輯器後，整塊面板塌成半個畫面寬
-（實測 390px 視窗下只有 171px，而回覆列有 366px），工具列被擠成三列、正文折行嚴重。
+窄螢幕下 WordPress 把留言清單的列排成橫向版面，回覆列只有一個儲存格、套不到任何寬度規則，
+於是退化成「依內容寬度」——換成外掛編輯器後只剩半個畫面（390px 視窗實測 171px，回覆列 366px），
+工具列被擠成三列。現在窄螢幕下把這一格固定成整列寬。
 
-現在窄螢幕下把這一格固定成整列寬，編輯器、工具列與按鈕都會跟著撐滿。只影響窄螢幕
-（寬度 782px 及以下）的後台回覆框，桌面端與前台留言框不受影響。
+**修正：留言正文寫了外掛容器類名，整則留言會跳過外掛容器**
 
-**修正：留言正文寫了外掛的容器類名，整則留言會跳過外掛容器**
-
-留言裡出現 `editormd-comment-body` 這串字時（例如 `<span class="editormd-comment-body">` ——
-留言允許的標籤裡 span 是可以帶 class 的），外掛會誤以為已經套過容器而跳過，
-圖片的寬度約束、emoji 短碼關閉一同失效。現在只在真的套過容器時才跳過。
+留言裡寫了 `editormd-comment-body` 這串字（例如 `<span class="editormd-comment-body">`）時，
+外掛會誤判成已經套過容器，圖片寬度約束與 emoji 關閉一同失效。現在只在真的套過容器時才跳過。
 
 ### Version 10.5.0
 
