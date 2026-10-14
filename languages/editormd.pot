@@ -445,3 +445,79 @@ msgstr ""
 #: src/Utils/Settings.php
 msgid "I am the author of this modified / forked version. Compared with the original author's contribution, all I did was some minor fixes and small tweaks with little technical merit, so I did not add my own donation info. If you enjoy this modified WP-Editor.md, it would be great if you could visit my blog <a href=\"https://www.tjsky.net\" target=\"_blank\" rel=\"noopener\">秋风于渭水</a> when you have time. Thank you!"
 msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Static Resource Integrity (integrity)"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Static Resource Integrity"
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Current resource address is on this site, so integrity is not required."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "%d integrity entries configured. Resources on another host are verified by the browser, and any mismatch is refused."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The resource address is on another host. Fill in the integrity values above."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "One entry per line, format: path=sha384-xxxx. The path is relative to the resource address above; a full URL is also accepted."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "A wrong CDN setting, or a compromised CDN, may inject malicious code into the JavaScript and CSS it serves. Please set the <code>integrity</code> attribute — how to set it up:"
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Documentation"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Fill in with the local files"
+msgstr ""
+
+#: src/Utils/Settings.php
+msgid "Not found locally, so skipped:"
+msgstr ""
+
+#: src/Utils/Settings/settings.js.php
+msgid "Filled in %d entries — remember to save."
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "%d entries"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Resource address"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "[on another host — integrity is required]"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "[on this site]"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Configured entries"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Verified on this page"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Loaded from another host without integrity"
+msgstr ""
+
+#: src/Utils/Debugger.php
+msgid "Files used by this plugin that have no integrity entry"
+msgstr ""

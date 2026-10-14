@@ -20,6 +20,7 @@ use EditormdUtils\Internationalization;
 use EditormdUtils\PluginMeta;
 use EditormdUtils\Settings;
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 /**
  * 核心插件类
@@ -74,6 +75,7 @@ class Main {
      * @return void
      */
     public function run_core() {
+        new AssetsIntegrity();
         // 实现后台编辑器加载
         new ControllerAdmin();
         // 实现Markdown类

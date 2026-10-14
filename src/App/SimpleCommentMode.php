@@ -180,8 +180,11 @@ class SimpleCommentMode {
             return $content;
         }
 
-        // 避免重复包裹（comment_text 可能被调用多次 / 被其它过滤器嵌套）
-        if (false !== strpos($content, self::BODY_CLASS)) {
+        if (preg_match(
+            '/<div\b[^>]*\bclass\s*=\s*["\'][^"\']*\b'
+                . preg_quote(self::BODY_CLASS, "/") . '\b/i',
+            $content
+        )) {
             return $content;
         }
 

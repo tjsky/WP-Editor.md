@@ -45,6 +45,7 @@ class Settings {
             "code_style"        => "key",
             "front_style_sync"  => "onoff",
             "editor_addres"     => "url",
+            "editor_integrity"  => "integrity",
         ),
         "syntax_highlighting" => array(
             "highlight_mode_auto"     => "onoff",
@@ -142,6 +143,9 @@ class Settings {
                     break;
                 case "url":
                     $clean[$key] = esc_url_raw(trim((string) $item));
+                    break;
+                case "integrity":
+                    $clean[$key] = AssetsIntegrity::sanitize_lines((string) $item);
                     break;
                 case "json":
                     $decoded = json_decode((string) $item, true);
@@ -626,9 +630,16 @@ class Settings {
                 array(
                     'name'    => 'editor_addres',
                     'label'   => __('Editor.md Static Resource Addres', $this->text_domain),
-                    'desc'    => __('Please make sure the resources are up to date.<br/>' , $this->text_domain) . __('Please upload the resource (the unzipped folder name is "assets") to your server or cdn. If your resource address is: "http(s)://example.com/myfile/assets", you should fill in: "http(s)://example.com/myfile ". <br/>',$this->text_domain) . $this->upgrade_editormd_file(),
+                    'desc'    => __('Please make sure the resources are up to date.<br/>' , $this->text_domain) . __('Please upload the resource (the unzipped folder name is "assets") to your server or cdn. If your resource address is: "http(s)://example.com/myfile/assets", you should fill in: "http(s)://example.com/myfile ". <br/>',$this->text_domain) . $this->upgrade_editormd_file() . AssetsIntegrity::warning_html($this->text_domain),
                     'type'    => 'text',
                     'default' => self::default_static_address()
+                ),
+                array(
+                    'name'    => 'editor_integrity',
+                    'label'   => __('Static Resource Integrity (integrity)', $this->text_domain),
+                    'desc'    => AssetsIntegrity::status_html($this->text_domain) . $this->integrity_tools_html(),
+                    'type'    => 'textarea',
+                    'default' => ''
                 ),
             ),
             'syntax_highlighting' => array(
@@ -839,6 +850,34 @@ class Settings {
         }
 
         return $pages_options;
+    }
+
+    private function integrity_tools_html() {
+        $generated = AssetsIntegrity::generate_from_local();
+
+        if (empty($generated["lines"])) {
+            return "";
+        }
+
+        $html = '<div class="editormd-integrity-tools">'
+            . '<button type="button" class="button" id="editormd-integrity-fill">'
+            . esc_html__("Fill in with the local files", $this->text_domain)
+            . '</button>'
+            . '<span id="editormd-integrity-fill-note"></span>'
+            . '</div>';
+
+        if (! empty($generated["skipped"])) {
+            $html .= '<div class="editormd-integrity-note">'
+                . esc_html__("Not found locally, so skipped:", $this->text_domain)
+                . ' ' . esc_html(implode(", ", $generated["skipped"]))
+                . '</div>';
+        }
+
+        $html .= '<textarea id="editormd-integrity-source" class="editormd-integrity-source" readonly="readonly" aria-hidden="true" tabindex="-1">'
+            . esc_textarea(implode("\n", $generated["lines"]))
+            . '</textarea>';
+
+        return $html;
     }
 
     private function script_style() {

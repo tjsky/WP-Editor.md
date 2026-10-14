@@ -10,6 +10,33 @@
 
 ## 简体中文
 
+### Version 10.5.1
+
+> **给外站（CDN）的 JS / CSS 加了一道指纹校验，并修好后台回复框在手机上的宽度。**
+
+**新增：资源完整性校验（integrity）**
+
+资源地址填了本站以外的主机时，页面的 JS / CSS 由那台主机提供；地址填错、对方被入侵或被投毒，
+访客就会执行到别人的代码。现在可以给这些资源配置文件指纹，浏览器加载前先核对，对不上就拒绝执行：
+
+* 设置页点「用本机文件生成」算好指纹，填进「静态资源完整性校验」保存即可。
+* 没填指纹时设置页会一直提示；**高级设置 → 调试信息**里能看还差哪些文件。
+* 页面直接引用的资源与编辑器运行时按需加载的模块都覆盖在内。
+
+只对「别的主机」生效：本站资源加校验反而会要求跨源许可，可能把好资源拦下来；
+按语言惰性加载的语法高亮包无法逐个校验，地址指向外部主机时固定从本机加载。
+
+**修复：手机上后台回复框只有半个屏幕宽**
+
+窄屏下 WordPress 把评论列表的行排成横向布局，回复行只有一个单元格、套不到任何宽度规则，
+于是退化成「按内容宽度」——换成插件编辑器后只剩半个屏幕（390px 视口实测 171px，回复行 366px），
+工具栏被挤成三行。现在窄屏下把这一格固定成整行宽。
+
+**修复：评论正文里写了插件容器类名，整条评论会跳过插件容器**
+
+评论里写了 `editormd-comment-body` 这串字（例如 `<span class="editormd-comment-body">`）时，
+插件会误判成已经套过容器，图片宽度约束与 emoji 关闭一并失效。现在只在真的套过容器时才跳过。
+
 ### Version 10.5.0
 
 > **给访客评论加了一个「简版编辑器」，去掉了已转收费的第三方图床，并修好后台到处弹提示的问题。**
@@ -131,6 +158,41 @@
 ---
 
 ## English
+
+### Version 10.5.1
+
+> **Adds a fingerprint check for JavaScript and CSS served from another host, and fixes the width of
+> the admin reply box on phones.**
+
+**New: integrity check for external resources**
+
+When the resource address points away from your site, the page's JavaScript and CSS come from that
+host; a typo, or a host that gets compromised or poisoned, means visitors run someone else's code.
+You can now supply file fingerprints and have the browser verify each file before running it:
+
+* Click "Fill in with the local files" on the settings page and save the result in the
+  "Static Resource Integrity" field.
+* If no fingerprints are set, the settings page keeps reminding you, and
+  **Advanced Settings → Debugging info** lists the files that are still missing one.
+* Covers both the files the page references directly and the modules the editor loads on demand.
+
+It applies only to resources on another host: adding the attribute to same-site files would also
+require a CORS header and could block files that used to load fine. Syntax highlighting files loaded
+per language cannot be verified one by one, so with an external address those always come from your
+own site.
+
+**Fixed: the admin reply box was only half a screen wide on phones**
+
+On narrow screens WordPress lays the comment list rows out horizontally; the reply row has a single
+cell and no width rule applies to it, so it fell back to "sized by its content" — with the plugin's
+editor that meant half the screen (measured: 171px of a 366px row at a 390px viewport), squeezing the
+toolbar onto three rows. The cell is now pinned to the full row width.
+
+**Fixed: a comment that merely contained the plugin's container class name skipped the wrapper**
+
+If a comment contained the string `editormd-comment-body` (for example
+`<span class="editormd-comment-body">`), the plugin assumed the wrapper was already there, losing the
+image width limit and the disabled emoji shortcodes. It now skips only when the wrapper is present.
 
 ### Version 10.5.0
 
@@ -275,6 +337,33 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.1
+
+> **為外站（CDN）的 JS / CSS 加上指紋校驗，並修好後台回覆框在手機上的寬度。**
+
+**新增：資源完整性校驗（integrity）**
+
+資源位址填了本站以外的主機時，頁面的 JS / CSS 由那台主機提供；位址填錯、對方被入侵或被投毒，
+訪客就會執行到別人的程式碼。現在可以為這些資源設定檔案指紋，瀏覽器載入前先核對，不符即拒絕執行：
+
+* 在設定頁按「用本機檔案產生」算好指紋，填進「靜態資源完整性校驗」儲存即可。
+* 沒填指紋時設定頁會持續提示；**高級設定 → 偵錯資訊**裡能看到還缺哪些檔案。
+* 頁面直接引用的資源與編輯器執行時按需載入的模組都涵蓋在內。
+
+只對「其他主機」生效：本站資源加上校驗反而會要求跨來源許可，可能把正常資源擋下來；
+依語言臨時載入的語法高亮包無法逐個校驗，位址指向外部主機時固定從本機載入。
+
+**修正：手機上後台回覆框只有半個畫面寬**
+
+窄螢幕下 WordPress 把留言清單的列排成橫向版面，回覆列只有一個儲存格、套不到任何寬度規則，
+於是退化成「依內容寬度」——換成外掛編輯器後只剩半個畫面（390px 視窗實測 171px，回覆列 366px），
+工具列被擠成三列。現在窄螢幕下把這一格固定成整列寬。
+
+**修正：留言正文寫了外掛容器類名，整則留言會跳過外掛容器**
+
+留言裡寫了 `editormd-comment-body` 這串字（例如 `<span class="editormd-comment-body">`）時，
+外掛會誤判成已經套過容器，圖片寬度約束與 emoji 關閉一同失效。現在只在真的套過容器時才跳過。
 
 ### Version 10.5.0
 

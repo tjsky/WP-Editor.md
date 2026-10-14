@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.0
+Stable tag: 10.5.1
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,21 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.1 =
+* 新功能：当「编辑器静态资源地址」指向本站以外的主机时，可为这些 JS / CSS 配置完整性校验
+  （integrity）。浏览器会先核对文件指纹，对不上就拒绝执行，避免 CDN 被入侵或设置填错时
+  访客执行到被替换的脚本。设置页提供「用本机文件生成」按钮，无需自己算哈希
+* 安全：资源地址在别的主机、又没填哈希时，插件设置页会在相关选项旁持续显示提醒；
+  「高级设置 → 调试信息」里可看到「本机会用到、但还没配哈希」的文件清单
+* 说明：按语言惰性加载的语法组件（Prism 语法包）无法逐个校验，资源地址指向外部主机时
+  这部分固定从本机加载
+* 缺陷修复：手机上打开后台「回复评论」框时，编辑区只有半个屏幕宽 —— 窄屏下 WordPress
+  把评论列表的行排成弹性布局，而回复行只有一个单元格、无宽度规则可套，宽度退化成
+  「按内容宽度」，工具栏被挤成三行、正文折行。现在窄屏（≤782px）下固定占满整行
+* 缺陷修复：评论正文里出现插件的容器类名时（如评论里写了 <span class="editormd-comment-body">），
+  整条评论会跳过插件的正文容器，图片宽度约束与 emoji 短代码关闭一并失效；现在只在真的
+  套过容器时才跳过
 
 = 10.5.0 =
 * 缺陷修复：后台「回复评论」框打开后没有光标、键盘输入无效，必须点一下工具栏按钮才能开始输入

@@ -67,7 +67,8 @@ class Activator {
         "theme_style"       => "default",
         "code_style"        => "default",
         "front_style_sync"  => "off",
-        "editor_addres"     => ""
+        "editor_addres"     => "",
+        "editor_integrity"  => ""
     );
 
     public static $defaultOptionsSyntax = array(

@@ -1,6 +1,6 @@
 <!-- 导出调试信息需要使用到的JS文件 -->
-<script src="<?php echo esc_url( $editor_style_base_address . "/assets/DomToImage/dist/dom-to-image.min.js?version=" . WP_EDITORMD_VER ); ?>"></script>
-<script src="<?php echo esc_url( $editor_style_base_address . "/assets/FileSaver/FileSaver.min.js?version=" . WP_EDITORMD_VER ); ?>"></script>
+<script src="<?php echo esc_url( $editor_style_base_address . "/assets/DomToImage/dist/dom-to-image.min.js?version=" . WP_EDITORMD_VER ); ?>"<?php echo \EditormdUtils\AssetsIntegrity::tag_attrs( $editor_style_base_address . "/assets/DomToImage/dist/dom-to-image.min.js" ); ?>></script>
+<script src="<?php echo esc_url( $editor_style_base_address . "/assets/FileSaver/FileSaver.min.js?version=" . WP_EDITORMD_VER ); ?>"<?php echo \EditormdUtils\AssetsIntegrity::tag_attrs( $editor_style_base_address . "/assets/FileSaver/FileSaver.min.js" ); ?>></script>
 
 <script type="text/javascript">
 (function ($) {
@@ -60,7 +60,7 @@
 
 
 		///	---------------------
-		/// sm-ms-management
+		/// 通用 Modal 模板（升级提示等共用）
 		///	---------------------
 		function modalTemplate(content) {
 			return '<div id="wp-editormd-modal" class="modal">' 
@@ -104,6 +104,27 @@
 		///	---------------------
 		// 在编辑器静态资源地址部分增加重置按钮
 		resetResources();
+
+
+		$("#editormd-integrity-fill").click(function (event) {
+			event.preventDefault();
+
+			var field  = $("#editor_style\\[editor_integrity\\]");
+			var source = $("#editormd-integrity-source").val();
+
+			if (!field.length || !source) {
+				return;
+			}
+
+			var lines = source.split("\n").filter(function (line) {
+				return "" !== $.trim(line);
+			});
+
+			field.val(lines.join("\n"));
+			$("#editormd-integrity-fill-note").text(
+				<?php echo wp_json_encode(__("Filled in %d entries — remember to save.", $this->text_domain)); ?>.replace("%d", lines.length)
+			);
+		});
 
 		function resetResources() {
 			// 定位按钮插入位置

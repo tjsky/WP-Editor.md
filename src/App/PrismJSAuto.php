@@ -3,6 +3,7 @@
 namespace EditormdApp;
 
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 class PrismJSAuto {
 
@@ -13,7 +14,15 @@ class PrismJSAuto {
     }
 
     private static function prism_languages_path() {
-        return esc_url_raw(Config::get_option("editor_addres", "editor_style") . "/assets/Prism.js/components/");
+        return esc_url_raw(self::prism_components_base() . "/assets/Prism.js/components/");
+    }
+
+    private static function prism_components_base() {
+        if (AssetsIntegrity::root_is_external()) {
+            return WP_EDITORMD_URL;
+        }
+
+        return Config::get_option("editor_addres", "editor_style");
     }
 
     public function prism_styles_scripts() {

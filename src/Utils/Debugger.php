@@ -70,6 +70,9 @@ class Debugger {
         $debug_info .= '<tr><th>' . esc_html__("Comment Behavior Added By This Plugin", $text_domain) . '</th><th>'
             . self::render_comment_extras($text_domain) . '</th></tr>';
 
+        $debug_info .= '<tr><th>' . esc_html__("Static Resource Integrity", $text_domain) . '</th><th>'
+            . self::render_integrity($text_domain) . '</th></tr>';
+
         $plugins = array();
         foreach ((array) get_option("active_plugins") as $key => $value) {
             $plugins[] = $key . " => " . $value;
@@ -94,7 +97,70 @@ class Debugger {
                 $value = wp_json_encode($value);
             }
 
+            if (AssetsIntegrity::OPTION === $key) {
+                $value = sprintf(
+                    __("%d entries", "editormd"),
+                    count(AssetsIntegrity::map())
+                );
+            }
+
             $rows .= esc_html($key) . " => " . esc_html(self::mask_sensitive($key, (string) $value)) . " <br>";
+        }
+
+        return $rows;
+    }
+
+    private static function render_integrity($text_domain) {
+        $rows = "";
+
+        $external = AssetsIntegrity::root_is_external();
+        $map      = AssetsIntegrity::map();
+
+        $rows .= esc_html__("Resource address", $text_domain) . " => "
+            . esc_html(AssetsIntegrity::root()) . " "
+            . esc_html($external
+                ? __("[on another host — integrity is required]", $text_domain)
+                : __("[on this site]", $text_domain))
+            . " <br>";
+
+        $rows .= esc_html__("Configured entries", $text_domain) . " => "
+            . esc_html((string) count($map)) . " <br>";
+
+        if ($external) {
+            $uncovered = array_values(array_diff(AssetsIntegrity::candidates(), array_keys($map)));
+
+            $rows .= '<span class="' . (empty($uncovered) ? "updated" : "error") . '">'
+                . esc_html__("Files used by this plugin that have no integrity entry", $text_domain)
+                . " => " . esc_html((string) count($uncovered)) . "</span><br>";
+
+            foreach (array_slice($uncovered, 0, 30) as $relative) {
+                $rows .= "&nbsp;&nbsp;" . esc_html($relative) . " <br>";
+            }
+
+            if (count($uncovered) > 30) {
+                $rows .= "&nbsp;&nbsp;" . esc_html__("…", $text_domain) . " <br>";
+            }
+        }
+
+        $applied = AssetsIntegrity::$applied;
+
+        if (! empty($applied)) {
+            $rows .= esc_html__("Verified on this page", $text_domain) . " => <br>";
+
+            foreach ($applied as $handle => $item) {
+                $rows .= "&nbsp;&nbsp;" . esc_html((string) $handle) . " ⇐ "
+                    . esc_html((string) $item["url"]) . " <br>";
+            }
+        }
+
+        if (! empty(AssetsIntegrity::$missing)) {
+            $rows .= '<span class="error">'
+                . esc_html__("Loaded from another host without integrity", $text_domain)
+                . " => </span><br>";
+
+            foreach (array_keys(AssetsIntegrity::$missing) as $url) {
+                $rows .= "&nbsp;&nbsp;" . esc_html((string) $url) . " <br>";
+            }
         }
 
         return $rows;

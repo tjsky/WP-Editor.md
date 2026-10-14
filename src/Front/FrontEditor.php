@@ -4,6 +4,7 @@ namespace EditormdFront;
 
 use EditormdApp\PrismJSAuto;
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 class FrontEditor {
     /**
@@ -155,6 +156,7 @@ class FrontEditor {
             "commentPlaceholder" => __("Supports **bold**, *italic*, ~~strikethrough~~, > quote, `code`, images and links (links and images are not clickable)", $this->text_domain),
             "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
             "pagesNonce"        => wp_create_nonce("wp_editormd_pages"),
+            "integrity"         => AssetsIntegrity::runtime_config(),
         ));
     }
 

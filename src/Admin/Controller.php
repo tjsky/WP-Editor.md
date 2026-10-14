@@ -5,6 +5,7 @@ namespace EditormdAdmin;
 use EditormdApp\PrismJSAuto;
 use EditormdApp\WPComMarkdown;
 use EditormdUtils\Config;
+use EditormdUtils\AssetsIntegrity;
 
 class Controller {
     /**
@@ -157,7 +158,8 @@ class Controller {
             "supportComment"    => Config::get_option("support_front", "editor_basics"),         // 前端评论
             "supportReply"      => Config::get_option("support_reply", "editor_basics"),         // 后台回复评论
             "imagepasteNonce"   => wp_create_nonce("wp_editormd_imagepaste"),
-            "pagesNonce"        => wp_create_nonce("wp_editormd_pages")
+            "pagesNonce"        => wp_create_nonce("wp_editormd_pages"),
+            "integrity"         => AssetsIntegrity::runtime_config()
         ));
     }
 
