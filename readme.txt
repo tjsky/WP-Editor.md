@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.1
+Stable tag: 10.5.2
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,12 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.2 =
+* 缺陷修复：后台评论列表点「快速编辑」时弹出的编辑器是空白的（评论原文没有带进去）；
+  现在会正确载入评论内容，改完点「更新」正常保存
+* 缺陷修复：回复完一条评论再点另一条的「回复」，编辑器里还留着上一次的内容；现在每次
+  切换回复对象都会清空
 
 = 10.5.1 =
 * 新功能：当「编辑器静态资源地址」指向本站以外的主机时，可为这些 JS / CSS 配置完整性校验

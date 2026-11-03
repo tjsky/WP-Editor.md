@@ -10,6 +10,21 @@
 
 ## 简体中文
 
+### Version 10.5.2
+
+> **修好后台评论列表里「快速编辑」和「回复」两处内容错位。**
+
+**缺陷修复：点「快速编辑」时编辑器是空白的**
+
+WordPress 的评论「快速编辑」会把评论原文写进一个隐藏的文本框，而插件把这个文本框换成了
+Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字都没有。现在打开时会把评论原文
+带进编辑器，改完点「更新」照常保存。
+
+**缺陷修复：回复不同评论时，编辑器带着上一条的内容**
+
+回复完 A 再点 B 的「回复」，上一段文字还留在编辑器里，得手动删掉。现在每次切换回复对象
+都会清空。
+
 ### Version 10.5.1
 
 > **给外站（CDN）的 JS / CSS 加了一道指纹校验，并修好后台回复框在手机上的宽度。**
@@ -158,6 +173,22 @@
 ---
 
 ## English
+
+### Version 10.5.2
+
+> **Fixes two content mix-ups in the admin comment list: Quick Edit and Reply.**
+
+**Fixed: Quick Edit opened an empty editor**
+
+WordPress writes the comment text into a hidden textarea when you click Quick Edit, but the
+plugin replaces that textarea with the Markdown editor. The two never talked to each other, so
+the editor came up blank. The comment text is now loaded into the editor, and Update saves as
+usual.
+
+**Fixed: Replying to another comment kept the previous draft**
+
+After replying to comment A, clicking Reply on comment B left A's text in the editor. The editor
+is now cleared whenever the reply target changes.
 
 ### Version 10.5.1
 
@@ -337,6 +368,21 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.2
+
+> **修好後台留言列表裡「快速編輯」與「回覆」兩處內容錯位。**
+
+**缺陷修復：點「快速編輯」時編輯器是空白的**
+
+WordPress 的留言「快速編輯」會把留言原文寫進一個隱藏的輸入框，而外掛把這個輸入框換成了
+Markdown 編輯器，兩邊各說各話 —— 彈出來的編輯器裡一個字都沒有。現在開啟時會把留言原文
+帶進編輯器，改完點「更新」照常儲存。
+
+**缺陷修復：回覆不同留言時，編輯器帶著上一則的內容**
+
+回覆完 A 再點 B 的「回覆」，上一段文字還留在編輯器裡，得手動刪掉。現在每次切換回覆對象
+都會清空。
 
 ### Version 10.5.1
 
