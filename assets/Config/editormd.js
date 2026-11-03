@@ -1227,6 +1227,57 @@ require("./editormd.css");
             });
           }
 
+          /**
+           * 回复行显示时，以原生 textarea 为准回灌编辑器内容
+           *
+           * WP 核心（wp-admin/js/edit-comments.js）只认原生 textarea，它在这两处
+           * 直接改写 `#replycontent`，全程绕过了 CodeMirror（原生 textarea 已被
+           * Editor.md 隐藏起来）：
+           *
+           *   · `commentReply.open(id, post, 'edit')` —— 快速编辑，把评论内容写进
+           *     textarea（`$('#replycontent', editRow).val(comment)`）；
+           *   · `commentReply.close()` —— 关闭/切换回复对象时把 textarea 清空
+           *     （`$('#replycontent').css('height', '').val('')`）。
+           *
+           * 于是编辑器与 textarea 彻底失步，表现为两个症状：
+           *   1. 点「快速编辑」，评论内容只进了看不见的 textarea，弹出来的编辑器
+           *      是空白的；
+           *   2. 回复过 A 之后点 B 的「回复」，编辑器里还留着上一段内容。
+           *
+           * 修法：每次回复行从隐藏变为可见时，把 textarea 的当前值灌进 CodeMirror。
+           * 只做「显示时回灌」这一个方向，不在隐藏时反向清空 —— 因为 close() 里的
+           * `.val('')` 与 open() 里的 `.val(内容)` 在同一个同步任务内先后执行，
+           * 而 MutationObserver 的回调是微任务、会排在两者之后，此刻反向写 textarea
+           * 会把刚填好的评论内容抹掉。
+           */
+          var syncReplyContent = function () {
+            var container = document.getElementById("wp-replycontent-editor-container");
+            var wrapper = container && container.querySelector(".CodeMirror");
+            var instance = wrapper && wrapper.CodeMirror;
+            var source = document.getElementById("replycontent");
+
+            if (!instance || !source) {
+              return;
+            }
+
+            var value = source.value || "";
+
+            if (instance.getValue() !== value) {
+              instance.setValue(value);
+            }
+          };
+
+          // 关闭回复行后把编辑器里的残留清掉（textarea 为空时才会被调用）
+          var clearReplyEditor = function () {
+            var container = document.getElementById("wp-replycontent-editor-container");
+            var wrapper = container && container.querySelector(".CodeMirror");
+            var instance = wrapper && wrapper.CodeMirror;
+
+            if (instance && instance.getValue() !== "") {
+              instance.setValue("");
+            }
+          };
+
           // 回复行是容器的**祖先**（不在上面那个观察范围内），要单独监听它
           // 从 display:none 变为可见的那一刻。用「可见性变化」而不是固定延时，
           // 是为了不依赖 WP 具体在什么时候显示这一行。
@@ -1236,16 +1287,37 @@ require("./editormd.css");
             var visible = !!replyRowNode
               && !!replyRowNode.offsetWidth && !!replyRowNode.offsetHeight;
 
-            if (visible === replyRowVisible) {
+            if (!visible) {
+              replyRowVisible = false;
+
+              // 只有在原生 textarea 确实为空时才清编辑器。
+              // close() 后面可能紧跟 open()（同一任务里先清空、再写入新的评论
+              // 内容），此刻如果无条件清空，会把刚填进去的内容吞掉；
+              // Editor.md 的 setValue 还会把空值同步回 textarea，那就是真丢数据。
+              var closeSource = document.getElementById("replycontent");
+              if (closeSource && !closeSource.value) {
+                clearReplyEditor();
+              }
+
               return;
             }
 
-            replyRowVisible = visible;
+            // 只要回复行可见就对齐一次内容。
+            //
+            // 不能只在「隐藏 → 显示」这个状态跳变上做：核心的 open() 里
+            // `t.close()`（hide）与随后的 `fadeIn()`（show）发生在同一个任务里，
+            // 两次 style 变更会被合并成一次 MutationObserver 回调，此时读到的
+            // 已经是「可见」—— 状态没跳变，短路逻辑会漏掉这次内容切换。
+            // syncReplyContent() 内部有「值相同就跳过」，可以安全地反复调用。
+            syncReplyContent();
 
-            if (visible) {
-              prepareReplyEditor();
-              syncReplyEditorWidth();
+            if (replyRowVisible) {
+              return;
             }
+
+            replyRowVisible = true;
+            prepareReplyEditor();
+            syncReplyEditorWidth();
           };
 
           if (replyRowNode && typeof MutationObserver !== "undefined") {

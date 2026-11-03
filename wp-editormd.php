@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.5.1
+ * Version:           10.5.2
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,16 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.5.2 —— 后台评论列表里编辑器与原生 textarea 失步
+ *   评论的「快速编辑」与「回复」共用同一个 wp_editor（replycontent），核心只通过
+ *   $('#replycontent').val() 读写内容；而本插件把这个 textarea 隐藏、改用 CodeMirror
+ *   呈现，两边读写完全脱钩，于是：
+ *   - 点「快速编辑」时评论原文只写进了看不见的 textarea，弹出的编辑器是空白的；
+ *   - 回复完一条再点另一条的「回复」，编辑器里还留着上一段输入。
+ *   修法：回复行每次变为可见时以 textarea 为准回灌 CodeMirror，关闭且 textarea 已为
+ *   空时再清掉编辑器残留。不在隐藏瞬间无条件清空 —— close() 与 open() 在同一个任务
+ *   里先后执行，反向写 textarea 会把刚填入的评论内容抹掉。
  *
  * 10.5.1 —— 跨站资源的完整性校验（integrity）
  *   「编辑器静态资源地址」允许指向本站以外的主机，页面里的 JS / CSS 就由对方提供：
@@ -172,7 +182,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.5.1' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.2' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
