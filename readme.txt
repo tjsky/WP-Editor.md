@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.3
+Stable tag: 10.5.4
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,11 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.4 =
+* 缺陷修复：10.5.3 的 CDN 静态资源与安装包里的文件不是同一份构建产物（压缩器版本不同，
+  min.js 字节不一致），照 10.5.3 的说明做完整性校验会全部对不上。现已改为与安装包
+  逐字节一致的产物；10.5.3 的功能改动不变
 
 = 10.5.3 =
 * 变更：编辑器静态资源默认改为维护者 CDN（jsDelivr），升级插件不再重新下载静态文件。

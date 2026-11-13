@@ -20,7 +20,7 @@
 > | 本维护版 | [tjsky/WP-Editor.md](https://github.com/tjsky/WP-Editor.md) |
 > | 维护者 | [tjsky](https://github.com/tjsky) |
 > | 修改起始 | 2026-10-02 |
-> | 当前版本 | 10.5.3（2026-11-13） |
+> | 当前版本 | 10.5.4（2026-11-13） |
 >
 > 按 GPL-3.0 第 5 条的要求，此处保留修改声明与日期。逐项明细见
 > [CHANGELOG.md](https://github.com/tjsky/WP-Editor.md/blob/master/CHANGELOG.md)。
@@ -79,6 +79,11 @@
 ---
 
 ## 最近更新
+
+**10.5.4（2026-11-13）**
+
+* 修正 10.5.3 的 CDN 静态资源与安装包不是同一份构建产物、导致完整性校验值对不上的问题。
+  功能与 10.5.3 相同。
 
 **10.5.3（2026-11-13）**
 

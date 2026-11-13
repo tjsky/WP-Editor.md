@@ -10,6 +10,17 @@
 
 ## 简体中文
 
+### Version 10.5.4
+
+> **修正 10.5.3 的 CDN 资源与安装包不一致的问题；功能没有变化。**
+
+10.5.3 首发时，CDN 上放的是本地构建的产物，而安装包由 CI 构建 —— 两边的压缩器版本不同，
+`min.js` 字节并不相同。结果就是：按安装包里的文件生成完整性校验值，会和 CDN 上的文件对不上，
+资源被浏览器拒绝加载。
+
+现在 CDN 上的文件与安装包**逐字节一致**。已经装过 10.5.3 且填了校验值的站点，升级到 10.5.4
+后重新点一次「用本机文件生成」即可；没有填校验值的站点不受影响。
+
 ### Version 10.5.3
 
 > **静态资源默认走维护者 CDN，升级不用重下文件；顺带修好公式资源不跟随 CDN、新站前台 404。**
@@ -204,6 +215,18 @@ Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字
 ---
 
 ## English
+
+### Version 10.5.4
+
+> **Fixes the CDN assets of 10.5.3 not matching the release package. No functional change.**
+
+The first 10.5.3 upload carried locally built assets while the release package was built on CI.
+Different minifier versions produce different bytes, so an integrity hash generated from the
+bundled files would not match the CDN copy, and the browser would refuse to load them.
+
+The CDN now serves the exact bytes from the release package. If you installed 10.5.3 and filled in
+integrity hashes, upgrade to 10.5.4 and click "generate from local files" once; sites without
+hashes are unaffected.
 
 ### Version 10.5.3
 
@@ -433,6 +456,17 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.4
+
+> **修正 10.5.3 的 CDN 資源與安裝包不一致的問題；功能沒有變化。**
+
+10.5.3 首發時，CDN 上放的是本機建置的產物，而安裝包由 CI 建置 —— 兩邊的壓縮器版本不同，
+`min.js` 位元組並不相同。結果就是：按安裝包裡的檔案產生完整性校驗值，會和 CDN 上的檔案對不上，
+資源被瀏覽器拒絕載入。
+
+現在 CDN 上的檔案與安裝包**逐位元組一致**。已經裝過 10.5.3 且填了校驗值的站點，升級到 10.5.4
+後重新點一次「用本機檔案產生」即可；沒有填校驗值的站點不受影響。
 
 ### Version 10.5.3
 
