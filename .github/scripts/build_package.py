@@ -23,8 +23,16 @@ import zipfile
 
 TOP_DIR = "wp-editormd"
 
-# 整个目录跳过
-SKIP_DIRS = {".git", ".github", "node_modules", "docker", "dist", "__pycache__", ".idea", ".vscode"}
+# 整个目录跳过（任意深度）
+SKIP_DIRS = {".git", ".github", "node_modules", "__pycache__", ".idea", ".vscode"}
+
+# 只在插件**根目录**下才跳过的目录名。
+#
+# 根级 dist/ 是打包输出，根级 docker/ 是开发用构建环境，都不该进包；
+# 但同名子目录可能是运行期资源 —— assets/DomToImage/dist/dom-to-image.min.js
+# 就是这种情况。此前按「任意深度」跳过 dist，把这个文件连带丢掉了，
+# 用发布包安装的站点，设置页调试信息的截图功能（domtoimage.toBlob）一直 404。
+ROOT_ONLY_SKIP_DIRS = {"dist", "docker"}
 
 # 根级开发文件跳过
 SKIP_ROOT_FILES = {
@@ -70,8 +78,10 @@ def should_skip(rel):
     """rel 为相对插件根的 POSIX 路径"""
     parts = rel.split("/")
 
-    for p in parts:
+    for index, p in enumerate(parts):
         if p in SKIP_DIRS:
+            return True
+        if p in ROOT_ONLY_SKIP_DIRS and 0 == index:
             return True
         if p in SKIP_ANY:
             return True
