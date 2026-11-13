@@ -173,7 +173,9 @@ class Settings {
     }
 
     public static function default_static_address() {
-        return WP_EDITORMD_URL;
+        $url = "https://cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@" . WP_EDITORMD_VER;
+
+        return (string) apply_filters("editormd_default_static_address", $url);
     }
 
     public static function default_mindmap_address() {
@@ -189,7 +191,8 @@ class Settings {
 
         $addres = isset($style_option["editor_addres"]) ? (string) $style_option["editor_addres"] : "";
 
-        if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net#i", $addres)) {
+        // 只迁移 wp.org 那条已下线的通道，用户自己填的 jsDelivr 地址不能被覆盖
+        if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net/wp/wp-editormd#i", $addres)) {
             $style_option["editor_addres"] = self::default_static_address();
             update_option("editor_style", $style_option);
         }

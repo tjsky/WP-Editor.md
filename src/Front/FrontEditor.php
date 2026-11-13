@@ -5,6 +5,7 @@ namespace EditormdFront;
 use EditormdApp\PrismJSAuto;
 use EditormdUtils\Config;
 use EditormdUtils\AssetsIntegrity;
+use EditormdUtils\Settings;
 
 class FrontEditor {
     /**
@@ -39,6 +40,11 @@ class FrontEditor {
         $this->text_domain      = "editormd";
         $this->version          = WP_EDITORMD_VER;
         $this->front_static_url = Config::get_option("editor_addres", "editor_style");
+
+        // 尚未进过后台时该键为空，拼出来会是站点根下的 /assets/...（必然 404）
+        if ("" === $this->front_static_url) {
+            $this->front_static_url = Settings::default_static_address();
+        }
 
         add_action("wp_enqueue_scripts", array($this, "enqueue_front_styles"));
         add_action("wp_enqueue_scripts", array($this, "enqueue_front_scripts"));

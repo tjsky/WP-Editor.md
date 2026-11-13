@@ -1517,7 +1517,8 @@ require("./editormd.css");
   editormd.mindMapURL = splitFileName(editor.mindMapURL);
 
   // KaTeX科学公式配置
-  if (editor.tex === "on") {
+  // 开关取值是 katex（select），原先写成 on 导致这里永不成立
+  if (editor.tex === "katex") {
     editormd.katexURL = {
       css: cdn_url(editor.editormdUrl, "katex") + "/katex.min",
       js: cdn_url(editor.editormdUrl, "katex") + "/katex.min",

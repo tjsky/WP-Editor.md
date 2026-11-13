@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.2
+Stable tag: 10.5.3
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,16 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.3 =
+* 变更：编辑器静态资源默认改为维护者 CDN（jsDelivr），升级插件不再重新下载静态文件。
+  内网或无外网环境把「Editor.md 静态资源地址」改回插件目录地址即可走本地资源，插件内
+  仍完整自带全套文件；也可用 editormd_default_static_address 过滤器改用自己的镜像
+* 缺陷修复：公式（KaTeX）资源不受「静态资源地址」控制，一直从第三方 npm 地址加载，
+  换 CDN 时不跟随；现在跟随设置
+* 缺陷修复：全新站点还没进过后台时，前台评论编辑器会拼出指向站点根的相对地址（资源 404）
+* 缺陷修复：安装包缺少 assets/DomToImage/dist/dom-to-image.min.js，设置页调试信息的
+  截图功能一直是坏的（打包脚本把名为 dist 的目录整目录排除了）
 
 = 10.5.2 =
 * 缺陷修复：后台评论列表点「快速编辑」时弹出的编辑器是空白的（评论原文没有带进去）；
