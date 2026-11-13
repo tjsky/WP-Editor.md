@@ -10,6 +10,37 @@
 
 ## 简体中文
 
+### Version 10.5.3
+
+> **静态资源默认走维护者 CDN，升级不用重下文件；顺带修好公式资源不跟随 CDN、新站前台 404。**
+
+**变更：编辑器静态资源默认指向维护者 CDN**
+
+「Editor.md 静态资源地址」的默认值从插件目录改成了维护者提供的 CDN
+（`cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@版本号`）。升级插件不必重新下发几十 MB
+的静态文件，这部分流量也不必由你的站点承担。
+
+* 已经手动填过地址的站点不受影响。插件内仍完整自带全套资源，内网或无外网环境把地址
+  换回插件目录地址即可。
+* 想换自己的镜像：`editormd_default_static_address` 过滤器。
+* 想加完整性校验：设置页点「用本机文件生成」即可 —— 插件自带的文件与 CDN 上逐字节一致。
+
+**缺陷修复：公式资源不受「静态资源地址」控制**
+
+公式开关的取值是 `katex`，代码里却按 `on` 判断，于是 KaTeX 一直从 Editor.md 内置的
+第三方 npm 地址加载。换 CDN 时公式资源不跟着走，也拿不到完整性校验。
+
+**缺陷修复：全新站点前台评论编辑器资源 404**
+
+插件装好后若先访问前台（还没进过后台），资源地址还是空的，拼出来是 `/assets/...`
+这种指向站点根的相对地址。现在会退回默认地址。
+
+**缺陷修复：安装包缺少 dom-to-image.min.js**
+
+打包脚本把名为 `dist` 的目录当开发产物整目录排除，连带丢掉了
+`assets/DomToImage/dist/dom-to-image.min.js` —— 用安装包部署的站点，设置页调试信息的
+截图功能一直是坏的。
+
 ### Version 10.5.2
 
 > **修好后台评论列表里「快速编辑」和「回复」两处内容错位。**
@@ -173,6 +204,40 @@ Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字
 ---
 
 ## English
+
+### Version 10.5.3
+
+> **Static assets now come from the maintainer's CDN, so upgrades stop re-shipping files. Also fixes
+> formula assets ignoring the CDN setting and a 404 on the front-end editor for fresh installs.**
+
+**Change: the default asset address is now the maintainer's CDN**
+
+The default for "Editor.md Static Resource Addres" moved from the plugin folder to
+`cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@<version>`. Upgrading no longer re-downloads tens of
+megabytes of static files, and that traffic is no longer on your server.
+
+* Sites that already filled in an address are untouched. The plugin still ships the full local
+  copy; for intranet or offline setups, point the address back at the plugin folder.
+* Use the `editormd_default_static_address` filter to serve from your own mirror.
+* For integrity checks, click "generate from local files" — the bundled files are byte-identical
+  to the ones on the CDN.
+
+**Fixed: formula assets ignored the asset address setting**
+
+The setting stores `katex`, but the code compared against `on`, so KaTeX always loaded from
+Editor.md's built-in third-party npm URL — it did not follow the CDN setting and got no integrity
+check.
+
+**Fixed: front-end comment editor loaded nothing on a fresh install**
+
+Until someone opened wp-admin, the stored asset address was empty, so the plugin emitted
+`/assets/...` — a path relative to the site root. It now falls back to the default address.
+
+**Fixed: the release package was missing dom-to-image.min.js**
+
+The packaging script skipped any directory named `dist`, which also dropped
+`assets/DomToImage/dist/dom-to-image.min.js`. The debug screenshot on the settings page has been
+broken in every release built that way.
 
 ### Version 10.5.2
 
@@ -368,6 +433,37 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.3
+
+> **靜態資源預設走維護者 CDN，升級不必重新下載檔案；順帶修好公式資源不跟隨 CDN、新站前台 404。**
+
+**變更：編輯器靜態資源預設指向維護者 CDN**
+
+「Editor.md 靜態資源位址」的預設值從外掛目錄改成維護者提供的 CDN
+（`cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@版本號`）。升級外掛不必重新下發幾十 MB
+的靜態檔案，這部分流量也不必由你的站點承擔。
+
+* 已經手動填過位址的站點不受影響。外掛內仍完整自帶全套資源，內網或無外網環境把位址
+  換回外掛目錄位址即可。
+* 想換自己的鏡像：`editormd_default_static_address` 過濾器。
+* 想加完整性校驗：設定頁點「用本機檔案產生」即可 —— 外掛自帶的檔案與 CDN 上逐位元組一致。
+
+**缺陷修復：公式資源不受「靜態資源位址」控制**
+
+公式開關的取值是 `katex`，程式碼裡卻按 `on` 判斷，於是 KaTeX 一直從 Editor.md 內建的
+第三方 npm 位址載入。換 CDN 時公式資源不跟著走，也拿不到完整性校驗。
+
+**缺陷修復：全新站點前台留言編輯器資源 404**
+
+外掛裝好後若先瀏覽前台（還沒進過後台），資源位址還是空的，拼出來是 `/assets/...`
+這種指向站點根目錄的相對位址。現在會退回預設位址。
+
+**缺陷修復：安裝包缺少 dom-to-image.min.js**
+
+打包腳本把名為 `dist` 的目錄當開發產物整目錄排除，連帶丟掉了
+`assets/DomToImage/dist/dom-to-image.min.js` —— 用安裝包部署的站點，設定頁偵錯資訊的
+截圖功能一直是壞的。
 
 ### Version 10.5.2
 

@@ -1517,7 +1517,12 @@ require("./editormd.css");
   editormd.mindMapURL = splitFileName(editor.mindMapURL);
 
   // KaTeX科学公式配置
-  if (editor.tex === "on") {
+  //
+  // 注意开关的取值是 "katex"（设置里 support_latex 是个 select，选项值为 katex /
+  // mathjax / off），不是 "on"。原先写成 "on" 导致这里永远不生效：KaTeX 一直走
+  // Editor.md 内置的 `cdn.jsdelivr.net/npm/katex` —— 既不受「静态资源地址」控制
+  // （换 CDN 时这一块不会跟着走），也拿不到 integrity 校验。
+  if (editor.tex === "katex") {
     editormd.katexURL = {
       css: cdn_url(editor.editormdUrl, "katex") + "/katex.min",
       js: cdn_url(editor.editormdUrl, "katex") + "/katex.min",

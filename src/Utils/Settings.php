@@ -210,15 +210,24 @@ class Settings {
     }
 
     /**
-     * 插件静态资源默认地址（插件自带本地资源）
+     * 编辑器静态资源默认地址（维护者提供的 CDN）
      *
-     * 调整说明：原实现默认从 jsdelivr CDN 加载编辑器的 JS/CSS，后台因此会向第三方
-     * CDN 发起请求，存在供应链与隐私风险。现改为默认使用插件自带的本地资源。
+     * 版本号以 tag 的形式拼进 URL（`...@10.5.2`），发版时跟着 WP_EDITORMD_VER 自动切换，
+     * 不需要单独维护；代价是每次发版都必须往 CDN 仓库推同名 tag，否则这里会 404。
+     *
+     * 想改用自己的镜像（自建 CDN、内网分发）：
+     *     add_filter('editormd_default_static_address', function () { return 'https://...'; });
+     *
+     * 为什么默认用外部 CDN：资源与插件解耦后，静态文件不用随每次升级重新下发，
+     * 也不会占用站点流量。插件自带的本地资源仍然完整保留，把地址改回
+     * WP_EDITORMD_URL 即可在无外网/内网环境使用。
      *
      * @return string
      */
     public static function default_static_address() {
-        return WP_EDITORMD_URL;
+        $url = "https://cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@" . WP_EDITORMD_VER;
+
+        return (string) apply_filters("editormd_default_static_address", $url);
     }
 
     /**
@@ -241,13 +250,19 @@ class Settings {
 
         $addres = isset($style_option["editor_addres"]) ? (string) $style_option["editor_addres"] : "";
 
-        // 历史配置里若指向 jsdelivr CDN，一次性迁移为本地资源
-        if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net#i", $addres)) {
+        // 历史配置里若还指着 WordPress.org 那条已下线的 jsDelivr 通道
+        // （`cdn.jsdelivr.net/wp/wp-editormd/...`，插件被 wp.org 下架后不再更新），
+        // 一次性迁移到默认地址。
+        //
+        // 只匹配这一条具体路径：用户自己填的其它 jsDelivr 镜像（或本 CDN 的旧 tag）
+        // 不能被覆盖 —— 10.5.1 版本的过期逻辑是「地址里出现 jsdelivr 就改回本地」，
+        // 默认值换成 CDN 之后那样会把用户刚填的地址立刻冲掉。
+        if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net/wp/wp-editormd#i", $addres)) {
             $style_option["editor_addres"] = self::default_static_address();
             update_option("editor_style", $style_option);
         }
 
-        // 空值填入默认（本地）地址 - 编辑器静态地址
+        // 空值填入默认地址 - 编辑器静态地址
         if (Config::get_option("editor_addres", "editor_style") === "") {
             $style_option["editor_addres"] = self::default_static_address();
             update_option("editor_style", $style_option);
@@ -737,7 +752,8 @@ class Settings {
                     'label'   => __('Editor.md Static Resource Addres', $this->text_domain),
                     'desc'    => __('Please make sure the resources are up to date.<br/>' , $this->text_domain) . __('Please upload the resource (the unzipped folder name is "assets") to your server or cdn. If your resource address is: "http(s)://example.com/myfile/assets", you should fill in: "http(s)://example.com/myfile ". <br/>',$this->text_domain) . $this->upgrade_editormd_file() . AssetsIntegrity::warning_html($this->text_domain),
                     'type'    => 'text',
-                    // 默认使用插件自带的本地资源（原默认值为 jsdelivr CDN 地址）
+                    // 默认指向维护者提供的 CDN（见 default_static_address()）。
+                    // 内网/无外网环境把这里换成插件目录地址即可走本地资源。
                     'default' => self::default_static_address()
                 ),
                 array(

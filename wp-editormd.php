@@ -3,7 +3,7 @@
  * Plugin Name:       WP Editor.md
  * Plugin URI:        https://github.com/tjsky/WP-Editor.md
  * Description:       Perhaps this is the best and most perfect Markdown editor in WordPress
- * Version:           10.5.2
+ * Version:           10.5.3
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Tested up to:      7.1
@@ -15,6 +15,20 @@
  * Domain Path:       /languages
  *
  * 本 fork 的改造（自 10.3.0 起）：
+ *
+ * 10.5.3 —— 静态资源默认走维护者 CDN
+ *   「编辑器静态资源地址」的默认值从插件目录改为
+ *   https://cdn.jsdelivr.net/gh/tjsky/wp-editormd-cdn@<版本>（tag 跟随 WP_EDITORMD_VER）。
+ *   资源与插件解耦后，升级不必重新下发几十 MB 静态文件；插件自带的本地资源仍完整保留，
+ *   内网环境把地址换回 WP_EDITORMD_URL 即可，另提供 editormd_default_static_address
+ *   过滤器供自建镜像覆盖。
+ *   - 迁移逻辑收窄：只有「cdn.jsdelivr.net/wp/wp-editormd」（wp.org 已下架通道）才迁到
+ *     新默认值。10.5.1 那版是「出现 jsdelivr 就改回本地」，默认值换成 CDN 后会把用户
+ *     刚填的地址立刻冲掉；
+ *   - KaTeX 地址判断修正：开关取值是 katex 而非 on，原判断永不成立，公式资源一直走
+ *     Editor.md 内置的 npm 地址，换 CDN 时不跟随；
+ *   - 前台兜底：站点未进过后台时 editor_addres 为空，会拼出指向站点根的 /assets/...，
+ *     现在退回默认地址。
  *
  * 10.5.2 —— 后台评论列表里编辑器与原生 textarea 失步
  *   评论的「快速编辑」与「回复」共用同一个 wp_editor（replycontent），核心只通过
@@ -182,7 +196,7 @@ use EditormdUtils\Activator;
 use EditormdUtils\Logger;
 use EditormdUtils\Deactivator;
 
-define( 'WP_EDITORMD_VER', '10.5.2' );                      // 版本说明
+define( 'WP_EDITORMD_VER', '10.5.3' );                      // 版本说明
 define( 'WP_EDITORMD_URL', plugins_url( '', __FILE__ ) );   // 插件资源路径
 define( 'WP_EDITORMD_PATH', dirname( __FILE__ ) );          // 插件路径文件夹
 define( 'WP_EDITORMD_NAME', plugin_basename( __FILE__ ) );  // 插件名称
