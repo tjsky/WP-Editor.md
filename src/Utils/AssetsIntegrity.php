@@ -8,8 +8,6 @@ namespace EditormdUtils;
  * 「编辑器静态资源地址」允许填本站以外的地址（CDN）。这样一来，页面里的可执行代码
  * 就由外部主机提供：设置填错，或对方主机被入侵、被替换，都会让访客执行到别人的 JS。
  *
- * 本类把管理员配置的哈希表（editor_style[editor_integrity]）套到插件输出的
- * <script> / <link> 标签上，交给浏览器做校验：哈希对不上就直接拒绝执行。
  *
  * 约定：
  * - 只处理「跨站」资源。本站（同协议+域名+端口）的资源不加属性，免得自伤。
@@ -25,6 +23,8 @@ class AssetsIntegrity {
 
     /** 哈希算法。sha384 是 SRI 的推荐值，浏览器兼容性也最好。 */
     const HASH_ALGO = "sha384";
+
+    const CURRENT_CACHE_PREFIX = "editormd_integrity_current_";
 
     /**
      * 本次请求里成功加上 integrity 的资源
@@ -46,6 +46,10 @@ class AssetsIntegrity {
      * @var array|null
      */
     private static $map = null;
+
+    private static $effective = null;
+
+    private static $current = null;
 
     /**
      * 本站主机名缓存
@@ -195,31 +199,102 @@ class AssetsIntegrity {
     }
 
     /**
-     * 是否有可用的哈希配置
+    public static function current_map() {
+        if (null !== self::$current) {
+            return self::$current;
+        }
+
+        $key = self::CURRENT_CACHE_PREFIX . WP_EDITORMD_VER . "_" . md5(implode("|", self::candidates()));
+
+        $cached = get_transient($key);
+        if (is_array($cached)) {
+            self::$current = $cached;
+
+            return self::$current;
+        }
+
+        $map = array();
+
+        foreach (self::generate_from_local()["lines"] as $line) {
+            $pos = strpos($line, "=");
+            if (false === $pos) {
+                continue;
+            }
+
+            $map[substr($line, 0, $pos)] = substr($line, $pos + 1);
+        }
+
+        if (! empty($map)) {
+            set_transient($key, $map, WEEK_IN_SECONDS);
+        }
+
+        self::$current = $map;
+
+        return self::$current;
+    }
+
+    public static function effective_map() {
+        if (null !== self::$effective) {
+            return self::$effective;
+        }
+
+        $map = self::current_map();
+
+        foreach (self::map() as $key => $hash) {
+            if (! isset($map[$key])) {
+                $map[$key] = $hash;
+            }
+        }
+
+        self::$effective = $map;
+
+        return self::$effective;
+    }
+
+    public static function config_is_stale() {
+        $saved = self::map();
+        if (empty($saved)) {
+            return false;
+        }
+
+        $current = self::current_map();
+
+        foreach ($saved as $key => $hash) {
+            if (isset($current[$key]) && $current[$key] !== $hash) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
      *
      * @return bool
      */
     public static function has_entries() {
-        return ! empty(self::map());
+        return ! empty(self::effective_map());
     }
 
     /**
      * 传给前端脚本的哈希表
      *
-     * 只有「资源在别的主机」且「配了哈希」时才需要：页面里由脚本按需加载的资源
-     * （CodeMirror 附属模块、marked 等）无法用 PHP 过滤器加属性，改由前端脚本补。
-     * 其余情况一律返回空数组，站点不用为这个功能多背几 KB 的页面数据。
      *
      * @return array
      */
     public static function runtime_config() {
-        if (! self::root_is_external() || ! self::has_entries()) {
+        if (! self::root_is_external()) {
+            return array();
+        }
+
+        $map = self::effective_map();
+
+        if (empty($map)) {
             return array();
         }
 
         return array(
             "root" => self::root(),
-            "map"  => self::map(),
+            "map"  => $map,
         );
     }
 
@@ -345,7 +420,7 @@ class AssetsIntegrity {
             return "";
         }
 
-        $map  = self::map();
+        $map  = self::effective_map();
         $keys = array($clean, self::relative_key($clean));
 
         foreach ($keys as $key) {
@@ -641,33 +716,40 @@ class AssetsIntegrity {
      * @return string
      */
     public static function status_html($text_domain) {
-        $count = count(self::map());
-        $html  = "";
-
         if (! self::root_is_external()) {
-            $html .= '<span class="updated">'
+            return '<span class="updated">'
                 . esc_html__("Current resource address is on this site, so integrity is not required.", $text_domain)
-                . '</span> ';
-        } elseif ($count > 0) {
-            $html .= '<span class="updated">'
-                . sprintf(
-                    esc_html__("%d integrity entries configured. Resources on another host are verified by the browser, and any mismatch is refused.", $text_domain),
-                    $count
-                )
-                . '</span> ';
-        } else {
-            $html .= '<span class="error">'
-                . esc_html__("The resource address is on another host. Fill in the integrity values above.", $text_domain)
+                . '</span> '
+                . esc_html__("The box below can stay empty.", $text_domain);
+        }
+
+        $count = count(self::effective_map());
+
+        if (0 === $count) {
+            return '<span class="error">'
+                . esc_html__("Cannot read the bundled resource files, so integrity is disabled. Upload the resource package again.", $text_domain)
+                . '</span>';
+        }
+
+        $html = '<span class="updated">'
+            . sprintf(
+                esc_html__("%d integrity entries are computed from this version's files. Nothing to do after an upgrade.", $text_domain),
+                $count
+            )
+            . '</span> ';
+
+        if (self::config_is_stale()) {
+            $html .= '<br><span class="error">'
+                . esc_html__("The values saved below were made for another version. The plugin is using the ones it computed itself — save them here to clean up.", $text_domain)
                 . '</span> ';
         }
 
-        $html .= esc_html__("One entry per line, format: path=sha384-xxxx. The path is relative to the resource address above; a full URL is also accepted.", $text_domain);
+        $html .= esc_html__("The box below is optional: fill it in only if your resource package differs from the bundled files. Format: path=sha384-xxxx.", $text_domain);
 
         return $html;
     }
 
     /**
-     * 「别再无视它」的警告：非本站资源地址 + 没配置哈希
      *
      * @param string $text_domain 翻译域
      *
@@ -678,15 +760,8 @@ class AssetsIntegrity {
             return "";
         }
 
-        $doc = "https://www.tjsky.net/tutorial/1536";
-
-        $message = wp_kses(
-            __("A wrong CDN setting, or a compromised CDN, may inject malicious code into the JavaScript and CSS it serves. Please set the <code>integrity</code> attribute — how to set it up:", $text_domain),
-            array("code" => array())
-        );
-
-        return '<div class="editormd-integrity-warning">' . $message . ' <a href="' . esc_url($doc)
-            . '" target="_blank" rel="noopener noreferrer">'
-            . esc_html__("Documentation", $text_domain) . '</a></div>';
+        return '<div class="editormd-integrity-warning">'
+            . esc_html__("The resource package is incomplete, so integrity cannot be computed. Re-upload the resource package, or point the address back to the plugin folder.", $text_domain)
+            . '</div>';
     }
 }

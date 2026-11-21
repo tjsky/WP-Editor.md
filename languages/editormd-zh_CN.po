@@ -624,3 +624,27 @@ msgstr "已切换，新上传的图片会存成 WebP。"
 #: src/Utils/Settings.php src/Admin/Controller.php
 msgid "You are not allowed to do that."
 msgstr "你没有权限执行此操作。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The box below can stay empty."
+msgstr "下面的输入框可以留空。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "%d integrity entries are computed from this version's files. Nothing to do after an upgrade."
+msgstr "已按本版资源自动算出 %d 条校验值，升级后无需处理。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The values saved below were made for another version. The plugin is using the ones it computed itself — save them here to clean up."
+msgstr "下面保存的校验值来自其他版本。当前用的是插件自己算出的值；保存一次即可把它们替换成本版的。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The box below is optional: fill it in only if your resource package differs from the bundled files. Format: path=sha384-xxxx."
+msgstr "下面的输入框是可选的：只在你换了自己的资源包时才需要填。格式：路径=sha384-xxxx。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Cannot read the bundled resource files, so integrity is disabled. Upload the resource package again."
+msgstr "读不到插件自带的资源文件，完整性校验暂不可用。请重新上传资源包。"
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The resource package is incomplete, so integrity cannot be computed. Re-upload the resource package, or point the address back to the plugin folder."
+msgstr "资源包不完整，无法计算校验值。请重新上传资源包，或把资源地址改回插件目录。"

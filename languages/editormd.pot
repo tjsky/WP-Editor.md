@@ -521,3 +521,27 @@ msgstr ""
 #: src/Utils/Debugger.php
 msgid "Files used by this plugin that have no integrity entry"
 msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The box below can stay empty."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "%d integrity entries are computed from this version's files. Nothing to do after an upgrade."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The values saved below were made for another version. The plugin is using the ones it computed itself — save them here to clean up."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The box below is optional: fill it in only if your resource package differs from the bundled files. Format: path=sha384-xxxx."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "Cannot read the bundled resource files, so integrity is disabled. Upload the resource package again."
+msgstr ""
+
+#: src/Utils/AssetsIntegrity.php
+msgid "The resource package is incomplete, so integrity cannot be computed. Re-upload the resource package, or point the address back to the plugin folder."
+msgstr ""

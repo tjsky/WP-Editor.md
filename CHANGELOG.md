@@ -10,6 +10,13 @@
 
 ## 简体中文
 
+### Version 10.5.6
+
+> **升级后不用再手动更新完整性校验值，忘了也不会让编辑器崩掉。**
+
+* **修复**：设置过「静态资源完整性校验」（integrity）的站点，升级后会因为哈希对应的是上一版文件，浏览器拒绝加载编辑器的 CSS / JS —— 编辑区没有样式、按钮点了没反应。现在校验值由插件按本版资源自动计算，升级后不需要任何操作。
+* **改进**：完整性校验默认生效，不再需要手动填。设置页的输入框改成可选，只有自己换过资源包的站点才需要动它。
+
 ### Version 10.5.5
 
 > **修代码块的语言名识别与显示，并让粘贴的图片进入媒体库、保留原始画质。**
@@ -233,6 +240,18 @@ Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字
 ---
 
 ## English
+
+### Version 10.5.6
+
+> **Integrity values no longer need to be refreshed by hand — and forgetting no longer breaks
+> the editor.**
+
+* **Fixed**: sites that had set up subresource integrity (SRI) saw the browser refuse every editor
+  CSS and JS after an upgrade, because the saved hashes belonged to the previous version's files —
+  the editor lost its styles and the toolbar stopped responding. The plugin now computes the hashes
+  from the files it ships, so an upgrade needs no action.
+* **Improved**: integrity is on by default and no longer needs to be filled in. The box in settings
+  is optional, only for sites that replaced the resource package.
 
 ### Version 10.5.5
 
@@ -505,6 +524,13 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.6
+
+> **升級後不用再手動更新完整性校驗值，忘了也不會讓編輯器崩掉。**
+
+* **修正**：設定過「靜態資源完整性校驗」（integrity）的站點，升級後會因為雜湊對應的是上一版檔案，瀏覽器拒絕載入編輯器的 CSS / JS —— 編輯區沒有樣式、按鈕點了沒反應。現在校驗值由外掛按本版資源自動計算，升級後不需要任何操作。
+* **改進**：完整性校驗預設生效，不再需要手動填寫。設定頁的輸入框改成選用，只有自己換過資源包的站點才需要動它。
 
 ### Version 10.5.5
 

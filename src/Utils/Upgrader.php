@@ -54,6 +54,8 @@ class Upgrader {
             case "10.5.3":
             case "10.5.4":
                 $this->upgrade_to_10_5_5();
+            case "10.5.5":
+                $this->upgrade_10_5_5_to_10_5_6();
             default:
                 break;
         }
@@ -83,6 +85,24 @@ class Upgrader {
 
     private function upgrade_to_10_5_5() {
         $this->update_to_version("10.5.5");
+    }
+
+    private function upgrade_10_5_5_to_10_5_6() {
+        $saved = (string) Config::get_option("editor_integrity", "editor_style");
+
+        if ("" !== trim($saved)) {
+            $generated = AssetsIntegrity::generate_from_local();
+
+            if (! empty($generated["lines"])) {
+                Config::update_option(
+                    "editor_integrity",
+                    "editor_style",
+                    implode("\n", $generated["lines"])
+                );
+            }
+        }
+
+        $this->update_to_version("10.5.6");
     }
 
     private function upgrade_10_4_4_to_10_4_5() {
