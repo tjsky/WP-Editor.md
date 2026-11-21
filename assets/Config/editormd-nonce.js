@@ -23,6 +23,7 @@
   // action => 配置对象中的 key 名。不在此表内的请求一律不注入，避免影响其它插件的 AJAX。
   var NONCE_KEYS = {
     wp_editormd_imagepaste: "imagepasteNonce",
+    wp_editormd_imageupload: "imagepasteNonce",
     wp_editormd_pages: "pagesNonce",
   };
 

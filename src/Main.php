@@ -93,11 +93,11 @@ class Main {
 
         // 根据选项开启相关选项
         Config::get_option("task_list", "editor_basics")                 == "on"     ? new TaskList()          : null;
-        Config::get_option("imagepaste", "editor_basics")                == "on"     ? new ImagePaste()        : null;
+        Config::get_option("imagepaste", "editor_image")                == "on"     ? new ImagePaste()        : null;
         Config::get_option("support_latex", "editor_latex")              == "katex"  ? new KaTeX()             : null;
         Config::get_option("support_mermaid", "editor_mermaid")          == "on"     ? new Mermaid()           : null;
         Config::get_option("support_mindmap", "editor_mindmap")          == "on"     ? new MindMap()           : null;
-        Config::get_option("support_emoji", "editor_emoji")              == "on"     ? new Emoji()             : null;
+        Config::get_option("support_emoji", "editor_basics")              == "on"     ? new Emoji()             : null;
         Config::get_option("highlight_mode_auto", "syntax_highlighting") == "on"     ? new PrismJSAuto()       : null;
         Config::get_option("support_front", "editor_basics")             == "on" 
         || Config::get_option("support_other_text", "editor_basics")    !== ""       ? new ControllerFrontEditor()   : null;

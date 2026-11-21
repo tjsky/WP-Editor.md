@@ -265,7 +265,10 @@ class WPMarkdownParser extends MarkdownExtra {
         %
             (?:
                 (`(?:``)?)              ### 0: Begin block
-                ([a-zA-Z]*\r?\n)?       ### 1: Language Identifier
+                ([-_.+:#a-zA-Z0-9]*\r?\n)?  ### 1: Language Identifier
+                                                ###    含 - . + : # 等字符：只认字母时，
+                                                ###    ```objective-c / ```c++ 的语言行匹配不上，
+                                                ###    整块会被当成「无语言块」处理，围栏结构被破坏
                 ([^`]+?)                ### 2: Block Body
                 (\n?`(?:``)?)           ### 3: End Block
             )
@@ -405,11 +408,65 @@ class WPMarkdownParser extends MarkdownExtra {
         }
     }
 
+    protected function doFencedCodeBlocks($text) {
+        $text = preg_replace_callback('{
+				(?:\n|\A)
+				# 1: Opening marker
+				(
+					(?:~{3,}|`{3,}) # 3 or more tildes/backticks.
+				)
+				[ ]*
+				(?:
+					\.?([-_:a-zA-Z0-9+#.]+) # 2: standalone class name
+				)?
+				[ ]*
+				(?:
+					' . $this->id_class_attr_catch_re . ' # 3: Extra attributes
+				)?
+				[ ]* \n # Whitespace and newline following marker.
+
+				# 4: Content
+				(
+					(?>
+						(?!\1 [ ]* \n)	# Not a closing marker.
+						.*\n+
+					)+
+				)
+
+				# Closing marker.
+				\1 [ ]* (?= \n )
+			}xm',
+            array($this, '_doFencedCodeBlocks_callback'), $text);
+
+        return $text;
+    }
+
+    private function normalize_code_language($classname) {
+        $key = strtolower(trim((string) $classname));
+
+        $aliases = array(
+            "objective-c" => "objectivec",
+            "objc"        => "objectivec",
+            "c++"         => "cpp",
+            "c#"          => "csharp",
+            "cs"          => "csharp",
+            "f#"          => "fsharp",
+            "fs"          => "fsharp",
+            "vb.net"      => "vbnet",
+            "vb"          => "vbnet",
+            "shell"       => "bash",
+            "sh"          => "bash",
+            "yml"         => "yaml",
+        );
+
+        return isset($aliases[$key]) ? $aliases[$key] : $key;
+    }
+
     /**
      * 重载方法，支持Prism语法高亮和科学公式
      */
     public function _doFencedCodeBlocks_callback($matches) {
-        $classname = $matches[2];
+        $classname = $this->normalize_code_language(isset($matches[2]) ? $matches[2] : "");
         $attrs = $matches[3];
         $codeblock = $matches[4];
 

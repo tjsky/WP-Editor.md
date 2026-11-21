@@ -29,9 +29,6 @@ class Settings {
     private static $field_types = array(
         "editor_basics"       => array(
             "task_list"           => "onoff",
-            "imagepaste"          => "onoff",
-            "image_link"          => "onoff",
-            "open_in_new_tab"     => "onoff",
             "live_preview"        => "onoff",
             "sync_scrolling"      => "onoff",
             "html_decode"         => "onoff",
@@ -39,6 +36,8 @@ class Settings {
             "support_reply"       => "onoff",
             "support_other_text"  => "text",
             "simple_comment_editor" => "onoff",
+            "support_emoji"       => "onoff",
+            "open_in_new_tab"     => "onoff",
         ),
         "editor_style"        => array(
             "theme_style"       => "key",
@@ -47,6 +46,15 @@ class Settings {
             "editor_addres"     => "url",
             "editor_integrity"  => "integrity",
         ),
+        "editor_image"        => array(
+            "imagepaste"          => "onoff",
+            "image_keep_origin"   => "onoff",
+            "image_format"        => "image_format",
+            "image_quality"       => "number",
+            "image_to_library"    => "onoff",
+            "image_open_library"  => "onoff",
+            "image_link"          => "onoff",
+        ),
         "syntax_highlighting" => array(
             "highlight_mode_auto"     => "onoff",
             "line_numbers"            => "onoff",
@@ -54,9 +62,6 @@ class Settings {
             "copy_clipboard"          => "onoff",
             "highlight_library_style" => "key",
             "customize_my_style"      => "text",
-        ),
-        "editor_emoji"        => array(
-            "support_emoji" => "onoff",
         ),
         "editor_toc"          => array(
             "support_toc" => "onoff",
@@ -97,6 +102,18 @@ class Settings {
         }
 
         add_action("admin_enqueue_scripts", array($this, "enqueue_settings_assets"));
+
+        add_action("admin_footer", array($this, "print_image_option_toggle"));
+
+        add_filter("option_editor_image", array($this, "merge_legacy_image_options"), 10, 2);
+        add_filter("default_option_editor_image", array($this, "merge_legacy_image_options"), 10, 3);
+        add_filter("option_editor_basics", array($this, "merge_legacy_basics_options"), 10, 2);
+
+        add_action("update_option_editor_basics", array($this, "drop_legacy_new_tab_key"));
+
+        add_action("admin_notices", array($this, "print_webp_suggestion"));
+        add_action("admin_post_editormd_switch_to_webp", array($this, "handle_switch_to_webp"));
+        add_action("admin_post_editormd_dismiss_webp_notice", array($this, "handle_dismiss_webp_notice"));
     }
 
     public function enqueue_settings_assets() {
@@ -115,6 +132,215 @@ class Settings {
         $page = isset($_GET["page"]) ? sanitize_key(wp_unslash($_GET["page"])) : "";
 
         return "wp-editormd-settings" === $page;
+    }
+
+    private function image_format_desc() {
+        $desc = __("WebP is the smallest of the three at the same quality. JPG drops transparency; PNG stays lossless but largest.", $this->text_domain);
+
+        if (! function_exists("imagewebp")) {
+            $desc .= " " . __("This server cannot write WebP, so WebP is saved as JPG.", $this->text_domain);
+        }
+
+        return $desc;
+    }
+
+    public function print_image_option_toggle() {
+        if (! $this->is_settings_page()) {
+            return;
+        }
+        ?>
+        <script>
+        (function () {
+          var keep = document.querySelector('input[type=checkbox][name="editor_image[image_keep_origin]"]');
+          if (!keep) {
+            return;
+          }
+
+          var rows = ["image_format", "image_quality"].map(function (name) {
+            var field = document.querySelector(
+              'select[name="editor_image[' + name + ']"], input[name="editor_image[' + name + ']"]'
+            );
+            return field ? field.closest("tr") : null;
+          }).filter(Boolean);
+
+          var sync = function () {
+            rows.forEach(function (row) {
+              row.style.display = keep.checked ? "none" : "";
+            });
+          };
+
+          keep.addEventListener("change", sync);
+          sync();
+        })();
+        </script>
+        <?php
+    }
+
+    private static $legacy_image_keys = array(
+        "imagepaste",
+        "image_link",
+    );
+
+    private static $basics_merge_depth = 0;
+
+    public function merge_legacy_image_options($value, $option) {
+        $legacy = get_option("editor_basics");
+        $legacy = is_array($legacy) ? $legacy : array();
+
+        $merged = is_array($value) ? $value : array();
+
+        $keys = array(
+            "imagepaste",
+            "image_keep_origin",
+            "image_format",
+            "image_quality",
+            "image_to_library",
+            "image_open_library",
+            "image_link",
+        );
+
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $merged) && array_key_exists($key, $legacy)) {
+                $merged[$key] = $legacy[$key];
+            }
+        }
+
+        $is_legacy_site = array_key_exists("imagepaste", $legacy)
+            && ! array_key_exists("image_keep_origin", $legacy);
+
+        if ($is_legacy_site) {
+            $legacy_defaults = array(
+                "image_keep_origin"  => "off",
+                "image_format"       => "jpg",
+                "image_quality"      => "50",
+                "image_to_library"   => "on",
+                "image_open_library" => "off",
+            );
+
+            foreach ($legacy_defaults as $key => $fallback) {
+                if (! array_key_exists($key, $merged)) {
+                    $merged[$key] = $fallback;
+                }
+            }
+        }
+
+        return empty($merged) ? $value : $merged;
+    }
+
+    public function merge_legacy_basics_options($value, $option) {
+        if (! is_array($value) || 0 !== self::$basics_merge_depth) {
+            return $value;
+        }
+
+        self::$basics_merge_depth++;
+
+        try {
+            if (! array_key_exists("support_emoji", $value)) {
+                $legacy = get_option("editor_emoji");
+                if (is_array($legacy) && array_key_exists("support_emoji", $legacy)) {
+                    $value["support_emoji"] = $legacy["support_emoji"];
+                }
+            }
+
+            if (! array_key_exists("open_in_new_tab", $value)) {
+                $image = get_option("editor_image");
+                if (is_array($image) && array_key_exists("open_in_new_tab", $image)) {
+                    $value["open_in_new_tab"] = $image["open_in_new_tab"];
+                }
+            }
+        } finally {
+            self::$basics_merge_depth--;
+        }
+
+        return $value;
+    }
+
+    public function drop_legacy_new_tab_key() {
+        $image = get_option("editor_image");
+        if (! is_array($image) || ! array_key_exists("open_in_new_tab", $image)) {
+            return;
+        }
+
+        unset($image["open_in_new_tab"]);
+        update_option("editor_image", $image);
+    }
+
+    public function print_webp_suggestion() {
+        if (! $this->is_settings_page() || ! current_user_can("manage_options")) {
+            return;
+        }
+
+        if (isset($_GET["editormd-webp"]) && "1" === $_GET["editormd-webp"]) {
+            echo '<div class="notice notice-success is-dismissible"><p>'
+                . esc_html__("Done. New images will be saved as WebP.", $this->text_domain)
+                . '</p></div>';
+        }
+
+        if (get_user_meta(get_current_user_id(), "editormd_webp_notice_dismissed", true)) {
+            return;
+        }
+
+        $options = get_option("editor_image");
+        $options = is_array($options) ? $options : array();
+
+        if ("off" !== (isset($options["image_keep_origin"]) ? $options["image_keep_origin"] : "on")) {
+            return;
+        }
+
+        if ("jpg" !== (isset($options["image_format"]) ? $options["image_format"] : "")) {
+            return;
+        }
+
+        $switch = wp_nonce_url(
+            admin_url("admin-post.php?action=editormd_switch_to_webp"),
+            "editormd_webp_suggestion"
+        );
+        $dismiss = wp_nonce_url(
+            admin_url("admin-post.php?action=editormd_dismiss_webp_notice"),
+            "editormd_webp_suggestion"
+        );
+
+        echo '<div class="notice notice-info"><p><strong>'
+            . esc_html__("Your images are still compressed to JPG.", $this->text_domain)
+            . '</strong> '
+            . esc_html__("WebP looks the same or better at roughly half the size, and every browser released in the last few years can display it. You can switch the format in Image Settings.", $this->text_domain)
+            . '</p><p><a href="' . esc_url($switch) . '" class="button button-primary">'
+            . esc_html__("Switch to WebP", $this->text_domain)
+            . '</a> <a href="' . esc_url($dismiss) . '" class="button">'
+            . esc_html__("Don't show this again", $this->text_domain)
+            . '</a></p></div>';
+    }
+
+    public function handle_switch_to_webp() {
+        if (! current_user_can("manage_options")) {
+            wp_die(esc_html__("You are not allowed to do that.", $this->text_domain));
+        }
+
+        check_admin_referer("editormd_webp_suggestion");
+
+        $options = get_option("editor_image");
+        $options = is_array($options) ? $options : array();
+        $options["image_format"] = "webp";
+        update_option("editor_image", $options);
+
+        wp_safe_redirect(add_query_arg(
+            array("page" => "wp-editormd-settings", "editormd-webp" => "1"),
+            admin_url("options-general.php")
+        ));
+        exit;
+    }
+
+    public function handle_dismiss_webp_notice() {
+        if (! current_user_can("manage_options")) {
+            wp_die(esc_html__("You are not allowed to do that.", $this->text_domain));
+        }
+
+        check_admin_referer("editormd_webp_suggestion");
+
+        update_user_meta(get_current_user_id(), "editormd_webp_notice_dismissed", 1);
+
+        wp_safe_redirect(add_query_arg("page", "wp-editormd-settings", admin_url("options-general.php")));
+        exit;
     }
 
     public function sanitize_section($value, $old_value, $option) {
@@ -156,6 +382,16 @@ class Settings {
                         ? (string) $item
                         : (string) $old_item;
                     break;
+                case "number":
+                    $number = (int) $item;
+                    $clean[$key] = ($number >= 1 && $number <= 100) ? (string) $number : (string) $old_item;
+                    break;
+                case "image_format":
+                    $format = strtolower(trim((string) $item));
+                    $clean[$key] = in_array($format, array("jpg", "png", "webp"), true)
+                        ? $format
+                        : (string) $old_item;
+                    break;
                 case "text":
                 default:
                     $clean[$key] = sanitize_text_field((string) $item);
@@ -166,6 +402,22 @@ class Settings {
         foreach ($old as $key => $item) {
             if (! array_key_exists($key, $clean) && array_key_exists($key, $allowed)) {
                 $clean[$key] = $item;
+            }
+        }
+
+        if ("editor_basics" === $option) {
+            $legacy_keep = array_merge(self::$legacy_image_keys, array(
+                "image_keep_origin",
+                "image_format",
+                "image_quality",
+                "image_to_library",
+                "image_open_library",
+            ));
+
+            foreach ($legacy_keep as $key) {
+                if (! array_key_exists($key, $clean) && array_key_exists($key, $old)) {
+                    $clean[$key] = $old[$key];
+                }
             }
         }
 
@@ -191,7 +443,6 @@ class Settings {
 
         $addres = isset($style_option["editor_addres"]) ? (string) $style_option["editor_addres"] : "";
 
-        // 只迁移 wp.org 那条已下线的通道，用户自己填的 jsDelivr 地址不能被覆盖
         if ("" !== $addres && preg_match("#cdn\.jsdelivr\.net/wp/wp-editormd#i", $addres)) {
             $style_option["editor_addres"] = self::default_static_address();
             update_option("editor_style", $style_option);
@@ -357,12 +608,12 @@ class Settings {
                 "title" => __("Editor Style Settings", $this->text_domain)
             ),
             array(
-                "id"    => "syntax_highlighting",
-                "title" => __("Syntax Highlighting Settings", $this->text_domain)
+                "id"    => "editor_image",
+                "title" => __("Image Settings", $this->text_domain)
             ),
             array(
-                "id"    => "editor_emoji",
-                "title" => __("Emoji Settings", $this->text_domain)
+                "id"    => "syntax_highlighting",
+                "title" => __("Syntax Highlighting Settings", $this->text_domain)
             ),
             array(
                 "id"    => "editor_toc",
@@ -455,25 +706,11 @@ class Settings {
                     'default' => 'off'
                 ),
                 array(
-                    'name'    => 'imagepaste',
-                    'label'   => __('Support Image Paste', $this->text_domain),
-                    'desc'    => __('Image Paste allows you to copy and paste images from your desktop to the editor, maybe won\'t work on some browsers due to incompatibility. Reference: <a href="https://github.com/LuRenJiasWorld/WP-Editor.md/pull/386" target="_blank">PR #386</a>', $this->text_domain),
+                    'name'    => 'support_emoji',
+                    'label'   => __('Support Emoji', $this->text_domain),
+                    'desc'    => __('Turns shortcuts like :smile: into emoji images on the published page. Emoji you type or paste yourself (😄) display normally either way — this option does not affect them.', $this->text_domain),
                     'type'    => 'checkbox',
                     'default' => 'off'
-                ),
-                array(
-                    'name'    => 'image_link',
-                    'label'   => __('Image Hyperlink', $this->text_domain),
-                    'desc'    => __('Support upload image hyperlink', $this->text_domain),
-                    'type'    => 'checkbox',
-                    'default' => 'off'
-                ),
-                array(
-                    'name'    => 'open_in_new_tab',
-                    'label'   => __('Open link in new tab', $this->text_domain),
-                    'desc'    => __('Only works for new posts after enabled, or you can manually update every posts', $this->text_domain),
-                    'type'    => 'checkbox',
-                    'default' => 'on'
                 ),
                 array(
                     'name'    => 'live_preview',
@@ -495,6 +732,13 @@ class Settings {
                     'desc'    => __('Support rich text analysis', $this->text_domain),
                     'type'    => 'checkbox',
                     'default' => 'off'
+                ),
+                array(
+                    'name'    => 'open_in_new_tab',
+                    'label'   => __('Open link in new tab', $this->text_domain),
+                    'desc'    => __('Applies to every link in Markdown posts — text links as well as image links. Existing posts are covered too: the new-tab behaviour is added when the page loads, so nothing needs to be re-saved.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'on'
                 ),
                 array(
                     'name'    => 'support_front',
@@ -528,6 +772,65 @@ class Settings {
                     'desc'    => __('', $this->text_domain),
                     'type'    => 'text',
                     'default' => ''
+                )
+            ),
+            'editor_image'        => array(
+                array(
+                    'name'    => 'imagepaste',
+                    'label'   => __('Support Image Drag & Drop / Paste', $this->text_domain),
+                    'desc'    => __('Insert an image by pasting it or dragging it into the editor. If nothing happens after pasting or dropping, what arrived was a file name or path rather than the image file itself.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'off'
+                ),
+                array(
+                    'name'    => 'image_keep_origin',
+                    'label'   => __('Keep images as they are', $this->text_domain),
+                    'desc'    => __('Uploaded as-is: no re-encoding, no quality loss, transparent backgrounds preserved. Turn this off to compress new images into the format below.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'on'
+                ),
+                array(
+                    'name'    => 'image_format',
+                    'label'   => __('Compress images to', $this->text_domain),
+                    'desc'    => $this->image_format_desc(),
+                    'type'    => 'select',
+                    'options' => array(
+                        'webp' => 'WebP',
+                        'jpg'  => 'JPG',
+                        'png'  => 'PNG'
+                    ),
+                    'default' => 'webp'
+                ),
+                array(
+                    'name'    => 'image_quality',
+                    'label'   => __('Compression quality', $this->text_domain),
+                    'desc'    => __('Lower means smaller files and less detail. Applies to JPG and WebP only.', $this->text_domain),
+                    'type'    => 'number',
+                    'min'     => 1,
+                    'max'     => 100,
+                    'step'    => 1,
+                    'default' => '80'
+                ),
+                array(
+                    'name'    => 'image_to_library',
+                    'label'   => __('Save uploaded images to the Media Library', $this->text_domain),
+                    'desc'    => __('Images you paste or drop are added to the Media Library, so you can find them later and reuse them elsewhere.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'on'
+                ),
+                array(
+                    'name'    => 'image_open_library',
+                    'label'   => __('Open Media Library after upload', $this->text_domain),
+                    'desc'    => __('The image goes straight into your post. Turn this on to also open the Media Library, so you can give it a title, description or alt text right away. Needs the option above.', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'off'
+                ),
+                array(
+                    'name'    => 'image_link',
+                    'label'   => __('Image Hyperlink', $this->text_domain),
+                    'desc'    => __('Support upload image hyperlink', $this->text_domain),
+                    'type'    => 'checkbox',
+                    'default' => 'off'
                 )
             ),
             'editor_style'        => array(
@@ -711,15 +1014,6 @@ class Settings {
                     'desc'    => __('Get More <a href="https://github.com/LuRenJiasWorld/Prism.js-style" target="_blank" rel="nofollow">Theme Style</a>', $this->text_domain),
                     'type'    => 'text',
                     'default' => 'notiong'
-                )
-            ),
-            'editor_emoji'        => array(
-                array(
-                    'name'    => 'support_emoji',
-                    'label'   => __('Support Emoji', $this->text_domain),
-                    'desc'    => __('', $this->text_domain),
-                    'type'    => 'checkbox',
-                    'default' => 'off'
                 )
             ),
             'editor_toc'          => array(

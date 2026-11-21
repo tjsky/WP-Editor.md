@@ -10,6 +10,7 @@ class Config {
     private static $allowed_sections = array(
         "editor_basics",
         "editor_style",
+        "editor_image",
         "syntax_highlighting",
         "editor_emoji",
         "editor_toc",

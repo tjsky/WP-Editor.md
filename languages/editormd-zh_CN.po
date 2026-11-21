@@ -111,8 +111,8 @@ msgstr "站点地址"
 msgid "If you need to enable this option,you need install the plugin"
 msgstr "如果你要启用该功能，则需要安装该插件"
 
-msgid "Image Paste allows you to copy and paste images from your desktop to the editor, maybe won't work on some browsers due to incompatibility. Reference: <a href=\"https://github.com/LuRenJiasWorld/WP-Editor.md/pull/386\" target=\"_blank\">PR #386</a>"
-msgstr "让编辑器支持粘贴图像（该功能在一部分浏览器下存在兼容性问题，无法使用，参考<a href=\"https://github.com/LuRenJiasWorld/WP-Editor.md/pull/386\" target=\"_blank\">此链接</a>）"
+msgid "Insert an image by pasting it or dragging it into the editor. If nothing happens after pasting or dropping, what arrived was a file name or path rather than the image file itself."
+msgstr "让编辑器支持粘贴/拖拽插入图像（如果拖拽/粘贴后没有反应，说明粘贴/拖拽过来的不是图像文件本身，而是它的文件名或者路径）"
 
 msgid "Image Uploading..."
 msgstr "图片上传中..."
@@ -197,8 +197,8 @@ msgstr "启用该功能则支持流程图，时序图和甘特图"
 msgid "Support Html Decode"
 msgstr "支持HTML"
 
-msgid "Support Image Paste"
-msgstr "支持图像粘贴"
+msgid "Support Image Drag & Drop / Paste"
+msgstr "支持图像拖拽/粘贴"
 
 msgid "Support LaTeX"
 msgstr "支持科学公式"
@@ -345,8 +345,8 @@ msgstr "在新标签页中打开链接"
 msgid "Support upload image hyperlink"
 msgstr "上传图片自动添加图片链接"
 
-msgid "Only works for new posts after enabled, or you can manually update every posts"
-msgstr "只对新文章生效，也可以通过手动更新（不做修改，只更新）的方式来对旧文章生效"
+msgid "Applies to every link in Markdown posts — text links as well as image links. Existing posts are covered too: the new-tab behaviour is added when the page loads, so nothing needs to be re-saved."
+msgstr "对 Markdown 文章里的所有链接生效，文字链接和图片链接都算。已发布的文章同样适用：新标签页行为在页面加载时添加，不需要重新保存。"
 
 msgid "Use local"
 msgstr "使用本地资源"
@@ -524,3 +524,103 @@ msgstr "来自别的主机、但未加 integrity 的资源"
 #: src/Utils/Debugger.php
 msgid "Files used by this plugin that have no integrity entry"
 msgstr "本插件会用到、但没有 integrity 条目的文件"
+
+#: src/Utils/Settings.php
+msgid "Image quality"
+msgstr "图片清晰度"
+
+#: src/Utils/Settings.php
+msgid "Higher is sharper but larger. Only applies to images that need re-encoding."
+msgstr "越高越清晰，文件也越大。只对需要重新编码的图片生效。"
+
+#: src/Utils/Settings.php
+msgid "Keep transparent backgrounds"
+msgstr "保留透明背景"
+
+#: src/Utils/Settings.php
+msgid "Pasted or dropped PNG, GIF and WebP images stay in their original format instead of being flattened onto white."
+msgstr "粘贴或拖入的 PNG、GIF、WebP 图片保持原格式，不会被铺成白底。"
+
+#: src/Utils/Settings.php
+msgid "Save uploaded images to the Media Library"
+msgstr "自动存入媒体库"
+
+#: src/Utils/Settings.php
+msgid "Images you paste or drop are added to the Media Library, so you can find them later and reuse them elsewhere."
+msgstr "粘贴或拖入的图片会加入媒体库，以后能在这里找到并重复使用。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Open Media Library after upload"
+msgstr "上传后打开媒体库"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "The image goes straight into your post. Turn this on to also open the Media Library, so you can give it a title, description or alt text right away. Needs the option above."
+msgstr "图片会直接插入正文。打开这一项后，会同时弹出媒体库，方便顺手补上标题、说明或替代文本。需要同时开启上一项。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Media Library"
+msgstr "媒体库"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Close"
+msgstr "关闭"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Keep images as they are"
+msgstr "图像粘贴保持原格式"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Uploaded as-is: no re-encoding, no quality loss, transparent backgrounds preserved. Turn this off to compress new images into the format below."
+msgstr "图片原样上传，不转码、不压缩，透明背景也保留。关掉这一项，才会按下面的格式压缩。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Compress images to"
+msgstr "图片压缩转码格式"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "WebP is the smallest of the three at the same quality. JPG drops transparency; PNG stays lossless but largest."
+msgstr "同样清晰度下 WebP 体积最小；JPG 不支持透明；PNG 无损但体积最大。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "This server cannot write WebP, so WebP is saved as JPG."
+msgstr "这台服务器无法生成 WebP，选了会存成 JPG。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Compression quality"
+msgstr "图片压缩率"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Lower means smaller files and less detail. Applies to JPG and WebP only."
+msgstr "数值越低文件越小、细节越少。只对 JPG 和 WebP 生效。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Image Settings"
+msgstr "图片设置"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Turns shortcuts like :smile: into emoji images on the published page. Emoji you type or paste yourself (😄) display normally either way — this option does not affect them."
+msgstr "把 :smile: 这类短代码在文章页转成 Emoji 图片。你自己输入或粘贴的 Emoji 字符（如 😄）本来就能正常显示，不受这一项影响。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Your images are still compressed to JPG."
+msgstr "你的图片目前仍会压缩成 JPG。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "WebP looks the same or better at roughly half the size, and every browser released in the last few years can display it. You can switch the format in Image Settings."
+msgstr "在体积约为一半的情况下，WebP 的画质与 JPG 相当甚至更好，近几年发布的浏览器都能显示。你可以在「图片设置」里换过去。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Switch to WebP"
+msgstr "换成 WebP"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Don't show this again"
+msgstr "不再提示"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "Done. New images will be saved as WebP."
+msgstr "已切换，新上传的图片会存成 WebP。"
+
+#: src/Utils/Settings.php src/Admin/Controller.php
+msgid "You are not allowed to do that."
+msgstr "你没有权限执行此操作。"

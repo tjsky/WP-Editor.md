@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.4
+Stable tag: 10.5.5
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,20 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.5 =
+* 缺陷修复：语言名写成 objective-c、c++、c#、f#、vb.net 的代码块整块不解析，
+  连围栏一起原样输出。现在可以正常渲染，语言名也会转换成语法高亮库认的写法
+* 缺陷修复：代码块里出现过长的单行时横向溢出、把页面撑宽。现在改为在代码块内横向滚动
+* 缺陷修复：正文里的行内代码没有底纹，与普通文字混在一起。现在带浅色背景与圆角
+* 功能改进：粘贴的图片会登记到媒体库，可参与缩略图生成与后续优化（设置页可关闭）
+* 功能改进：粘贴的图片默认原样上传，不转码也不压缩，透明背景与动图都保留
+* 功能改进：关掉「保持原格式」后，可按设置压缩成 JPG / PNG / WebP（默认 WebP），压缩率可调（默认 80）
+* 功能改进：拖入图片与粘贴走同一条上传路径，原始文件名与照片说明（EXIF）会带进媒体库
+* 功能改进：上传完成后可自动打开媒体库，方便补标题、说明或替代文本（默认关闭）
+* 功能改进：设置页重组，图片 7 项独立成「图片设置」，Emoji 开关并入常规设置（「在新标签页中打开链接」仍属常规设置，它对文字链接同样生效）
+* 缺陷修复：直接覆盖插件文件升级时，图片设置可能丢失
+* 功能改进：老版本升级后保持原有图片压缩行为，并提示可以换成 WebP
 
 = 10.5.4 =
 * 缺陷修复：10.5.3 的 CDN 静态资源与安装包里的文件不是同一份构建产物（压缩器版本不同，

@@ -469,6 +469,87 @@ require("./editormd.css");
     );
   }
 
+  /* ------------------------------------------------- 预览：围栏语言名规范化 */
+  /*
+   * 预览侧把围栏后面的语言名直接拼进 class="language-xxx"，语言名里只要出现
+   * # 或 + ，HTML 属性就会被截断：
+   *     ```C#    → class="language-c"（# 之后的部分被当成另一个属性）
+   *     ```C++   → class="language-c"
+   *     ```f#    → class="language-f"，Prism 会去加载 prism-f.min.js
+   * 结果就是 C# 用 C 的语法高亮、f# 用 f 的语法高亮，语言标签也显示错。
+   *
+   * 服务端保存时已经做过同一份映射（WPMarkdownParser::normalize_code_language），
+   * 这里必须保持一致，否则又会出现「预览一个样、发布另一个样」。
+   */
+
+  var FENCE_OPEN_RE = /^([ \t]{0,3})(`{3,}|~{3,})[ \t]*([^\s`~]+)[ \t]*$/;
+  var FENCE_BARE_RE = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/;
+
+  var FENCE_LANG_ALIASES = {
+    "objective-c": "objectivec",
+    "objc": "objectivec",
+    "c++": "cpp",
+    "c#": "csharp",
+    "cs": "csharp",
+    "f#": "fsharp",
+    "fs": "fsharp",
+    "vb.net": "vbnet",
+    "vb": "vbnet",
+    "shell": "bash",
+    "sh": "bash",
+    "yml": "yaml",
+  };
+
+  /**
+   * 把围栏代码块起始行的语言名换成 Prism 认的写法。
+   *
+   * 只动起始行，围栏内的内容一概不碰；行内代码不在行首，天然不会被误改。
+   *
+   * @param {string} src Markdown 原文
+   * @returns {string}
+   */
+  function normalizeFenceLanguages(src) {
+    if (typeof src !== "string" || (src.indexOf("```") === -1 && src.indexOf("~~~") === -1)) {
+      return src;
+    }
+
+    var lines = src.split("\n");
+    var inFence = false;
+    var fenceChar = "";
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      if (inFence) {
+        var closing = FENCE_BARE_RE.exec(line);
+        if (closing && closing[1].charAt(0) === fenceChar) {
+          inFence = false;
+          fenceChar = "";
+        }
+        continue;
+      }
+
+      var opened = FENCE_OPEN_RE.exec(line);
+      if (opened) {
+        inFence = true;
+        fenceChar = opened[2].charAt(0);
+
+        var lang = opened[3].replace(/^\./, "");
+        var key = lang.toLowerCase();
+        lines[i] = opened[1] + opened[2] + (FENCE_LANG_ALIASES[key] || key);
+        continue;
+      }
+
+      var bare = FENCE_BARE_RE.exec(line);
+      if (bare) {
+        inFence = true;
+        fenceChar = bare[1].charAt(0);
+      }
+    }
+
+    return lines.join("\n");
+  }
+
   /* ------------------------------------------------------------- 包装安装 */
 
   function wrapMarked(original) {
@@ -477,7 +558,7 @@ require("./editormd.css");
     }
 
     var wrapped = function (src, options) {
-      return original.call(this, rewriteSource(src), options);
+      return original.call(this, normalizeFenceLanguages(rewriteSource(src)), options);
     };
     wrapped.__wpEditormdWrapped = true;
 
@@ -1409,6 +1490,181 @@ require("./editormd.css");
     // wp_ajax_（没有 nopriv 变体），匿名访客粘贴图片必然失败 —— 结果只是在评论框里
     // 插入一个「上传失败」占位符。图片在简版里通过「图片地址」按钮插入。
     if (editor.imagePaste === "on" && !isSimpleComment) {
+      /* 媒体库弹窗（按设置在上传完成后打开） */
+      var mediaFrame = null;
+      var mediaFrameOpen = false;
+
+      /**
+       * 打开媒体库并选中刚上传的那张图。
+       *
+       * 图片此时已经写进正文了，这个弹窗只是给「补标题 / 说明 / 替代文本」
+       * 提供一个入口，所以按钮写「关闭」而不是「插入」——再插一次会重复。
+       *
+       * 需要拿到附件 ID（即「自动存入媒体库」也开着）；拿不到就什么都不做。
+       *
+       * @param {number} attachmentId
+       */
+      var openMediaLibrary = function (attachmentId) {
+        if (!attachmentId || typeof wp === "undefined" || !wp.media) {
+          return;
+        }
+
+        var selectUploaded = function (frame) {
+          var selection = frame.state().get("selection");
+          var attachment = wp.media.attachment(attachmentId);
+
+          if (!attachment) {
+            return;
+          }
+
+          // 新建的附件模型还没有数据，fetch 回来之后才会渲染详情，
+          // 所以拉取完成后要再选一次，否则网格里高亮的是上一张。
+          selection.reset([attachment]);
+          if (attachment.fetch) {
+            attachment.fetch().done(function () {
+              selection.reset([attachment]);
+            });
+          }
+        };
+
+        // 连续粘贴多张时不再叠弹窗，只把选中项换成最新那张
+        if (mediaFrame && mediaFrameOpen) {
+          selectUploaded(mediaFrame);
+          return;
+        }
+
+        mediaFrame = wp.media({
+          title: editor.mediaLibraryTitle || "Media Library",
+          button: {
+            text: editor.mediaLibraryClose || "Close",
+          },
+          library: {
+            type: "image",
+          },
+          multiple: false,
+        });
+
+        mediaFrame.on("open", function () {
+          mediaFrameOpen = true;
+          selectUploaded(mediaFrame);
+        });
+
+        mediaFrame.on("close", function () {
+          mediaFrameOpen = false;
+        });
+
+        // 点按钮只是关掉，不往正文里再插一次
+        mediaFrame.on("select", function () {
+          mediaFrame.close();
+        });
+
+        mediaFrame.open();
+      };
+
+      /**
+       * 上传一张图片文件。
+       *
+       * 10.5.5：改为上传原始文件，不再先转 base64。这样文件名与 EXIF 能一路带到
+       * 媒体库（标题、说明都能填上），缩略图也交给 WordPress 生成。
+       * 剪贴板截图本身没有文件名，但同样是文件对象，走同一条路径没有额外成本。
+       *
+       * @param {File}   file     图片文件
+       * @param {string} fileName 文件名（部分设备会把它当文本一起粘进来）
+       * @param {Object} cursor   插入位置
+       */
+      var uploadImageFile = function (file, fileName, cursor) {
+        var uploadingText = "![" + editor.imgUploading + "]";
+        var uploadFailText = "![" + editor.imgUploadeFailed + "]";
+
+        wpEditormd.insertValue(uploadingText);
+
+        // 去除部分设备下粘贴时出现的文件名（如 MacOS）
+        if (fileName) {
+          wpEditormd.setValue(wpEditormd.getValue().replace(fileName, ""));
+          cursor.ch = Math.max(0, cursor.ch - fileName.length);
+        }
+
+        var form = new FormData();
+        form.append("action", "wp_editormd_imageupload");
+        form.append("file", file, fileName || file.name || "pasted-image.png");
+
+        var nonce = (window._EditormdNonce && window._EditormdNonce.imagepasteNonce) ||
+          (window._Editormd && window._Editormd.imagepasteNonce);
+        if (nonce) {
+          form.append("_wpnonce", nonce);
+        }
+
+        $.ajax({
+          url: ajaxurl,
+          type: "POST",
+          data: form,
+          processData: false,
+          contentType: false,
+          success: function (obj) {
+            var markdown;
+            if (!obj || obj.error) {
+              markdown = wpEditormd.getValue().replace(uploadingText, uploadFailText);
+            } else if (editor.imageLink === "on") {
+              markdown = wpEditormd.getValue().replace(uploadingText, "[![](" + obj.url + ")](" + obj.url + ")");
+            } else {
+              markdown = wpEditormd.getValue().replace(uploadingText, "![](" + obj.url + ")");
+            }
+
+            wpEditormd.setValue(markdown);
+
+            // 移动光标
+            cursor.ch = cursor.ch + markdown.length;
+            wpEditormd.setCursor(cursor);
+            wpEditormd.focus();
+
+            // 10.5.5：按设置打开媒体库，方便顺手补标题 / 说明 / 替代文本
+            if (editor.imageOpenLibrary === "on" && obj && obj.id) {
+              openMediaLibrary(parseInt(obj.id, 10));
+            }
+          },
+          error: function () {
+            wpEditormd.setValue(wpEditormd.getValue().replace(uploadingText, uploadFailText));
+          },
+          complete: function () {
+            hideLoader();
+          },
+        });
+      };
+
+      /* 拖入图片：与粘贴走同一条上传路径 */
+      var dropTarget = document.getElementById(textareaID);
+      if (dropTarget) {
+        dropTarget.addEventListener("dragover", function (e) {
+          if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.indexOf("Files") !== -1) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }, false);
+
+        dropTarget.addEventListener("drop", function (e) {
+          var dt = e.dataTransfer;
+          if (!dt || !dt.files || !dt.files.length) {
+            return;
+          }
+
+          var file = dt.files[0];
+          if (!file || 0 !== file.type.indexOf("image/")) {
+            return;
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          var cursor = {
+            line: wpEditormd.getCursor().line,
+            ch: wpEditormd.getCursor().ch,
+          };
+
+          showLoader();
+          uploadImageFile(file, file.name || "", cursor);
+        }, false);
+      }
+
       $("#" + textareaID).on("paste", function (event) {
         event = event.originalEvent;
         var cbd = window.clipboardData || event.clipboardData; //兼容ie||chrome
@@ -1449,53 +1705,14 @@ require("./editormd.css");
 
 
           var blob = item.getAsFile();
-          if (blob.size === 0) {
+          if (!blob || blob.size === 0) {
             return;
           }
 
           showLoader();
 
-          //传参
-          readBlobAsDataURL(blob, function (dataurl) {
-            var uploadingText = "![" + editor.imgUploading + "]";
-            var uploadFailText = "![" + editor.imgUploadeFailed + "]";
-            var data = {
-              action: "wp_editormd_imagepaste",
-              dataurl: dataurl,
-            };
-            wpEditormd.insertValue(uploadingText);
-
-            // 去除部分设备下粘贴时出现的文件名（如MacOS）
-            wpEditormd.setValue(wpEditormd.getValue().replace(fileName, ""));
-            nowCursor.ch = nowCursor.ch - fileName.length;
-
-            $.ajax({
-              url: ajaxurl,
-              type: "POST",
-              data: data,
-              success: function (obj) {
-                let pasteMarkdownText;
-                if (obj.error) {
-                  pasteMarkdownText = wpEditormd.getValue().replace(uploadingText, uploadFailText);
-                } else {
-                  if ( editor.imageLink === "on" ) {
-                    pasteMarkdownText = wpEditormd.getValue().replace(uploadingText, "[" + "![](" + obj.url + ")" + "](" + obj.url + ")");
-                  } else {
-                    pasteMarkdownText = wpEditormd.getValue().replace(uploadingText, "![](" + obj.url + ")");
-                  }
-                }
-                wpEditormd.setValue(pasteMarkdownText);
-
-                // 移动光标
-                nowCursor.ch = nowCursor.ch + pasteMarkdownText.length;
-                wpEditormd.setCursor(nowCursor);
-                wpEditormd.focus();
-              },
-              complete: function() {
-                hideLoader();
-              },
-            });
-          });
+          // 上传原始文件：文件名与 EXIF 都能保留下来
+          uploadImageFile(blob, fileName, nowCursor);
         }
       });
     }
@@ -1517,7 +1734,11 @@ require("./editormd.css");
   editormd.mindMapURL = splitFileName(editor.mindMapURL);
 
   // KaTeX科学公式配置
-  // 开关取值是 katex（select），原先写成 on 导致这里永不成立
+  //
+  // 注意开关的取值是 "katex"（设置里 support_latex 是个 select，选项值为 katex /
+  // mathjax / off），不是 "on"。原先写成 "on" 导致这里永远不生效：KaTeX 一直走
+  // Editor.md 内置的 `cdn.jsdelivr.net/npm/katex` —— 既不受「静态资源地址」控制
+  // （换 CDN 时这一块不会跟着走），也拿不到 integrity 校验。
   if (editor.tex === "katex") {
     editormd.katexURL = {
       css: cdn_url(editor.editormdUrl, "katex") + "/katex.min",
@@ -1596,15 +1817,6 @@ require("./editormd.css");
     } else {
       return text;
     }
-  }
-
-  //封装FileReader对象
-  function readBlobAsDataURL(blob, callback) {
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      callback(e.target.result);
-    };
-    reader.readAsDataURL(blob);
   }
 
   function showLoader() {

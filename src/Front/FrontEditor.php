@@ -41,7 +41,6 @@ class FrontEditor {
         $this->version          = WP_EDITORMD_VER;
         $this->front_static_url = Config::get_option("editor_addres", "editor_style");
 
-        // 尚未进过后台时该键为空，拼出来会是站点根下的 /assets/...（必然 404）
         if ("" === $this->front_static_url) {
             $this->front_static_url = Settings::default_static_address();
         }
@@ -138,15 +137,15 @@ class FrontEditor {
             "syncScrolling"     => Config::get_option("sync_scrolling", "editor_basics"),        // 编辑器同步
             "livePreview"       => Config::get_option("live_preview", "editor_basics"),          // 即是否开启实时预览
             "htmlDecode"        => Config::get_option("html_decode", "editor_basics"),           // HTML标签解析
-            "imageLink"         => Config::get_option("image_link", "editor_basics"),            // 图片链接
+            "imageLink"         => Config::get_option("image_link", "editor_image"),            // 图片链接
             "toc"               => Config::get_option("support_toc", "editor_toc"),              // TOC
             "theme"             => $front_theme,                                                 // 编辑器总体主题
             "previewTheme"      => $front_preview_theme,                                         // 编辑器预览主题
             "editorTheme"       => $front_code_style,                                            // 编辑器编辑主题
-            "emoji"             => Config::get_option("support_emoji", "editor_emoji"),          // emoji表情
+            "emoji"             => Config::get_option("support_emoji", "editor_basics"),          // emoji表情
             "tex"               => Config::get_option("support_latex", "editor_latex"),          // 科学公式
             "taskList"          => Config::get_option("task_list", "editor_basics"),             // task lists
-            "imagePaste"        => Config::get_option("imagepaste", "editor_basics"),            // 图像粘贴
+            "imagePaste"        => Config::get_option("imagepaste", "editor_image"),            // 图像粘贴
             "prismTheme"        => $prismTheme,                                                  // 语法高亮风格
             "prismLineNumbers"  => Config::get_option("line_numbers", "syntax_highlighting"),    // 行号显示
             "mindMap"           => Config::get_option("support_mindmap", "editor_mindmap"),      // 思维导图

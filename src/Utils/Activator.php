@@ -26,8 +26,8 @@ class Activator {
         $defaults = array(
             "editor_basics"       => self::$defaultOptionsBasics,
             "editor_style"        => self::$defaultOptionsStyle,
+            "editor_image"        => self::initial_image_options(),
             "syntax_highlighting" => self::$defaultOptionsSyntax,
-            "editor_emoji"        => self::$defaultOptionsEmoji,
             "editor_toc"          => self::$defaultOptionsToc,
             "editor_latex"        => self::$defaultOptionsKatex,
             "editor_mermaid"      => self::$defaultOptionsMermaid,
@@ -49,18 +49,63 @@ class Activator {
         new Upgrader();
     }
 
+    private static function initial_image_options() {
+        $options = self::$defaultOptionsImage;
+
+        $legacy = get_option("editor_basics");
+        if (! is_array($legacy)) {
+            return $options;
+        }
+
+        foreach (array_keys($options) as $key) {
+            if (array_key_exists($key, $legacy)) {
+                $options[$key] = $legacy[$key];
+            }
+        }
+
+        $is_legacy_site = array_key_exists("imagepaste", $legacy)
+            && ! array_key_exists("image_keep_origin", $legacy);
+
+        if ($is_legacy_site) {
+            $legacy_defaults = array(
+                "image_keep_origin"  => "off",
+                "image_format"       => "jpg",
+                "image_quality"      => "50",
+                "image_to_library"   => "on",
+                "image_open_library" => "off",
+            );
+
+            foreach ($legacy_defaults as $key => $fallback) {
+                if (! array_key_exists($key, $legacy)) {
+                    $options[$key] = $fallback;
+                }
+            }
+        }
+
+        return $options;
+    }
+
     public static $defaultOptionsBasics = array(
         "task_list"           =>  "on",
-        "imagepaste"          =>  "on",
-        "image_link"          =>  "on",
-        "open_in_new_tab"     =>  "on",
         "live_preview"        =>  "on",
         "sync_scrolling"      =>  "on",
         "html_decode"         =>  "on",
         "support_front"       =>  "off",
         "support_reply"       =>  "off",
         "support_other_text"  =>  "",
-        "simple_comment_editor" => "off"
+        "simple_comment_editor" => "off",
+        "support_emoji"       =>  "on",
+        "open_in_new_tab"     =>  "on"
+    );
+
+    public static $defaultOptionsImage = array(
+        "imagepaste"          =>  "on",
+        "image_keep_origin"   =>  "on",
+        "image_format"        =>  "webp",
+        "image_quality"       =>  "80",
+        "image_to_library"    =>  "on",
+        "image_open_library"  =>  "off",
+        "image_link"          =>  "on"
     );
 
     public static $defaultOptionsStyle = array(
@@ -78,10 +123,6 @@ class Activator {
         "copy_clipboard"                 => "on",
         "highlight_library_style"        => "default",
         "customize_my_style"             => "nothing"
-    );
-
-    public static $defaultOptionsEmoji = array(
-        "support_emoji" => "on"
     );
 
     public static $defaultOptionsToc = array(

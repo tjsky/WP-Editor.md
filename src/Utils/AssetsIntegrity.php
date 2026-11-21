@@ -564,7 +564,7 @@ class AssetsIntegrity {
             $list[] = "assets/Mermaid/mermaid.min.js";
         }
 
-        if ("on" === Config::get_option("support_emoji", "editor_emoji")) {
+        if ("on" === Config::get_option("support_emoji", "editor_basics")) {
             $list[] = "assets/Emojify.js/css/basic/emojify.min.css";
             $list[] = "assets/Emojify.js/js/emojify.min.js";
         }

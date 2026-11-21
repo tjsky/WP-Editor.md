@@ -52,10 +52,10 @@ msgstr ""
 msgid "Github Flavored Markdown task lists"
 msgstr ""
 
-msgid "Support Image Paste"
+msgid "Support Image Drag & Drop / Paste"
 msgstr ""
 
-msgid "Image Paste allows you to copy and paste images from your desktop to the editor, maybe won't work on some browsers due to incompatibility. Reference: <a href=\"https://github.com/LuRenJiasWorld/WP-Editor.md/pull/386\" target=\"_blank\">PR #386</a>"
+msgid "Insert an image by pasting it or dragging it into the editor. If nothing happens after pasting or dropping, what arrived was a file name or path rather than the image file itself."
 msgstr ""
 
 msgid "Live preview"
@@ -342,7 +342,7 @@ msgstr ""
 msgid "Support upload image hyperlink"
 msgstr ""
 
-msgid "Only works for new posts after enabled, or you can manually update every posts"
+msgid "Applies to every link in Markdown posts — text links as well as image links. Existing posts are covered too: the new-tab behaviour is added when the page loads, so nothing needs to be re-saved."
 msgstr ""
 
 msgid "Use local"

@@ -6,6 +6,7 @@
 namespace EditormdApp;
 
 use EditormdUtils\Ajax;
+use EditormdUtils\Config;
 
 /**
  * json数据结构：
@@ -53,8 +54,186 @@ class ImagePaste {
 
     private $last_error = "";
 
+    private $uploaded_exif = null;
+
     public function __construct() {
         add_action("wp_ajax_wp_editormd_imagepaste", array($this, "editormd_imagepaste_action_callback"));
+        add_action("wp_ajax_wp_editormd_imageupload", array($this, "editormd_imageupload_action_callback"));
+    }
+
+    public function editormd_imageupload_action_callback() {
+        try {
+            if (! current_user_can("upload_files")) {
+                Ajax::editormd_return_json("", "permission_denied", "");
+            }
+
+            check_ajax_referer("wp_editormd_imagepaste", "_wpnonce");
+
+            if ($this->editormd_rate_limit_exceeded()) {
+                Ajax::editormd_return_json("", "rate_limited", "");
+            }
+
+            if (empty($_FILES["file"]) || ! is_array($_FILES["file"])) {
+                Ajax::editormd_return_json("", "unknown_error", "Missing file");
+            }
+
+            $file = $_FILES["file"];
+
+            if (! empty($file["error"])) {
+                Ajax::editormd_return_json("", "unknown_error", "Upload error code " . (int) $file["error"]);
+            }
+
+            if (empty($file["tmp_name"]) || ! is_uploaded_file($file["tmp_name"])) {
+                Ajax::editormd_return_json("", "unknown_error", "Invalid upload");
+            }
+
+            $size = isset($file["size"]) ? (int) $file["size"] : 0;
+            if ($size <= 0 || $size > self::MAX_BINARY_BYTES) {
+                Ajax::editormd_return_json("", "file_too_large", "");
+            }
+
+            $info = @getimagesize($file["tmp_name"]);
+            if (false === $info || empty($info["mime"]) || ! in_array($info["mime"], self::$allowed_mimes, true)) {
+                Ajax::editormd_return_json("", "file_extension_error");
+            }
+
+            if (! $this->image_dimensions_within_budget((int) $info[0], (int) $info[1])) {
+                Ajax::editormd_return_json("", "image_too_large", "");
+            }
+
+            require_once ABSPATH . "wp-admin/includes/file.php";
+            require_once ABSPATH . "wp-admin/includes/media.php";
+            require_once ABSPATH . "wp-admin/includes/image.php";
+
+            $overrides = array(
+                "test_form" => false,
+                "test_type" => true,
+                "mimes"     => array(
+                    "png"  => "image/png",
+                    "jpg"  => "image/jpeg",
+                    "jpeg" => "image/jpeg",
+                    "gif"  => "image/gif",
+                    "webp" => "image/webp",
+                ),
+            );
+
+            if ("off" === Config::get_option("image_to_library", "editor_image")) {
+                $_FILES["file"] = $this->maybe_compress_upload($file);
+                $moved = wp_handle_upload($_FILES["file"], $overrides);
+                if (! empty($moved["error"])) {
+                    Ajax::editormd_return_json("", "unknown_error", $moved["error"]);
+                }
+
+                Ajax::editormd_return_json($moved["url"]);
+            }
+
+            $_FILES["file"] = $this->maybe_compress_upload($file);
+
+            $attachment_id = media_handle_upload("file", 0, array(), $overrides);
+            if (is_wp_error($attachment_id)) {
+                Ajax::editormd_return_json("", "unknown_error", $attachment_id->get_error_message());
+            }
+
+            $this->apply_exif_to_attachment($attachment_id, $this->uploaded_exif);
+
+            Ajax::editormd_return_json(wp_get_attachment_url($attachment_id), "", "", array("id" => (int) $attachment_id));
+        } catch (\Throwable $e) {
+            Ajax::editormd_return_json("", "unknown_error", "Exception occurred when uploading:" . $e->getMessage());
+        }
+    }
+
+    private function maybe_compress_upload($file) {
+        if ($this->keep_original_format()) {
+            return $file;
+        }
+
+        $target = $this->target_format();
+        if ("" === $target) {
+            return $file;
+        }
+
+        if (empty($file["tmp_name"]) || ! is_uploaded_file($file["tmp_name"])) {
+            return $file;
+        }
+
+        $info = @getimagesize($file["tmp_name"]);
+        if (false === $info || empty($info["mime"])) {
+            return $file;
+        }
+
+        if ("image/gif" === $info["mime"] && $this->is_animated_gif($file["tmp_name"])) {
+            return $file;
+        }
+
+        $this->uploaded_exif = $this->read_exif_meta($file["tmp_name"]);
+
+        $converted = $this->convert_image($file["tmp_name"], $info["mime"], $target);
+        if (false === $converted) {
+            return $file;
+        }
+
+        $original = $file["tmp_name"];
+        if (false === @copy($converted, $original)) {
+            wp_delete_file($converted);
+            return $file;
+        }
+        wp_delete_file($converted);
+
+        $name = isset($file["name"]) ? $file["name"] : "image";
+        $name = preg_replace("/\.[^.]+$/", "", $name);
+
+        $file["tmp_name"] = $original;
+        $file["name"]     = $name . "." . $target;
+        $file["type"]     = "jpg" === $target ? "image/jpeg" : "image/" . $target;
+        $file["size"]     = (int) filesize($original);
+        $file["error"]    = 0;
+
+        return $file;
+    }
+
+    private function read_exif_meta($file) {
+        if (! function_exists("wp_read_image_metadata")) {
+            require_once ABSPATH . "wp-admin/includes/image.php";
+        }
+
+        if (! function_exists("wp_read_image_metadata")) {
+            return null;
+        }
+
+        $meta = wp_read_image_metadata($file);
+
+        return (is_array($meta) && ! empty($meta)) ? $meta : null;
+    }
+
+    private function apply_exif_to_attachment($attachment_id, $image_meta = null) {
+        if (! is_array($image_meta) || empty($image_meta)) {
+            $meta = wp_get_attachment_metadata($attachment_id);
+            if (! is_array($meta) || empty($meta["image_meta"]) || ! is_array($meta["image_meta"])) {
+                return;
+            }
+            $image_meta = $meta["image_meta"];
+        }
+
+        $post = get_post($attachment_id);
+        if (! $post || "" !== trim((string) $post->post_excerpt)) {
+            return;
+        }
+
+        $description = "";
+        if (! empty($image_meta["caption"])) {
+            $description = (string) $image_meta["caption"];
+        } elseif (! empty($image_meta["title"])) {
+            $description = (string) $image_meta["title"];
+        }
+
+        if ("" === trim($description)) {
+            return;
+        }
+
+        wp_update_post(array(
+            "ID"           => $attachment_id,
+            "post_excerpt" => sanitize_text_field($description),
+        ));
     }
 
     // 入口方法，根据配置进行下一步路由
@@ -138,13 +317,19 @@ class ImagePaste {
             Ajax::editormd_return_json("", $this->last_error !== "" ? $this->last_error : "file_extension_error");
         }
 
-        $this->extension = "jpg";
+        $extension = strtolower(pathinfo($tempFile, PATHINFO_EXTENSION));
+        if (! in_array($extension, array("jpg", "png", "gif", "webp"), true)) {
+            $extension = "jpg";
+        }
+
+        $this->extension = $extension;
         $finalName       = $this->name . "." . $this->extension;
         $targetUrl       = trailingslashit($this->uploadUrl) . $finalName;
 
         if (file_exists(trailingslashit($this->uploadDir) . $finalName)) {
             wp_delete_file($tempFile);
-            Ajax::editormd_return_json($targetUrl);
+            $existing = $this->maybe_register_attachment(trailingslashit($this->uploadDir) . $finalName, $targetUrl);
+            Ajax::editormd_return_json($targetUrl, "", "", $existing ? array("id" => $existing) : array());
         }
 
         $bits = file_get_contents($tempFile);
@@ -159,7 +344,97 @@ class ImagePaste {
             Ajax::editormd_return_json("", "unknown_error", $uploaded["error"]);
         }
 
-        Ajax::editormd_return_json($uploaded["url"]);
+        $attachment_id = $this->maybe_register_attachment($uploaded["file"], $uploaded["url"]);
+
+        Ajax::editormd_return_json($uploaded["url"], "", "", $attachment_id ? array("id" => $attachment_id) : array());
+    }
+
+    private function maybe_register_attachment($file, $url) {
+        if ("off" === Config::get_option("image_to_library", "editor_image")) {
+            return 0;
+        }
+
+        if (function_exists("attachment_url_to_postid")) {
+            $existing = attachment_url_to_postid($url);
+            if ($existing) {
+                return (int) $existing;
+            }
+        }
+
+        if (! $file || ! file_exists($file)) {
+            return 0;
+        }
+
+        if (! function_exists("wp_generate_attachment_metadata")) {
+            require_once ABSPATH . "wp-admin/includes/image.php";
+        }
+
+        $filetype = wp_check_filetype($file);
+
+        $attachment_id = wp_insert_attachment(array(
+            "post_mime_type" => $filetype["type"] ? $filetype["type"] : "image/jpeg",
+            "post_title"     => sanitize_text_field(pathinfo($file, PATHINFO_FILENAME)),
+            "post_content"   => "",
+            "post_status"    => "inherit",
+        ), $file);
+
+        if (is_wp_error($attachment_id) || ! $attachment_id) {
+            return 0;
+        }
+
+        $metadata = wp_generate_attachment_metadata($attachment_id, $file);
+        if (! empty($metadata)) {
+            wp_update_attachment_metadata($attachment_id, $metadata);
+        }
+
+        return (int) $attachment_id;
+    }
+
+    private function pasted_image_quality() {
+        $quality = (int) Config::get_option("image_quality", "editor_image");
+
+        return ($quality >= 1 && $quality <= 100) ? $quality : 80;
+    }
+
+    private function keep_original_format() {
+        return "off" !== Config::get_option("image_keep_origin", "editor_image");
+    }
+
+    private function target_format() {
+        $format = strtolower(trim((string) Config::get_option("image_format", "editor_image")));
+        if (! in_array($format, array("jpg", "png", "webp"), true)) {
+            $format = "webp";
+        }
+
+        if ($this->can_write_format($format)) {
+            return $format;
+        }
+
+        return $this->can_write_format("jpg") ? "jpg" : "";
+    }
+
+    private function can_write_format($format) {
+        switch ($format) {
+            case "png":
+                return function_exists("imagepng");
+            case "webp":
+                return function_exists("imagewebp");
+            case "jpg":
+                return function_exists("imagejpeg");
+        }
+
+        return false;
+    }
+
+    private function extension_for_mime($mime) {
+        $map = array(
+            "image/png"  => "png",
+            "image/gif"  => "gif",
+            "image/webp" => "webp",
+            "image/jpeg" => "jpg",
+        );
+
+        return isset($map[$mime]) ? $map[$mime] : "jpg";
     }
 
     private function editormd_save_to_temp_dir() {
@@ -221,7 +496,64 @@ class ImagePaste {
             return $newFilename;
         }
 
-        return $this->editormd_png2jpg($tempFile, true, $mime);
+        if ($this->keep_original_format()) {
+            $newFilename = $tempFile . "." . $this->extension_for_mime($mime);
+            if (false === @rename($tempFile, $newFilename)) {
+                wp_delete_file($tempFile);
+                $this->last_error = "unknown_error";
+                return false;
+            }
+
+            return $newFilename;
+        }
+
+        if ("image/gif" === $mime && $this->is_animated_gif($tempFile)) {
+            $newFilename = $tempFile . ".gif";
+            if (false === @rename($tempFile, $newFilename)) {
+                wp_delete_file($tempFile);
+                $this->last_error = "unknown_error";
+                return false;
+            }
+
+            return $newFilename;
+        }
+
+        $target = $this->target_format();
+        if ("" !== $target) {
+            $converted = $this->convert_image($tempFile, $mime, $target);
+            if (false !== $converted) {
+                return $converted;
+            }
+        }
+
+        $newFilename = $tempFile . "." . $this->extension_for_mime($mime);
+        if (false === @rename($tempFile, $newFilename)) {
+            wp_delete_file($tempFile);
+            $this->last_error = "unknown_error";
+            return false;
+        }
+
+        return $newFilename;
+    }
+
+    private function is_animated_gif($file) {
+        $handle = @fopen($file, "rb");
+        if (! $handle) {
+            return false;
+        }
+
+        $frames = 0;
+        while (! feof($handle) && $frames < 2) {
+            $chunk = fread($handle, 102400);
+            if (false === $chunk || "" === $chunk) {
+                break;
+            }
+            $frames += (int) preg_match_all("#\x00\x21\xF9\x04.{4}\x00[\x2C\x21]#s", $chunk);
+        }
+
+        fclose($handle);
+
+        return $frames > 1;
     }
 
     private function image_info($file) {
@@ -284,51 +616,93 @@ class ImagePaste {
         return false;
     }
 
-    private function editormd_png2jpg($filePath, $deleteOldFile = true, $mime = "image/png") {
-        $quality = 50;
-
-        $newFilename = $filePath . ".jpg";
+    private function convert_image($filePath, $mime, $target) {
+        $quality = $this->pasted_image_quality();
 
         $image = $this->image_create_from($filePath, $mime);
         if (false === $image) {
-            if ($deleteOldFile) {
-                wp_delete_file($filePath);
-            }
             return false;
         }
 
-        $width  = imagesx($image);
-        $height = imagesy($image);
+        $image = $this->apply_orientation($image, $filePath);
 
-        $bg = imagecreatetruecolor($width, $height);
-        if (false === $bg) {
+        $width       = imagesx($image);
+        $height      = imagesy($image);
+        $newFilename = $filePath . "." . $target;
+
+        if ("png" === $target) {
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            $saved = @imagepng($image, $newFilename, 9);
             imagedestroy($image);
-            if ($deleteOldFile) {
-                wp_delete_file($filePath);
+        } elseif ("webp" === $target) {
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            $saved = @imagewebp($image, $newFilename, $quality);
+            imagedestroy($image);
+        } else {
+            $background = imagecreatetruecolor($width, $height);
+            if (false === $background) {
+                imagedestroy($image);
+                return false;
             }
-            return false;
+
+            imagefill($background, 0, 0, imagecolorallocate($background, 255, 255, 255));
+            imagealphablending($background, true);
+            imagecopy($background, $image, 0, 0, 0, 0, $width, $height);
+            imagedestroy($image);
+
+            $saved = @imagejpeg($background, $newFilename, $quality);
+            imagedestroy($background);
         }
-
-        imagefill($bg, 0, 0, imagecolorallocate($bg, 255, 255, 255));
-        imagealphablending($bg, true);
-        imagecopy($bg, $image, 0, 0, 0, 0, $width, $height);
-        imagedestroy($image);
-
-        $saved = imagejpeg($bg, $newFilename, $quality);
-        imagedestroy($bg);
 
         if (false === $saved) {
-            if ($deleteOldFile) {
-                wp_delete_file($filePath);
+            if (file_exists($newFilename)) {
+                wp_delete_file($newFilename);
             }
             return false;
         }
 
-        if ($deleteOldFile && file_exists($filePath) && $filePath !== $newFilename) {
+        if ($filePath !== $newFilename && file_exists($filePath)) {
             wp_delete_file($filePath);
         }
 
         return $newFilename;
+    }
+
+    private function apply_orientation($image, $file) {
+        if (! function_exists("exif_read_data")) {
+            return $image;
+        }
+
+        $exif = @exif_read_data($file);
+        if (! is_array($exif) || empty($exif["Orientation"])) {
+            return $image;
+        }
+
+        switch ((int) $exif["Orientation"]) {
+            case 3:
+                $angle = 180;
+                break;
+            case 6:
+                $angle = -90;
+                break;
+            case 8:
+                $angle = 90;
+                break;
+            default:
+                return $image;
+        }
+
+        $filler  = imagecolorallocatealpha($image, 0, 0, 0, 127);
+        $rotated = @imagerotate($image, $angle, $filler);
+        if (false === $rotated) {
+            return $image;
+        }
+
+        imagedestroy($image);
+
+        return $rotated;
     }
 
     private function image_create_from($file, $mime) {

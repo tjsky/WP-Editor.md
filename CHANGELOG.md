@@ -10,6 +10,24 @@
 
 ## 简体中文
 
+### Version 10.5.5
+
+> **修代码块的语言名识别与显示，并让粘贴的图片进入媒体库、保留原始画质。**
+
+* **修复**：语言名写成 objective-c、c++、c#、f#、vb.net 的代码块整块不解析，
+  连围栏一起原样输出。现在能正常渲染，语言名也会转换成语法高亮认的写法
+  （objectivec / cpp / csharp / fsharp），编辑器预览与发布后的结果一致。
+* **修复**：代码块里出现过长的单行时，横向溢出正文、把页面撑宽。现在在代码块内横向滚动。
+* **修复**：正文里的行内代码没有底纹，与普通文字混在一起。现在带浅色背景与圆角。
+* **改进**：粘贴的图片会登记到媒体库（设置页可关闭），能参与缩略图生成与后续优化。
+* **改进**：拖入的图片和粘贴的一样，原始文件名与照片里的说明（EXIF）会带进媒体库。
+* **改进**：粘贴的图片默认原样上传，不转码也不压缩，透明背景与动图都保留。
+* **改进**：关掉「保持原格式」后，会按设置压缩成 JPG / PNG / WebP（默认 WebP），压缩率可调（默认 80）。
+* **新增**：上传完成后可自动打开媒体库，方便顺手补标题、说明或替代文本（默认关闭）。
+* **改进**：设置页重组 —— 图片相关的 7 项移到独立的「图片设置」，Emoji 开关并入常规设置；「在新标签页中打开链接」留在常规设置，它对正文里的文字链接同样生效。
+* **修复**：直接覆盖插件文件升级时，图片设置可能丢失。
+* **改进**：从老版本升级的站点保持原有的图片处理方式（仍按 JPG、质量 50 压缩），设置页会提示可以换成体积更小的 WebP。
+
 ### Version 10.5.4
 
 > **修正 10.5.3 的 CDN 资源与安装包不一致的问题；功能没有变化。**
@@ -215,6 +233,37 @@ Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字
 ---
 
 ## English
+
+### Version 10.5.5
+
+> **Fixes code block language detection and rendering, and lets pasted images reach the media library
+> at their original quality.**
+
+* **Fixed**: fenced code blocks whose language name contains `-`, `.`, `+` or `#` (for example
+  objective-c, c++, c#, f#, vb.net) were not parsed at all — the fence and the source
+  were printed verbatim. They now render normally, and the language name is mapped to what the
+  highlighter expects (objectivec / cpp / csharp / fsharp). The editor preview and the saved
+  page now agree.
+* **Fixed**: a very long line inside a code block pushed the whole page wider than the viewport.
+  Code blocks now scroll horizontally instead.
+* **Fixed**: inline code had no background and blended into the surrounding text. It now has a light
+  background and rounded corners.
+* **Improved**: pasted images are registered in the media library (can be turned off in settings), so
+  they get thumbnail sizes and can be optimised later.
+* **Added**: the media library can open right after an upload, so you can add a title,
+  description or alt text without leaving the editor (off by default).
+* **Improved**: settings reorganized — the seven image options moved into a new Image Settings
+  tab, and the Emoji switch moved into Basic Settings. "Open link in new tab" stays in Basic
+  Settings, since it applies to text links as well as image links.
+* **Fixed**: image settings could be lost when the plugin files were overwritten to upgrade.
+* **Improved**: sites upgrading from an older version keep their previous image handling (still
+  compressed to JPG at quality 50), with a notice suggesting a switch to WebP.
+* **Improved**: dropped images keep their original file name and the photo's embedded description
+  (EXIF) in the media library, just like pasted ones.
+* **Improved**: pasted images are uploaded untouched by default: no re-encoding, no compression,
+  transparency and animation preserved.
+* **Improved**: with "keep images as they are" turned off, they are compressed to JPG, PNG or WebP
+  (WebP by default) at a quality you set (default 80).
 
 ### Version 10.5.4
 
@@ -456,6 +505,24 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.5
+
+> **修正程式碼區塊的語言名辨識與顯示，並讓貼上的圖片進入媒體庫、保留原始畫質。**
+
+* **修正**：語言名寫成 objective-c、c++、c#、f#、vb.net 的程式碼區塊整塊不解析，
+  連圍欄一起原樣輸出。現在能正常渲染，語言名也會轉換成語法高亮認的寫法
+  （objectivec / cpp / csharp / fsharp），編輯器預覽與發佈後的結果一致。
+* **修正**：程式碼區塊裡出現過長的單行時，橫向溢出正文、把頁面撐寬。現在在區塊內橫向捲動。
+* **修正**：正文裡的行內程式碼沒有底紋，與普通文字混在一起。現在帶淺色背景與圓角。
+* **改進**：貼上的圖片會登記到媒體庫（設定頁可關閉），能參與縮圖產生與後續最佳化。
+* **改進**：拖入的圖片和貼上的一樣，原始檔名與照片裡的說明（EXIF）會帶進媒體庫。
+* **改進**：貼上的圖片預設原樣上傳，不轉碼也不壓縮，透明背景與動圖都保留。
+* **改進**：關掉「保持原格式」後，會按設定壓縮成 JPG / PNG / WebP（預設 WebP），壓縮率可調（預設 80）。
+* **新增**：上傳完成後可自動開啟媒體庫，方便順手補標題、說明或替代文字（預設關閉）。
+* **改進**：設定頁重組 —— 圖片相關的 7 項移到獨立的「圖片設定」，Emoji 開關併入一般設定；「在新分頁中開啟連結」留在一般設定，它對正文裡的文字連結同樣生效。
+* **修正**：直接覆蓋外掛檔案升級時，圖片設定可能遺失。
+* **改進**：從舊版本升級的站點保持原有的圖片處理方式（仍按 JPG、品質 50 壓縮），設定頁會提示可以換成體積更小的 WebP。
 
 ### Version 10.5.4
 
