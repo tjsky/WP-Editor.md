@@ -4,7 +4,7 @@ Donate link: https://untitled.pw/
 Tags: Editor, Markdown, Markdown Editor, LaTeX, KaTeX, PrismJS, Mermaid
 Requires at least: 5.0
 Tested up to: 7.1
-Stable tag: 10.5.6
+Stable tag: 10.5.7
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,6 +69,9 @@ We recommend that you enable plugins in a clean environment (please disable othe
 2. Editor.md Interface - Page Display
 
 == Changelog ==
+
+= 10.5.7 =
+* 缺陷修复：升级到 10.5.6 后部分后台页面打不开；已在 10.5.6 的站点覆盖安装本版即可恢复
 
 = 10.5.6 =
 * 缺陷修复：设置过静态资源完整性校验（integrity）的站点，升级后浏览器会拒绝加载编辑器的

@@ -198,7 +198,6 @@ class AssetsIntegrity {
         return self::$map;
     }
 
-    /**
     public static function current_map() {
         if (null !== self::$current) {
             return self::$current;
@@ -268,9 +267,6 @@ class AssetsIntegrity {
         return false;
     }
 
-     *
-     * @return bool
-     */
     public static function has_entries() {
         return ! empty(self::effective_map());
     }

@@ -56,6 +56,8 @@ class Upgrader {
                 $this->upgrade_to_10_5_5();
             case "10.5.5":
                 $this->upgrade_10_5_5_to_10_5_6();
+            case "10.5.6":
+                $this->upgrade_to_10_5_7();
             default:
                 break;
         }
@@ -85,6 +87,10 @@ class Upgrader {
 
     private function upgrade_to_10_5_5() {
         $this->update_to_version("10.5.5");
+    }
+
+    private function upgrade_to_10_5_7() {
+        $this->update_to_version("10.5.7");
     }
 
     private function upgrade_10_5_5_to_10_5_6() {

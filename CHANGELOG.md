@@ -10,6 +10,10 @@
 
 ## 简体中文
 
+### Version 10.5.7
+
+* **修复**：升级到 10.5.6 后部分后台页面打不开的问题。已经升到 10.5.6 的站点，覆盖安装本版即可恢复，不需要手动改文件。
+
 ### Version 10.5.6
 
 > **升级后不用再手动更新完整性校验值，忘了也不会让编辑器崩掉。**
@@ -240,6 +244,11 @@ Markdown 编辑器，两边各说各话 —— 弹出来的编辑器里一个字
 ---
 
 ## English
+
+### Version 10.5.7
+
+* **Fixed**: after updating to 10.5.6, some admin pages could not be opened. Sites already on
+  10.5.6 recover by installing this version over it — no manual file changes needed.
 
 ### Version 10.5.6
 
@@ -524,6 +533,10 @@ settings are cleaned up on upgrade.
 ---
 
 ## 繁體中文
+
+### Version 10.5.7
+
+* **修正**：升級到 10.5.6 後部分後台頁面打不開的問題。已經升到 10.5.6 的站點，覆蓋安裝本版即可恢復，不需要手動改檔案。
 
 ### Version 10.5.6
 
